@@ -1,0 +1,30 @@
+version: "3.9"
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: flexlease-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: flexlease
+      POSTGRES_PASSWORD: flexlease
+      POSTGRES_DB: flexlease
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+  redis:
+    image: redis:7-alpine
+    container_name: flexlease-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: flexlease-rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+volumes:
+  postgres-data:

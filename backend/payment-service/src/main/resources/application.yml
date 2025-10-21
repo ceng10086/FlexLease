@@ -1,0 +1,10 @@
+spring:
+  application:
+    name: payment-service
+server:
+  port: 9005
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
