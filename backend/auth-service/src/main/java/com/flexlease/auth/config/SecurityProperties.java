@@ -8,6 +8,7 @@ public class SecurityProperties {
         private String secret = "flexlease-default-secret-please-change";
         private long accessTokenTtlSeconds = 3600;
         private String issuer = "flexlease-auth-service";
+        private String internalAccessToken = "flexlease-internal-secret";
 
         public String getSecret() {
                 return secret;
@@ -36,6 +37,16 @@ public class SecurityProperties {
         public void setIssuer(String issuer) {
                 if (issuer != null && !issuer.isBlank()) {
                         this.issuer = issuer;
+                }
+        }
+
+        public String getInternalAccessToken() {
+                return internalAccessToken;
+        }
+
+        public void setInternalAccessToken(String internalAccessToken) {
+                if (internalAccessToken != null && !internalAccessToken.isBlank()) {
+                        this.internalAccessToken = internalAccessToken;
                 }
         }
 }

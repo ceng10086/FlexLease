@@ -1,16 +1,32 @@
-import axios from 'axios';
-import type { AxiosError, AxiosRequestConfig, AxiosResponse } from 'axios';
-import { useAuthStore } from '../stores/auth';
+import axios, { AxiosHeaders } from 'axios';
+import type { AxiosError, AxiosResponse, InternalAxiosRequestConfig } from 'axios';
+
+type AuthHandlers = {
+  getToken: () => string | null;
+  clearSession: () => void;
+};
+
+let authHandlers: AuthHandlers = {
+  getToken: () => null,
+  clearSession: () => undefined
+};
+
+export const configureApiAuth = (handlers: AuthHandlers) => {
+  authHandlers = handlers;
+};
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL ?? '/api/v1'
 });
 
-api.interceptors.request.use((config: AxiosRequestConfig) => {
-  const auth = useAuthStore();
-  if (auth.token) {
-    config.headers = config.headers ?? {};
-    config.headers.Authorization = `Bearer ${auth.token}`;
+api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+  const token = authHandlers.getToken();
+  if (token) {
+    const headers = config.headers instanceof AxiosHeaders
+      ? config.headers
+      : new AxiosHeaders(config.headers);
+    headers.set('Authorization', `Bearer ${token}`);
+    config.headers = headers;
   }
   return config;
 });
@@ -18,9 +34,8 @@ api.interceptors.request.use((config: AxiosRequestConfig) => {
 api.interceptors.response.use(
   (response: AxiosResponse) => response,
   (error: AxiosError) => {
-    const auth = useAuthStore();
     if (error.response?.status === 401) {
-      auth.clearSession();
+      authHandlers.clearSession();
     }
     return Promise.reject(error);
   }

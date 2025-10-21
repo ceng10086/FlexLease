@@ -6,6 +6,7 @@ import com.flexlease.user.domain.VendorApplication;
 import com.flexlease.user.domain.VendorApplicationStatus;
 import com.flexlease.user.dto.VendorApplicationRequest;
 import com.flexlease.user.dto.VendorApplicationResponse;
+import com.flexlease.user.integration.AuthServiceClient;
 import com.flexlease.user.repository.VendorApplicationRepository;
 import java.util.List;
 import java.util.UUID;
@@ -16,9 +17,12 @@ import org.springframework.transaction.annotation.Transactional;
 public class VendorApplicationService {
 
     private final VendorApplicationRepository vendorApplicationRepository;
+    private final AuthServiceClient authServiceClient;
 
-    public VendorApplicationService(VendorApplicationRepository vendorApplicationRepository) {
+    public VendorApplicationService(VendorApplicationRepository vendorApplicationRepository,
+                                    AuthServiceClient authServiceClient) {
         this.vendorApplicationRepository = vendorApplicationRepository;
+        this.authServiceClient = authServiceClient;
     }
 
     @Transactional
@@ -62,7 +66,11 @@ public class VendorApplicationService {
     public VendorApplicationResponse approve(UUID applicationId, UUID reviewerId, String remark) {
         VendorApplication application = vendorApplicationRepository.findById(applicationId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "厂商申请不存在"));
+        if (application.getStatus() != VendorApplicationStatus.SUBMITTED) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "仅允许审核状态为 SUBMITTED 的申请");
+        }
         application.approve(reviewerId, remark);
+        authServiceClient.activateAccount(application.getOwnerUserId());
         return toResponse(application);
     }
 
@@ -70,6 +78,9 @@ public class VendorApplicationService {
     public VendorApplicationResponse reject(UUID applicationId, UUID reviewerId, String remark) {
         VendorApplication application = vendorApplicationRepository.findById(applicationId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "厂商申请不存在"));
+        if (application.getStatus() != VendorApplicationStatus.SUBMITTED) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "仅允许驳回状态为 SUBMITTED 的申请");
+        }
         application.reject(reviewerId, remark);
         return toResponse(application);
     }

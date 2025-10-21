@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { message } from 'ant-design-vue';
-import api from '../utils/api';
+import api, { configureApiAuth } from '../utils/api';
 
 export type UserSummary = {
   id: string;
@@ -32,6 +32,11 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = null;
     localStorage.removeItem(TOKEN_KEY);
   };
+
+  configureApiAuth({
+    getToken: () => (token.value ? token.value : null),
+    clearSession
+  });
 
   const fetchProfile = async (): Promise<UserSummary> => {
     const response = await api.get('/auth/me');

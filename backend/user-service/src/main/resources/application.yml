@@ -25,3 +25,8 @@ management:
     web:
       exposure:
         include: health,info
+
+flexlease:
+  auth-service:
+    base-url: http://localhost:9001
+    internal-token: flexlease-internal-secret

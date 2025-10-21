@@ -65,4 +65,12 @@ public class UserAccountService {
             account.updateLastLoginAt(OffsetDateTime.now());
         });
     }
+
+    @Transactional
+    public UserAccount updateStatus(UUID userId, UserStatus status) {
+        UserAccount account = userAccountRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "账号不存在"));
+        account.updateStatus(status);
+        return account;
+    }
 }

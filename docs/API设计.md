@@ -36,6 +36,13 @@
 | POST | `/auth/logout` | 注销（失效 token） |
 | POST | `/auth/password/reset` | 重置密码（短信/邮箱验证码） |
 
+### 2.3 内部接口
+> 内部接口供微服务之间调用，需在请求头中携带 `X-Internal-Token`，默认值可在配置中覆盖。
+
+| 方法 | URL | 描述 | 备注 |
+| ---- | --- | ---- | ---- |
+| PATCH | `/internal/users/{userId}/status` | 更新指定账号状态 | 典型用例：厂商入驻审核通过后将账号从 `PENDING_REVIEW` 调整为 `ENABLED`；支持状态枚举 `ENABLED` / `DISABLED` |
+
 ## 3. 用户 & 厂商管理（user-service）
 ### 3.1 厂商入驻
 | 方法 | URL | 角色 | 描述 |

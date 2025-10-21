@@ -8,16 +8,23 @@ FlexLease 是一个面向 B2C 模式的共享租赁平台，支持厂商入驻�
 - ✅ 多模块 Spring Boot 微服务骨架（见 `backend/`）
 - ✅ 认证中心支持用户注册、登录与 JWT 发放（Iteration 1）
 - ✅ 用户服务支持厂商入驻申请与审批（Iteration 1）
+- ✅ 厂商审核通过后自动激活账号（User Service → Auth Service 内部 API）
 - ✅ 前端管理端完成登录与基础仪表盘骨架（Iteration 1）
 - ✅ PostgreSQL schema 迁移基线与迭代脚本（见 `db/`）
 - ✅ GitHub Actions CI 草稿（待补充）
 
 ## 快速开始
 ```powershell
-# 在仓库根目录
-mvn -pl backend/auth-service spring-boot:run
+# 在仓库根目录打开两个 PowerShell 终端
+mvn -pl backend/auth-service spring-boot:run   # 终端 A，端口 9001
+mvn -pl backend/user-service spring-boot:run   # 终端 B，端口 9002
 ```
 > 各服务 `application.yml` 默认端口：Auth 9001、User 9002、Product 9003、Order 9004、Payment 9005、Notification 9006、Gateway 8080。
+
+> **内部访问令牌**：`auth-service` 的 `/api/v1/internal/**` 接口需携带 `X-Internal-Token` 请求头。默认值为 `flexlease-internal-secret`，可分别通过
+> `security.jwt.internal-access-token`（认证服务）与 `flexlease.auth-service.internal-token`（调用方，如用户服务）自定义。用户服务在审核厂商时会通过该接口将账号状态从 `PENDING_REVIEW` 激活为 `ENABLED`。
+
+完成启动后，可参考 `docs/API设计.md` 的示例调用“注册厂商 → 提交申请 → 审批 → 登录”链路验证系统行为。
 
 ## 目录结构
 ```

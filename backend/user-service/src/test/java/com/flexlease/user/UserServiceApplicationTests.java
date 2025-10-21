@@ -12,9 +12,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import static org.mockito.Mockito.verify;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -25,6 +27,9 @@ class UserServiceApplicationTests {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @MockBean
+    private com.flexlease.user.integration.AuthServiceClient authServiceClient;
 
     @Test
     void vendorApplicationLifecycle() throws Exception {
@@ -63,6 +68,8 @@ class UserServiceApplicationTests {
 
     JsonNode approveNode = objectMapper.readTree(approveResult.getResponse().getContentAsString());
     assertThat(approveNode.at("/data/status").asText()).isEqualTo("APPROVED");
+
+    verify(authServiceClient).activateAccount(ownerId);
 
     mockMvc.perform(get("/api/v1/vendors/applications/" + applicationId))
         .andExpect(status().isOk());
