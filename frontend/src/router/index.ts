@@ -18,6 +18,18 @@ const router = createRouter({
       meta: { requiresAuth: true }
     },
     {
+      path: '/products',
+      name: 'products',
+      component: () => import('../views/ProductManagementView.vue'),
+      meta: { requiresAuth: true }
+    },
+    {
+      path: '/admin/products',
+      name: 'admin-products',
+      component: () => import('../views/AdminProductView.vue'),
+      meta: { requiresAuth: true, roles: ['ADMIN'] }
+    },
+    {
       path: '/:pathMatch(.*)*',
       redirect: '/'
     }
@@ -40,6 +52,15 @@ router.beforeEach(async (to: RouteLocationNormalized) => {
 
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
     return { path: '/login', query: { redirect: to.fullPath } };
+  }
+
+  const requiredRoles = to.meta.roles as string[] | undefined;
+  if (requiredRoles && requiredRoles.length > 0) {
+    const userRoles = auth.user?.roles ?? [];
+    const hasRole = userRoles.some((role) => requiredRoles.includes(role));
+    if (!hasRole) {
+      return { path: '/' };
+    }
   }
 
   return true;

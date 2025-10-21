@@ -42,6 +42,12 @@
               <a-step title="商品与租赁配置" description="配置租赁方案、库存与商品上下架。" />
               <a-step title="订单与履约" description="处理订单履约、续租、退租与售后。" />
             </a-steps>
+            <div class="dashboard__shortcuts">
+              <a-space>
+                <a-button type="primary" @click="goProducts" v-if="isVendor">管理我的商品</a-button>
+                <a-button @click="goAdminProducts" v-if="isAdmin">审核商品</a-button>
+              </a-space>
+            </div>
           </a-card>
         </a-col>
       </a-row>
@@ -74,6 +80,17 @@ const initials = computed(() => {
   const [first] = auth.user.username.split('');
   return first?.toUpperCase() ?? 'U';
 });
+
+const isAdmin = computed(() => auth.user?.roles?.includes('ADMIN'));
+const isVendor = computed(() => auth.user?.roles?.includes('VENDOR'));
+
+const goProducts = () => {
+  router.push({ name: 'products' });
+};
+
+const goAdminProducts = () => {
+  router.push({ name: 'admin-products' });
+};
 
 const handleLogout = () => {
   auth.logout();
@@ -129,5 +146,9 @@ const handleLogout = () => {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.dashboard__shortcuts {
+  margin-top: 24px;
 }
 </style>
