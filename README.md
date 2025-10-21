@@ -1,13 +1,14 @@
 # FlexLease 智能共享租赁平台
 
 ## 简介
-FlexLease 是一个面向 B2C 模式的共享租赁平台，支持厂商入驻、商品租赁、订单履约与支付结算等完整业务流程。本仓库当前处于 Iteration 0 阶段，完成了基础骨架与环境搭建。
+FlexLease 是一个面向 B2C 模式的共享租赁平台，支持厂商入驻、商品租赁、订单履约与支付结算等完整业务流程。本仓库当前处于 Iteration 1 阶段，已完成基础骨架、认证与厂商入驻等首批能力。
 
 ## 当前进展
 - ✅ 项目规划文档与数据库/API 设计初稿（见 `docs/`）
-- ✅ 多模块 Spring Boot 微服务骨架（见 `backend/`）
+- ✅ 多模块 Spring Boot 微服务骨架（Iteration 0，见 `backend/`）
 - ✅ 认证中心支持用户注册、登录与 JWT 发放（Iteration 1）
 - ✅ 用户服务支持厂商入驻申请与审批（Iteration 1）
+- ✅ 前端管理端完成登录与基础仪表盘骨架（Iteration 1）
 - ✅ 厂商审核通过后自动激活账号（User Service → Auth Service 内部 API）
 - ✅ 前端管理端完成登录与基础仪表盘骨架（Iteration 1）
 - ✅ PostgreSQL schema 迁移基线与迭代脚本（见 `db/`）
