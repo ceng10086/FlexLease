@@ -8,6 +8,7 @@ FlexLease 是一个面向 B2C 模式的共享租赁平台，支持厂商入驻�
 - ✅ 多模块 Spring Boot 微服务骨架（见 `backend/`）
 - ✅ 认证中心支持用户注册、登录与 JWT 发放（Iteration 1）
 - ✅ 用户服务支持厂商入驻申请与审批（Iteration 1）
+- ✅ 前端管理端完成登录与基础仪表盘骨架（Iteration 1）
 - ✅ PostgreSQL schema 迁移基线与迭代脚本（见 `db/`）
 - ✅ GitHub Actions CI 草稿（待补充）
 
