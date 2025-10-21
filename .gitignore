@@ -1,0 +1,49 @@
+# Java / Maven
+/target/
+/**/*.iml
+/.project
+/.classpath
+/.settings/
+
+# Gradle
+gradle-app.settings
+gradle-app.iml
+.gradle/
+build/
+
+# Spring Boot
+/logs/
+/tmp/
+
+# Node / Frontend
+node_modules/
+dist/
+yarn-error.log
+pnpm-debug.log
+npm-debug.log
+*.local
+
+# IDE & Editor
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.*
+*.log
+!.gitkeep
+
+# Docker
+**/docker-data/
+**/docker-compose.override.yml
+
+# Tests
+/test-output/
+/coverage/
+
+# Misc
+*.bak
+*.tmp
