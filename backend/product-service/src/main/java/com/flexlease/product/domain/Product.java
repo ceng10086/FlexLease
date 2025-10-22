@@ -181,11 +181,11 @@ public class Product {
         this.reviewedBy = reviewerId;
     }
 
-    public void markRejected(String remark) {
+    public void markRejected(UUID reviewerId, String remark) {
         this.status = ProductStatus.REJECTED;
         this.reviewedAt = OffsetDateTime.now();
         this.reviewRemark = remark;
-        this.reviewedBy = null;
+        this.reviewedBy = reviewerId;
     }
 
     public void markInactive() {

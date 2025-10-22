@@ -98,21 +98,21 @@ public class VendorProductController {
                                                              @PathVariable UUID productId,
                                                              @PathVariable UUID planId,
                                                              @Valid @RequestBody RentalPlanRequest request) {
-        return ApiResponse.success(vendorProductService.updatePlan(vendorId, planId, request));
+        return ApiResponse.success(vendorProductService.updatePlan(vendorId, productId, planId, request));
     }
 
     @PostMapping("/{productId}/rental-plans/{planId}/activate")
     public ApiResponse<RentalPlanResponse> activateRentalPlan(@PathVariable UUID vendorId,
                                                                @PathVariable UUID productId,
                                                                @PathVariable UUID planId) {
-        return ApiResponse.success(vendorProductService.activatePlan(vendorId, planId));
+        return ApiResponse.success(vendorProductService.activatePlan(vendorId, productId, planId));
     }
 
     @PostMapping("/{productId}/rental-plans/{planId}/deactivate")
     public ApiResponse<RentalPlanResponse> deactivateRentalPlan(@PathVariable UUID vendorId,
                                                                  @PathVariable UUID productId,
                                                                  @PathVariable UUID planId) {
-        return ApiResponse.success(vendorProductService.deactivatePlan(vendorId, planId));
+        return ApiResponse.success(vendorProductService.deactivatePlan(vendorId, productId, planId));
     }
 
     @PostMapping("/{productId}/rental-plans/{planId}/skus")
@@ -120,7 +120,7 @@ public class VendorProductController {
                                                @PathVariable UUID productId,
                                                @PathVariable UUID planId,
                                                @Valid @RequestBody SkuRequest request) {
-        return ApiResponse.success(vendorProductService.createSku(vendorId, planId, request));
+        return ApiResponse.success(vendorProductService.createSku(vendorId, productId, planId, request));
     }
 
     @PutMapping("/{productId}/rental-plans/{planId}/skus/{skuId}")
@@ -129,7 +129,7 @@ public class VendorProductController {
                                                @PathVariable UUID planId,
                                                @PathVariable UUID skuId,
                                                @Valid @RequestBody SkuRequest request) {
-        return ApiResponse.success(vendorProductService.updateSku(vendorId, planId, skuId, request));
+        return ApiResponse.success(vendorProductService.updateSku(vendorId, productId, planId, skuId, request));
     }
 
     @PostMapping("/{productId}/rental-plans/{planId}/skus/{skuId}/inventory/adjust")
@@ -138,6 +138,6 @@ public class VendorProductController {
                                                      @PathVariable UUID planId,
                                                      @PathVariable UUID skuId,
                                                      @Valid @RequestBody InventoryAdjustRequest request) {
-        return ApiResponse.success(vendorProductService.adjustInventory(vendorId, planId, skuId, request));
+        return ApiResponse.success(vendorProductService.adjustInventory(vendorId, productId, planId, skuId, request));
     }
 }

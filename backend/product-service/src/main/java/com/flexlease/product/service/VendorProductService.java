@@ -151,8 +151,8 @@ public class VendorProductService {
         return assembler.toRentalPlanResponse(plan);
     }
 
-    public RentalPlanResponse updatePlan(UUID vendorId, UUID planId, RentalPlanRequest request) {
-        RentalPlan plan = getPlanForVendor(vendorId, planId);
+    public RentalPlanResponse updatePlan(UUID vendorId, UUID productId, UUID planId, RentalPlanRequest request) {
+        RentalPlan plan = getPlanForVendor(vendorId, productId, planId);
         if (plan.getStatus() == RentalPlanStatus.ACTIVE) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "启用中的方案请先停用再修改");
         }
@@ -167,8 +167,8 @@ public class VendorProductService {
         return assembler.toRentalPlanResponse(plan);
     }
 
-    public RentalPlanResponse activatePlan(UUID vendorId, UUID planId) {
-        RentalPlan plan = getPlanForVendor(vendorId, planId);
+    public RentalPlanResponse activatePlan(UUID vendorId, UUID productId, UUID planId) {
+        RentalPlan plan = getPlanForVendor(vendorId, productId, planId);
         if (plan.getStatus() == RentalPlanStatus.ACTIVE) {
             return assembler.toRentalPlanResponse(plan);
         }
@@ -176,8 +176,8 @@ public class VendorProductService {
         return assembler.toRentalPlanResponse(plan);
     }
 
-    public RentalPlanResponse deactivatePlan(UUID vendorId, UUID planId) {
-        RentalPlan plan = getPlanForVendor(vendorId, planId);
+    public RentalPlanResponse deactivatePlan(UUID vendorId, UUID productId, UUID planId) {
+        RentalPlan plan = getPlanForVendor(vendorId, productId, planId);
         if (plan.getStatus() == RentalPlanStatus.INACTIVE) {
             return assembler.toRentalPlanResponse(plan);
         }
@@ -185,8 +185,8 @@ public class VendorProductService {
         return assembler.toRentalPlanResponse(plan);
     }
 
-    public SkuResponse createSku(UUID vendorId, UUID planId, SkuRequest request) {
-        RentalPlan plan = getPlanForVendor(vendorId, planId);
+    public SkuResponse createSku(UUID vendorId, UUID productId, UUID planId, SkuRequest request) {
+        RentalPlan plan = getPlanForVendor(vendorId, productId, planId);
         productSkuRepository.findBySkuCodeIgnoreCase(request.skuCode()).ifPresent(existing -> {
             throw new BusinessException(ErrorCode.DUPLICATE_RESOURCE, "SKU 编码已存在");
         });
@@ -206,8 +206,8 @@ public class VendorProductService {
         return assembler.toSkuResponse(sku);
     }
 
-    public SkuResponse updateSku(UUID vendorId, UUID planId, UUID skuId, SkuRequest request) {
-        RentalPlan plan = getPlanForVendor(vendorId, planId);
+    public SkuResponse updateSku(UUID vendorId, UUID productId, UUID planId, UUID skuId, SkuRequest request) {
+        RentalPlan plan = getPlanForVendor(vendorId, productId, planId);
         ProductSku sku = productSkuRepository.findByIdAndProductId(skuId, plan.getProduct().getId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "SKU 不存在"));
         productSkuRepository.findBySkuCodeIgnoreCase(request.skuCode()).ifPresent(existing -> {
@@ -228,8 +228,8 @@ public class VendorProductService {
         return assembler.toSkuResponse(sku);
     }
 
-    public SkuResponse adjustInventory(UUID vendorId, UUID planId, UUID skuId, InventoryAdjustRequest request) {
-        RentalPlan plan = getPlanForVendor(vendorId, planId);
+    public SkuResponse adjustInventory(UUID vendorId, UUID productId, UUID planId, UUID skuId, InventoryAdjustRequest request) {
+        RentalPlan plan = getPlanForVendor(vendorId, productId, planId);
         ProductSku sku = productSkuRepository.findByIdAndProductId(skuId, plan.getProduct().getId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "SKU 不存在"));
         int quantity = request.quantity();
@@ -267,11 +267,14 @@ public class VendorProductService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "商品不存在"));
     }
 
-    private RentalPlan getPlanForVendor(UUID vendorId, UUID planId) {
+    private RentalPlan getPlanForVendor(UUID vendorId, UUID productId, UUID planId) {
         RentalPlan plan = rentalPlanRepository.findById(planId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "租赁方案不存在"));
         if (!plan.getProduct().getVendorId().equals(vendorId)) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "无权操作此租赁方案");
+        }
+        if (!plan.getProduct().getId().equals(productId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "租赁方案不属于指定商品");
         }
         return plan;
     }

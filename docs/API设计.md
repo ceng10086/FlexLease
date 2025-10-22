@@ -15,45 +15,52 @@
 - **分页参数**：`page`（从 1 起）、`size`、`sort`（如 `createdAt,desc`）。
 - **时间格式**：ISO 8601（UTC），示例 `2025-01-15T08:00:00Z`。
 - **幂等**：下单、支付相关接口支持 Idempotency-Key 请求头。
-- **错误码**：
-  - `1000` 通用失败
-  - `2001` 未登录/令牌失效
-  - `300X` 业务错误（库存不足、状态不允许）
+- **错误码**（参考 `platform-common` 枚举）：
+  - `0` 成功
+  - `1001` 参数校验失败
+  - `1002` 资源不存在
+  - `1003` 资源已存在
+  - `2001` 未认证
+  - `2003` 无权访问
+  - `2004` 凭证错误
+  - `5000` 系统异常
 
 ## 2. 认证与账号
-### 2.1 注册登录
-| 方法 | URL | 描述 | 请求体 | 响应 |
-| ---- | --- | ---- | ------ | ---- |
-| POST | `/auth/register/customer` | C 端注册 | `{username,password,phone,verificationCode}` | 创建用户 |
-| POST | `/auth/register/vendor` | B 端厂商管理员注册 | `{username,password,companyName,...}` | 返回入驻申请编号 |
-| POST | `/auth/token` | 获取访问令牌 | `grant_type=password` 或 `client_credentials` | `{access_token, refresh_token, expires_in}` |
-| POST | `/auth/token/refresh` | 刷新令牌 | `{refresh_token}` | 新 token |
+### 2.1 注册登录（已实现）
+| 方法 | URL | 描述 | 请求体 | 响应关键字段 |
+| ---- | --- | ---- | ------ | ------------ |
+| POST | `/auth/register/customer` | C 端注册 | `{ "username", "password" }` | `id`, `username`, `roles` |
+| POST | `/auth/register/vendor` | 厂商管理员注册 | `{ "username", "password" }` | `id`, `username`, `roles` |
+| POST | `/auth/token` | 获取访问令牌 | `{ "username", "password" }` | `accessToken`, `expiresInSeconds` |
+| GET | `/auth/me` | 获取当前登录用户信息 | `Authorization: Bearer <token>` | `id`, `username`, `roles`, `lastLoginAt` |
 
-### 2.2 账号管理
-| 方法 | URL | 描述 |
-| ---- | --- | ---- |
-| GET | `/auth/me` | 获取当前登录用户信息 |
-| POST | `/auth/logout` | 注销（失效 token） |
-| POST | `/auth/password/reset` | 重置密码（短信/邮箱验证码） |
+> 说明：注册接口当前仅返回账号摘要，厂商入驻详情在用户服务中维护；`/auth/token` 使用 JSON 请求体而非表单。
+
+### 2.2 账号管理（规划中）
+| 方法 | URL | 描述 | 状态 |
+| ---- | --- | ---- | ---- |
+| POST | `/auth/logout` | 注销（失效 token） | 待实现 |
+| POST | `/auth/password/reset` | 重置密码 | 待实现 |
+| POST | `/auth/token/refresh` | 刷新令牌 | 待实现 |
 
 ### 2.3 内部接口
 > 内部接口供微服务之间调用，需在请求头中携带 `X-Internal-Token`，默认值可在配置中覆盖。
 
 | 方法 | URL | 描述 | 备注 |
 | ---- | --- | ---- | ---- |
-| PATCH | `/internal/users/{userId}/status` | 更新指定账号状态 | 典型用例：厂商入驻审核通过后将账号从 `PENDING_REVIEW` 调整为 `ENABLED`；支持状态枚举 `ENABLED` / `DISABLED` |
+| PATCH | `/internal/users/{userId}/status` | 更新指定账号状态 | 典型用例：厂商入驻审核通过后将账号从 `PENDING_REVIEW` 调整为 `ENABLED`；支持 `ENABLED`/`DISABLED`，请求体 `{ "status": "ENABLED" }` |
 
 ## 3. 用户 & 厂商管理（user-service）
 ### 3.1 厂商入驻
-| 方法 | URL | 角色 | 描述 |
-| ---- | --- | ---- | ---- |
-| POST | `/vendors/applications` | VENDOR | 提交入驻资料 |
-| GET | `/vendors/applications/{id}` | ADMIN/VENDOR(本人) | 查看申请详情 |
-| GET | `/vendors/applications` | ADMIN | 分页查询（支持状态过滤） |
-| POST | `/vendors/applications/{id}/approve` | ADMIN | 审核通过 |
-| POST | `/vendors/applications/{id}/reject` | ADMIN | 审核驳回 |
+| 方法 | URL | 角色 | 描述 | 备注 |
+| ---- | --- | ---- | ---- | ---- |
+| POST | `/vendors/applications` | 厂商 | 提交入驻资料 | 需要 `X-User-Id` 头标识申请人 |
+| GET | `/vendors/applications/{id}` | 管理员/申请人 | 查看申请详情 | - |
+| GET | `/vendors/applications` | 管理员 | 列表查询 | 支持 `status` 过滤 |
+| POST | `/vendors/applications/{id}/approve` | 管理员 | 审核通过 | 请求体 `{ reviewerId, remark }`，调用认证服务激活账号 |
+| POST | `/vendors/applications/{id}/reject` | 管理员 | 审核驳回 | 请求体 `{ reviewerId, remark }` |
 
-### 3.2 厂商资料
+### 3.2 厂商资料（规划中）
 | 方法 | URL | 角色 | 描述 |
 | ---- | --- | ---- | ---- |
 | GET | `/vendors` | ADMIN | 分页查询厂商 |
@@ -61,7 +68,7 @@
 | PUT | `/vendors/{vendorId}` | VENDOR | 更新资料 |
 | POST | `/vendors/{vendorId}/suspend` | ADMIN | 冻结账号 |
 
-### 3.3 用户资料
+### 3.3 用户资料（规划中）
 | 方法 | URL | 角色 | 描述 |
 | ---- | --- | ---- | ---- |
 | GET | `/customers/profile` | USER | 获取个人资料 |
@@ -71,42 +78,41 @@
 
 ## 4. 商品与租赁方案（product-service）
 ### 4.1 商品管理（B 端）
-| 方法 | URL | 描述 |
-| ---- | --- | ---- |
-| POST | `/vendors/{vendorId}/products` | 创建商品 |
-| GET | `/vendors/{vendorId}/products` | 商品列表 |
-| GET | `/vendors/{vendorId}/products/{productId}` | 商品详情 |
-| PUT | `/vendors/{vendorId}/products/{productId}` | 修改商品 |
-| POST | `/vendors/{vendorId}/products/{productId}/submit` | 提交审核 |
-| POST | `/vendors/{vendorId}/products/{productId}/shelve` | 上架/下架 |
+| 方法 | URL | 描述 | 备注 |
+| ---- | --- | ---- | ---- |
+| POST | `/vendors/{vendorId}/products` | 创建商品 | 请求体 `{ name, categoryCode, description?, coverImageUrl? }` |
+| GET | `/vendors/{vendorId}/products` | 商品列表 | 支持 `page/size/status/keyword` 查询 |
+| GET | `/vendors/{vendorId}/products/{productId}` | 商品详情 | 返回租赁方案 & SKU 列表 |
+| PUT | `/vendors/{vendorId}/products/{productId}` | 修改商品 | 审核中商品不可修改 |
+| POST | `/vendors/{vendorId}/products/{productId}/submit` | 提交审核 | 需至少配置 1 个租赁方案 |
+| POST | `/vendors/{vendorId}/products/{productId}/shelve` | 上/下架商品 | 请求体 `{ "publish": true|false }`，仅 ACTIVE/INACTIVE 状态转换 |
 
 ### 4.2 商品审核（管理员）
-| 方法 | URL | 描述 |
-| ---- | --- | ---- |
-| GET | `/admin/products/pending` | 待审核列表 |
-| POST | `/admin/products/{productId}/approve` | 审核通过 |
-| POST | `/admin/products/{productId}/reject` | 审核驳回 |
+| 方法 | URL | 描述 | 备注 |
+| ---- | --- | ---- | ---- |
+| GET | `/admin/products` | 商品列表 | 默认筛选待审核，可指定 `status` |
+| POST | `/admin/products/{productId}/approve` | 审核通过 | 请求体 `{ reviewerId, remark? }`，置状态 `ACTIVE` |
+| POST | `/admin/products/{productId}/reject` | 审核驳回 | 请求体 `{ reviewerId, remark? }`，置状态 `REJECTED` |
 
 ### 4.3 租赁方案与 SKU
-| 方法 | URL | 描述 |
-| ---- | --- | ---- |
-| POST | `/products/{productId}/rental-plans` | 新增租赁方案 |
-| GET | `/products/{productId}/rental-plans` | 列表 |
-| PUT | `/rental-plans/{planId}` | 更新方案 |
-| POST | `/rental-plans/{planId}/activate` | 启用 |
-| POST | `/rental-plans/{planId}/deactivate` | 停用 |
-| POST | `/rental-plans/{planId}/skus` | 新增 SKU |
-| PUT | `/rental-plans/{planId}/skus/{skuId}` | 编辑 SKU |
-| POST | `/rental-plans/{planId}/skus/{skuId}/inventory/adjust` | 调整库存 |
+| 方法 | URL | 描述 | 备注 |
+| ---- | --- | ---- | ---- |
+| GET | `/vendors/{vendorId}/products/{productId}/rental-plans` | 查询方案 | - |
+| POST | `/vendors/{vendorId}/products/{productId}/rental-plans` | 新增方案 | `{ planType, termMonths, depositAmount, rentAmountMonthly, ... }` |
+| PUT | `/vendors/{vendorId}/products/{productId}/rental-plans/{planId}` | 更新方案 | 启用状态需先停用 |
+| POST | `/vendors/{vendorId}/products/{productId}/rental-plans/{planId}/activate` | 启用方案 | - |
+| POST | `/vendors/{vendorId}/products/{productId}/rental-plans/{planId}/deactivate` | 停用方案 | - |
+| POST | `/vendors/{vendorId}/products/{productId}/rental-plans/{planId}/skus` | 新增 SKU | `{ skuCode, attributes?, stockTotal, stockAvailable?, status? }` |
+| PUT | `/vendors/{vendorId}/products/{productId}/rental-plans/{planId}/skus/{skuId}` | 编辑 SKU | SKU 编码唯一校验 |
+| POST | `/vendors/{vendorId}/products/{productId}/rental-plans/{planId}/skus/{skuId}/inventory/adjust` | 调整库存 | `{ changeType, quantity, referenceId? }`，自动记录库存流水 |
 
 ### 4.4 C 端商品展示
-| 方法 | URL | 描述 |
-| ---- | --- | ---- |
-| GET | `/catalog/products` | 商品搜索/分类过滤 |
-| GET | `/catalog/products/{productId}` | 商品详情 |
-| GET | `/catalog/products/{productId}/plans` | 方案列表 |
+| 方法 | URL | 描述 | 响应要点 |
+| ---- | --- | ---- | -------- |
+| GET | `/catalog/products` | 商品搜索/分类过滤 | 返回分页数据，包含商品摘要与可用方案/库存概览 |
+| GET | `/catalog/products/{productId}` | 商品详情 | 仅允许查询 `ACTIVE` 商品，返回同上结构 |
 
-## 5. 订单与租赁流程（order-service）
+## 5. 订单与租赁流程（order-service，规划中）
 ### 5.1 下单与草稿
 | 方法 | URL | 描述 |
 | ---- | --- | ---- |
@@ -143,7 +149,7 @@
 | GET | `/admin/orders/{orderId}` | 详情 |
 | POST | `/admin/orders/{orderId}/force-close` | 强制关闭订单 |
 
-## 6. 支付与结算（payment-service）
+## 6. 支付与结算（payment-service，规划中）
 | 方法 | URL | 描述 |
 | ---- | --- | ---- |
 | POST | `/payments/{orderId}/init` | 创建支付单（指定支付场景）|
@@ -153,7 +159,7 @@
 | POST | `/payments/{transactionId}/refund` | 发起退款 |
 | GET | `/payments/settlements` | 结算查询 |
 
-## 7. 通知与运营（notification-service, analytics）
+## 7. 通知与运营（notification-service, analytics，规划中）
 | 方法 | URL | 描述 |
 | ---- | --- | ---- |
 | GET | `/notifications/logs` | 通知记录查询 |

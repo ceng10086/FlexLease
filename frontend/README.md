@@ -1,12 +1,14 @@
 # FlexLease 前端
 
-迭代 1 已交付基于 **Vite + Vue 3 + TypeScript** 的管理端单页应用骨架，内置登录页与仪表盘占位，配套 Pinia 状态管理、Vue Router 以及 Ant Design Vue 组件库。
+基于 **Vite + Vue 3 + TypeScript** 的管理端单页应用，已完成登录、仪表盘，以及迭代 2 新增的厂商商品管理与管理员审核界面。配套 Pinia 状态管理、Vue Router 与 Ant Design Vue 组件库。
 
 ## 功能概览
-- 🔐 登录表单：调用 `/api/v1/auth/token` 完成账号认证，持久化 JWT。
+- 🔐 登录表单：调用 `/api/v1/auth/token` 完成账号认证，并在 Pinia 中持久化 JWT。
 - 👤 用户信息：登录后自动读取 `/api/v1/auth/me`，展示用户名、角色等摘要。
-- 🧭 路由守卫：未登录用户会被重定向至登录页，支持登录后返回原页面。
-- 🎨 UI 框架：集成 Ant Design Vue，提供基础布局、表单、卡片、步骤条等组件。
+- 🧭 路由守卫：支持未登录重定向、角色控制（管理员可访问审核页）。
+- 🛠️ 厂商工作台：新增商品、配置租赁方案与 SKU、调整库存、提交审核。
+- ✅ 管理员审核：查看待审商品列表，执行通过/驳回操作。
+- 🎨 UI 框架：集成 Ant Design Vue，提供布局、表单、表格、抽屉等组件。
 
 ## 快速开始
 ```powershell
@@ -15,7 +17,7 @@ npm install
 npm run dev
 ```
 
-开发环境默认连接 `http://localhost:9001/api/v1`，可通过 `.env.development` 调整。
+开发环境默认通过 Vite 代理分别联调 9001/9002/9003 服务，可在 `vite.config.ts` 调整。
 
 ## 生产构建
 ```powershell
@@ -25,6 +27,6 @@ npm run build
 产物位于 `frontend/dist`，可交由网关或静态资源服务器托管。
 
 ## 后续迭代建议
-- 接入实际的厂商入驻、商品管理等业务页面。
-- 集成前端路由权限与菜单配置。
-- 加入 UI/UX 设计语言与响应式布局优化。
+- 补充厂商入驻申请、订单管理等页面，串联完整租赁流程。
+- 引入 ESLint + Prettier、组件级单测（Vitest / Testing Library）。
+- 加入响应式布局、文件上传等交互体验优化。

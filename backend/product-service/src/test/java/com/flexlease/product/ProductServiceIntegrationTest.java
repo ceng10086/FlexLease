@@ -60,7 +60,7 @@ class ProductServiceIntegrationTest {
                 new BigDecimal("299.00")
         );
         RentalPlanResponse plan = vendorProductService.createPlan(vendorId, createdProduct.id(), planRequest);
-        vendorProductService.activatePlan(vendorId, plan.id());
+        vendorProductService.activatePlan(vendorId, createdProduct.id(), plan.id());
 
         SkuRequest skuRequest = new SkuRequest(
                 "DESK-001",
@@ -69,18 +69,18 @@ class ProductServiceIntegrationTest {
                 null,
                 null
         );
-        SkuResponse sku = vendorProductService.createSku(vendorId, plan.id(), skuRequest);
+        SkuResponse sku = vendorProductService.createSku(vendorId, createdProduct.id(), plan.id(), skuRequest);
         assertThat(sku.stockAvailable()).isEqualTo(5);
 
-        SkuResponse afterInbound = vendorProductService.adjustInventory(vendorId, plan.id(), sku.id(),
+        SkuResponse afterInbound = vendorProductService.adjustInventory(vendorId, createdProduct.id(), plan.id(), sku.id(),
                 new InventoryAdjustRequest(InventoryChangeType.INBOUND, 10, null));
         assertThat(afterInbound.stockTotal()).isEqualTo(15);
         assertThat(afterInbound.stockAvailable()).isEqualTo(15);
 
-        SkuResponse afterReserve = vendorProductService.adjustInventory(vendorId, plan.id(), sku.id(),
+        SkuResponse afterReserve = vendorProductService.adjustInventory(vendorId, createdProduct.id(), plan.id(), sku.id(),
                 new InventoryAdjustRequest(InventoryChangeType.RESERVE, 3, null));
         assertThat(afterReserve.stockAvailable()).isEqualTo(12);
-        SkuResponse afterRelease = vendorProductService.adjustInventory(vendorId, plan.id(), sku.id(),
+        SkuResponse afterRelease = vendorProductService.adjustInventory(vendorId, createdProduct.id(), plan.id(), sku.id(),
                 new InventoryAdjustRequest(InventoryChangeType.RELEASE, 3, null));
         assertThat(afterRelease.stockAvailable()).isEqualTo(15);
 

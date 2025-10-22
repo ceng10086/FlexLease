@@ -52,7 +52,8 @@ public class AdminProductController {
     @PostMapping("/{productId}/reject")
     public ApiResponse<ProductResponse> reject(@PathVariable UUID productId,
                                                 @Valid @RequestBody ProductApprovalRequest request) {
-        return ApiResponse.success(productAdminService.rejectProduct(productId, request.remark()));
+        UUID reviewerId = parseReviewerId(request.reviewerId());
+        return ApiResponse.success(productAdminService.rejectProduct(productId, reviewerId, request.remark()));
     }
 
     private UUID parseReviewerId(String reviewerId) {

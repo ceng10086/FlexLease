@@ -50,12 +50,12 @@ public class ProductAdminService {
         return assembler.toProductResponse(product);
     }
 
-    public ProductResponse rejectProduct(UUID productId, String remark) {
+    public ProductResponse rejectProduct(UUID productId, UUID reviewerId, String remark) {
         Product product = loadProduct(productId);
         if (product.getStatus() != ProductStatus.PENDING_REVIEW) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "仅待审核商品可执行该操作");
         }
-        product.markRejected(remark);
+        product.markRejected(reviewerId, remark);
         return assembler.toProductResponse(product);
     }
 
