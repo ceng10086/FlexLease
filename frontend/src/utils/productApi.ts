@@ -13,6 +13,39 @@ export type ProductSummary = {
   createdAt: string;
 };
 
+export type RentalPlanType = 'STANDARD' | 'RENT_TO_OWN' | 'LEASE_TO_SALE';
+
+export type RentalPlanStatus = 'DRAFT' | 'ACTIVE' | 'INACTIVE';
+
+export type ProductSkuStatus = 'ACTIVE' | 'INACTIVE';
+
+export type RentalSku = {
+  id: string;
+  skuCode: string;
+  attributes: Record<string, unknown>;
+  stockTotal: number;
+  stockAvailable: number;
+  status: ProductSkuStatus;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type RentalPlan = {
+  id: string;
+  planType: RentalPlanType;
+  termMonths: number;
+  depositAmount: number;
+  rentAmountMonthly: number;
+  buyoutPrice?: number | null;
+  allowExtend: boolean;
+  extensionUnit?: string | null;
+  extensionPrice?: number | null;
+  status: RentalPlanStatus;
+  createdAt: string;
+  updatedAt: string;
+  skus: RentalSku[];
+};
+
 export type PagedResult<T> = {
   content: T[];
   page: number;
@@ -33,11 +66,37 @@ export type ProductDetail = ProductSummary & {
   coverImageUrl?: string | null;
   reviewRemark?: string | null;
   reviewedBy?: string | null;
+  rentalPlans?: RentalPlan[];
 };
 
 export type ProductApprovalPayload = {
   reviewerId: string;
   remark?: string;
+};
+
+export type RentalPlanPayload = {
+  planType: RentalPlanType;
+  termMonths: number;
+  depositAmount: number;
+  rentAmountMonthly: number;
+  buyoutPrice?: number | null;
+  allowExtend: boolean;
+  extensionUnit?: string | null;
+  extensionPrice?: number | null;
+};
+
+export type SkuPayload = {
+  skuCode: string;
+  attributes?: Record<string, unknown>;
+  stockTotal: number;
+  stockAvailable?: number | null;
+  status?: ProductSkuStatus;
+};
+
+export type InventoryAdjustPayload = {
+  changeType: 'INBOUND' | 'OUTBOUND' | 'RESERVE' | 'RELEASE';
+  quantity: number;
+  referenceId?: string;
 };
 
 export const listVendorProducts = async (
@@ -62,6 +121,86 @@ export const submitVendorProduct = async (
 ): Promise<ProductDetail> => {
   const response = await api.post(`/vendors/${vendorId}/products/${productId}/submit`);
   return response.data.data as ProductDetail;
+};
+
+export const getVendorProduct = async (
+  vendorId: string,
+  productId: string
+): Promise<ProductDetail> => {
+  const response = await api.get(`/vendors/${vendorId}/products/${productId}`);
+  return response.data.data as ProductDetail;
+};
+
+export const createRentalPlan = async (
+  vendorId: string,
+  productId: string,
+  payload: RentalPlanPayload
+): Promise<RentalPlan> => {
+  const response = await api.post(`/vendors/${vendorId}/products/${productId}/rental-plans`, payload);
+  return response.data.data as RentalPlan;
+};
+
+export const activateRentalPlan = async (
+  vendorId: string,
+  productId: string,
+  planId: string
+): Promise<RentalPlan> => {
+  const response = await api.post(
+    `/vendors/${vendorId}/products/${productId}/rental-plans/${planId}/activate`
+  );
+  return response.data.data as RentalPlan;
+};
+
+export const deactivateRentalPlan = async (
+  vendorId: string,
+  productId: string,
+  planId: string
+): Promise<RentalPlan> => {
+  const response = await api.post(
+    `/vendors/${vendorId}/products/${productId}/rental-plans/${planId}/deactivate`
+  );
+  return response.data.data as RentalPlan;
+};
+
+export const createSku = async (
+  vendorId: string,
+  productId: string,
+  planId: string,
+  payload: SkuPayload
+): Promise<RentalSku> => {
+  const response = await api.post(
+    `/vendors/${vendorId}/products/${productId}/rental-plans/${planId}/skus`,
+    payload
+  );
+  return response.data.data as RentalSku;
+};
+
+export const updateSku = async (
+  vendorId: string,
+  productId: string,
+  planId: string,
+  skuId: string,
+  payload: SkuPayload
+): Promise<RentalSku> => {
+  const response = await api.put(
+    `/vendors/${vendorId}/products/${productId}/rental-plans/${planId}/skus/${skuId}`,
+    payload
+  );
+  return response.data.data as RentalSku;
+};
+
+export const adjustSkuInventory = async (
+  vendorId: string,
+  productId: string,
+  planId: string,
+  skuId: string,
+  payload: InventoryAdjustPayload
+): Promise<RentalSku> => {
+  const response = await api.post(
+    `/vendors/${vendorId}/products/${productId}/rental-plans/${planId}/skus/${skuId}/inventory/adjust`,
+    payload
+  );
+  return response.data.data as RentalSku;
 };
 
 export const listAdminProducts = async (
