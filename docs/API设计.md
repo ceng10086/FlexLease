@@ -10,6 +10,8 @@
 > ```
 > 认证方式为 OAuth2 + JWT，访问令牌放置在 `Authorization: Bearer <token>` 头部。除 `auth` 模块外，其余接口均需鉴权。角色控制通过 RBAC 校验。
 
+- **分页**：使用 `PagedResponse` 包装，字段包含 `content`、`page`、`size`、`totalElements`、`totalPages`。
+
 ## 1. 公共与约定
 - **HTTP 状态码**：200 成功；4xx 客户端错误；5xx 服务错误。
 - **分页参数**：`page`（从 1 起）、`size`、`sort`（如 `createdAt,desc`）。
@@ -114,40 +116,40 @@
 
 ## 5. 订单与租赁流程（order-service，规划中）
 ### 5.1 下单与草稿
-| 方法 | URL | 描述 |
-| ---- | --- | ---- |
-| POST | `/orders/preview` | 价格试算（包含押金、租金）|
-| POST | `/orders` | 创建订单（选择 SKU + 方案）|
-| GET | `/orders/{orderId}` | 查看订单详情 |
-| GET | `/orders` | 我的订单列表（支持状态过滤）|
+| 方法 | URL | 描述 | 请求体要点 | 响应要点 |
+| ---- | --- | ---- | ---------- | -------- |
+| POST | `/orders/preview` | 价格试算（押金、租金、合计） | `{ userId, vendorId, planType?, leaseStartAt?, leaseEndAt?, items: [{ productId, skuId?, planId?, productName, skuCode?, planSnapshot?, quantity, unitRentAmount, unitDepositAmount, buyoutPrice? }] }` | `depositAmount`, `rentAmount`, `totalAmount` |
+| POST | `/orders` | 创建订单（与预览结构一致，服务端生成 `orderNo` 并固化明细快照） | 同上 | `RentalOrderResponse`（含订单基础信息、明细、事件、续租/退租记录） |
+| GET | `/orders/{orderId}` | 查看订单详情 | - | `RentalOrderResponse` |
+| GET | `/orders` | 查询订单列表 | 需提供 `userId` 或 `vendorId` 其一，可选 `status`、`page`、`size` | `PagedResponse<RentalOrderSummaryResponse>` |
 
 ### 5.2 订单状态流转
-| 方法 | URL | 角色 | 描述 |
+| 方法 | URL | 角色 | 描述 | 请求体要点 |
+| ---- | --- | ---- | ---- | ---------- |
+| POST | `/orders/{orderId}/pay` | USER | 支付完成回执，订单从 `PENDING_PAYMENT` → `AWAITING_SHIPMENT` | `{ userId, paymentReference, paidAmount }` |
+| POST | `/orders/{orderId}/cancel` | USER | 支付前取消订单 | `{ userId, reason? }` |
+| POST | `/orders/{orderId}/ship` | VENDOR | 填写发货信息，订单进入 `IN_LEASE` | `{ vendorId, carrier, trackingNumber }` |
+| POST | `/orders/{orderId}/confirm-receive` | USER | 确认收货，记录事件 | `{ actorId }` |
+| POST | `/orders/{orderId}/extend` | USER | 发起续租申请 | `{ userId, additionalMonths, remark? }` |
+| POST | `/orders/{orderId}/extend/approve` | VENDOR | 处理续租申请，更新租期 | `{ vendorId, approve, remark? }` |
+| POST | `/orders/{orderId}/return` | USER | 发起退租申请，记录物流信息 | `{ userId, reason?, logisticsCompany?, trackingNumber? }` |
+| POST | `/orders/{orderId}/return/approve` | VENDOR | 审核退租，更新状态（完成/退回租赁） | `{ vendorId, approve, remark? }` |
+| POST | `/orders/{orderId}/buyout` | USER | 申请买断，可调整买断金额 | `{ userId, buyoutAmount?, remark? }` |
+| POST | `/orders/{orderId}/buyout/confirm` | VENDOR | 处理买断请求（通过/驳回） | `{ vendorId, approve, remark? }` |
+
+### 5.3 合同与票据（规划中）
+| 方法 | URL | 描述 | 状态 |
 | ---- | --- | ---- | ---- |
-| POST | `/orders/{orderId}/pay` | USER | 发起支付（押金/租金）|
-| POST | `/orders/{orderId}/cancel` | USER | 支付前取消 |
-| POST | `/orders/{orderId}/ship` | VENDOR | 填写发货信息 |
-| POST | `/orders/{orderId}/confirm-receive` | USER | 确认收货 |
-| POST | `/orders/{orderId}/extend` | USER | 续租申请 |
-| POST | `/orders/{orderId}/extend/approve` | VENDOR | 审核续租 |
-| POST | `/orders/{orderId}/return` | USER | 退租申请 |
-| POST | `/orders/{orderId}/return/approve` | VENDOR | 退租处理 |
-| POST | `/orders/{orderId}/buyout` | USER | 买断申请 |
-| POST | `/orders/{orderId}/buyout/confirm` | VENDOR | 买断确认 |
+| GET | `/orders/{orderId}/contract` | 获取合同信息 | 待实现 |
+| POST | `/orders/{orderId}/contract/sign` | 上传/生成合同 | 待实现 |
+| GET | `/orders/{orderId}/events` | 获取状态日志 | 可通过 `RentalOrderResponse.events` 获取，独立接口待定 |
 
-### 5.3 合同与票据
-| 方法 | URL | 描述 |
-| ---- | --- | ---- |
-| GET | `/orders/{orderId}/contract` | 获取合同信息 |
-| POST | `/orders/{orderId}/contract/sign` | 上传/生成合同 |
-| GET | `/orders/{orderId}/events` | 获取状态日志 |
-
-### 5.4 管理侧订单
-| 方法 | URL | 描述 |
-| ---- | --- | ---- |
-| GET | `/admin/orders` | 分页检索订单（多条件）|
-| GET | `/admin/orders/{orderId}` | 详情 |
-| POST | `/admin/orders/{orderId}/force-close` | 强制关闭订单 |
+### 5.4 管理侧订单（规划中）
+| 方法 | URL | 描述 | 状态 |
+| ---- | --- | ---- | ---- |
+| GET | `/admin/orders` | 分页检索订单（多条件）| 待实现 |
+| GET | `/admin/orders/{orderId}` | 详情 | 待实现 |
+| POST | `/admin/orders/{orderId}/force-close` | 强制关闭订单 | 待实现 |
 
 ## 6. 支付与结算（payment-service，规划中）
 | 方法 | URL | 描述 |

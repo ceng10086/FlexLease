@@ -1,6 +1,28 @@
 spring:
   application:
     name: order-service
+  datasource:
+    url: jdbc:h2:mem:flexlease-order;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;INIT=CREATE SCHEMA IF NOT EXISTS "order"
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: "order"
+        format_sql: true
+        globally_quoted_identifiers: true
+    open-in-view: false
+  flyway:
+    enabled: true
+    schemas: "order"
+    locations: classpath:db/migration
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
 server:
   port: 9004
 management:

@@ -10,6 +10,7 @@ FlexLease 是一个面向 B2C 模式的共享租赁平台，覆盖厂商入驻�
 - ✅ 商品与租赁方案（Iteration 2）：商品 CRUD、租赁方案与 SKU 管理、库存调整流水、管理员审核、前台商品目录查询
 - ✅ 管理端前端（Iteration 1-2）：登录与仪表盘、厂商商品管理、管理员商品审核流程
 - ✅ 产品域集成测试：`backend/product-service` 覆盖商品生命周期 e2e 场景
+- ✅ 订单与履约流程（Iteration 3）：交付独立 `order-service`，支持下单预览、创建、支付确认、发货、收货、续租、退租、买断等状态流转，并提供集成测试覆盖核心闭环
 
 ## 快速开始
 ### 后端服务
@@ -18,12 +19,13 @@ FlexLease 是一个面向 B2C 模式的共享租赁平台，覆盖厂商入驻�
 mvn -pl backend/auth-service spring-boot:run      # 认证服务，端口 9001
 mvn -pl backend/user-service spring-boot:run      # 用户/厂商服务，端口 9002
 mvn -pl backend/product-service spring-boot:run   # 商品服务，端口 9003
+mvn -pl backend/order-service spring-boot:run     # 订单服务，端口 9004
 ```
 > 常用端口：Auth 9001、User 9002、Product 9003、Order 9004、Payment 9005、Notification 9006、Gateway 8080。
 
 > **内部访问令牌**：调用 `auth-service` 的 `/api/v1/internal/**` 接口时需携带 `X-Internal-Token`，默认值 `flexlease-internal-secret` 可在认证服务 `security.jwt.internal-access-token` 和调用方（如用户服务）`flexlease.auth-service.internal-token` 中调整。
 
-完成启动后，可参考 `docs/API设计.md` 流程体验“注册厂商 → 提交入驻 → 审批 → 创建商品 → 审核上架 → 前台查询”链路。
+完成启动后，可参考 `docs/API设计.md` 流程体验“注册厂商 → 提交入驻 → 审批 → 创建商品 → 审核上架 → 用户下单/履约”链路。
 
 ### 前端管理端
 ```powershell
@@ -60,4 +62,4 @@ frontend/           管理端前端（Vite + Vue 3）
 ```
 
 ## 后续计划
-详见 `docs/项目规划与任务分解.md`，迭代 3 将聚焦订单与履约流程、跨服务调用以及持续交付流水线完善。
+详见 `docs/项目规划与任务分解.md`，迭代 4 将聚焦支付与结算模拟、订单前端体验、跨服务调用以及持续交付流水线完善。

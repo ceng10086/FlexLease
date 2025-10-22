@@ -1,0 +1,14 @@
+package com.flexlease.order.domain;
+
+public enum OrderStatus {
+    PENDING_PAYMENT,
+    CANCELLED,
+    AWAITING_SHIPMENT,
+    IN_LEASE,
+    RETURN_REQUESTED,
+    RETURN_IN_PROGRESS,
+    COMPLETED,
+    BUYOUT_REQUESTED,
+    BUYOUT_COMPLETED,
+    EXCEPTION_CLOSED
+}
