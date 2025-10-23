@@ -126,7 +126,7 @@
 ### 5.2 订单状态流转
 | 方法 | URL | 角色 | 描述 | 请求体要点 |
 | ---- | --- | ---- | ---- | ---------- |
-| POST | `/orders/{orderId}/pay` | USER | 支付完成回执，订单从 `PENDING_PAYMENT` → `AWAITING_SHIPMENT` | `{ userId, paymentReference, paidAmount }` |
+| POST | `/orders/{orderId}/pay` | USER | 支付完成回执，订单从 `PENDING_PAYMENT` → `AWAITING_SHIPMENT` | `{ userId, paymentReference(UUID), paidAmount }` |
 | POST | `/orders/{orderId}/cancel` | USER | 支付前取消订单 | `{ userId, reason? }` |
 | POST | `/orders/{orderId}/ship` | VENDOR | 填写发货信息，订单进入 `IN_LEASE` | `{ vendorId, carrier, trackingNumber }` |
 | POST | `/orders/{orderId}/confirm-receive` | USER | 确认收货，记录事件 | `{ actorId }` |
@@ -136,6 +136,8 @@
 | POST | `/orders/{orderId}/return/approve` | VENDOR | 审核退租，更新状态（完成/退回租赁） | `{ vendorId, approve, remark? }` |
 | POST | `/orders/{orderId}/buyout` | USER | 申请买断，可调整买断金额 | `{ userId, buyoutAmount?, remark? }` |
 | POST | `/orders/{orderId}/buyout/confirm` | VENDOR | 处理买断请求（通过/驳回） | `{ vendorId, approve, remark? }` |
+
+> 订单支付确认会回调支付服务核验流水，`paymentReference` 需提供支付服务返回的交易 UUID，金额必须与订单应付一致。
 
 ### 5.3 合同与票据（规划中）
 | 方法 | URL | 描述 | 状态 |
@@ -151,15 +153,19 @@
 | GET | `/admin/orders/{orderId}` | 详情 | 待实现 |
 | POST | `/admin/orders/{orderId}/force-close` | 强制关闭订单 | 待实现 |
 
-## 6. 支付与结算（payment-service，规划中）
-| 方法 | URL | 描述 |
-| ---- | --- | ---- |
-| POST | `/payments/{orderId}/init` | 创建支付单（指定支付场景）|
-| GET | `/payments/{transactionId}` | 查询支付状态 |
-| POST | `/payments/{transactionId}/callback` | 支付渠道回调（对内）|
-| POST | `/payments/{transactionId}/confirm` | 平台侧确认（模拟）|
-| POST | `/payments/{transactionId}/refund` | 发起退款 |
-| GET | `/payments/settlements` | 结算查询 |
+## 6. 支付与结算（payment-service）
+> 枚举说明：`scene` 取值 `DEPOSIT`/`RENT`/`BUYOUT`/`PENALTY`；`channel` 取值 `MOCK`/`ALIPAY`/`WECHAT`/`BANK_TRANSFER`；`status` 取值 `PENDING`/`SUCCEEDED`/`FAILED`。
+
+| 方法 | URL | 描述 | 请求体要点 | 响应 |
+| ---- | --- | ---- | -------- | ---- |
+| POST | `/payments/{orderId}/init` | 创建支付单 | `{ userId, vendorId, scene, channel, amount, description?, splits?: [{ splitType, amount, beneficiary }] }` | `PaymentTransactionResponse` |
+| GET | `/payments/{transactionId}` | 查询支付详情 | - | `PaymentTransactionResponse` |
+| POST | `/payments/{transactionId}/confirm` | 后台手动确认支付成功 | `{ channelTransactionNo, paidAt? }` | `PaymentTransactionResponse` |
+| POST | `/payments/{transactionId}/callback` | 模拟支付通道回调 | `{ status, channelTransactionNo, paidAt?, failureReason? }` | `PaymentTransactionResponse` |
+| POST | `/payments/{transactionId}/refund` | 发起退款（立即成功） | `{ amount, reason? }` | `RefundTransactionResponse` |
+| GET | `/payments/settlements` | 查询厂商结算汇总 | `vendorId?`、`from?`、`to?`、`refundFrom?`、`refundTo?`（ISO8601 时间） | `List<PaymentSettlementResponse>` |
+
+> `PaymentTransactionResponse` 返回基础字段、`splits`（分账明细）以及 `refunds`（退款流水）。`PaymentSettlementResponse` 汇总厂商维度的总金额、押金/租金/买断/违约金拆分、已退款金额、净入账金额以及最近一次支付时间；可按支付时间和退款完成时间两个时间窗过滤。
 
 ## 7. 通知与运营（notification-service, analytics，规划中）
 | 方法 | URL | 描述 |

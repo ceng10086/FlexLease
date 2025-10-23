@@ -2,6 +2,9 @@ package com.flexlease.order.service;
 
 import com.flexlease.common.exception.BusinessException;
 import com.flexlease.common.exception.ErrorCode;
+import com.flexlease.order.client.PaymentClient;
+import com.flexlease.order.client.PaymentStatus;
+import com.flexlease.order.client.PaymentTransactionView;
 import com.flexlease.order.domain.ExtensionRequestStatus;
 import com.flexlease.order.domain.OrderEvent;
 import com.flexlease.order.domain.OrderEventType;
@@ -46,15 +49,18 @@ public class RentalOrderService {
     private final RentalOrderRepository rentalOrderRepository;
     private final OrderExtensionRequestRepository extensionRequestRepository;
     private final OrderReturnRequestRepository returnRequestRepository;
+    private final PaymentClient paymentClient;
     private final OrderAssembler assembler;
 
     public RentalOrderService(RentalOrderRepository rentalOrderRepository,
                               OrderExtensionRequestRepository extensionRequestRepository,
                               OrderReturnRequestRepository returnRequestRepository,
+                              PaymentClient paymentClient,
                               OrderAssembler assembler) {
         this.rentalOrderRepository = rentalOrderRepository;
         this.extensionRequestRepository = extensionRequestRepository;
         this.returnRequestRepository = returnRequestRepository;
+        this.paymentClient = paymentClient;
         this.assembler = assembler;
     }
 
@@ -126,9 +132,12 @@ public class RentalOrderService {
     public RentalOrderResponse confirmPayment(UUID orderId, OrderPaymentRequest request) {
         RentalOrder order = getOrderForUpdate(orderId);
         ensureUser(order, request.userId());
+        UUID transactionId = parseTransactionId(request.paymentReference());
+        PaymentTransactionView transaction = paymentClient.loadTransaction(transactionId);
+        ensurePaymentMatches(order, transaction, request);
         order.markPaid();
         order.addEvent(OrderEvent.record(OrderEventType.PAYMENT_CONFIRMED,
-                "支付成功: " + request.paymentReference(),
+            buildPaymentMessage(transaction),
                 request.userId()));
         return assembler.toOrderResponse(order);
     }
@@ -297,6 +306,44 @@ public class RentalOrderService {
         if (!order.getVendorId().equals(vendorId)) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "无权操作此订单");
         }
+    }
+
+    private UUID parseTransactionId(String reference) {
+        try {
+            return UUID.fromString(reference);
+        } catch (IllegalArgumentException ex) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "支付凭证格式错误");
+        }
+    }
+
+    private void ensurePaymentMatches(RentalOrder order,
+                                      PaymentTransactionView transaction,
+                                      OrderPaymentRequest request) {
+        if (transaction.orderId() == null || !transaction.orderId().equals(order.getId())) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "支付流水与订单不匹配");
+        }
+        if (transaction.userId() == null || !transaction.userId().equals(order.getUserId())) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "支付用户与订单不一致");
+        }
+        if (transaction.vendorId() == null || !transaction.vendorId().equals(order.getVendorId())) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "支付厂商与订单不一致");
+        }
+        if (transaction.status() != PaymentStatus.SUCCEEDED) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "支付尚未完成");
+        }
+        if (transaction.amount() == null || transaction.amount().compareTo(request.paidAmount()) != 0) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "支付金额与请求不一致");
+        }
+        if (transaction.amount().compareTo(order.getTotalAmount()) != 0) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "支付金额与订单应付不一致");
+        }
+    }
+
+    private String buildPaymentMessage(PaymentTransactionView transaction) {
+        String reference = transaction.transactionNo() != null
+                ? transaction.transactionNo()
+                : transaction.id().toString();
+        return "支付成功: 交易号 " + reference + ", 金额 " + transaction.amount();
     }
 
     private Totals calculateTotals(List<OrderItemRequest> items) {

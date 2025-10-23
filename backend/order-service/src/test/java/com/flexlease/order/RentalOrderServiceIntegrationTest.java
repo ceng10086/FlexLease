@@ -25,12 +25,19 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import com.flexlease.order.client.PaymentClient;
+import com.flexlease.order.client.PaymentStatus;
+import com.flexlease.order.client.PaymentTransactionView;
+import org.springframework.boot.test.mock.mockito.MockBean;
 
 @SpringBootTest
 class RentalOrderServiceIntegrationTest {
 
     @Autowired
     private RentalOrderService rentalOrderService;
+
+    @MockBean
+    private PaymentClient paymentClient;
 
     @Test
     void shouldCompleteFullOrderLifecycle() {
@@ -76,8 +83,22 @@ class RentalOrderServiceIntegrationTest {
         ));
         assertThat(created.status()).isEqualTo(OrderStatus.PENDING_PAYMENT);
 
+        UUID transactionId = UUID.randomUUID();
+        PaymentTransactionView transactionView = new PaymentTransactionView(
+                transactionId,
+                "P20241023",
+                created.id(),
+                userId,
+                vendorId,
+                PaymentStatus.SUCCEEDED,
+                preview.totalAmount(),
+                null,
+                List.of()
+        );
+        org.mockito.Mockito.when(paymentClient.loadTransaction(transactionId)).thenReturn(transactionView);
+
         RentalOrderResponse paid = rentalOrderService.confirmPayment(created.id(),
-                new OrderPaymentRequest(userId, "PAY-123456", preview.totalAmount()));
+                new OrderPaymentRequest(userId, transactionId.toString(), preview.totalAmount()));
         assertThat(paid.status()).isEqualTo(OrderStatus.AWAITING_SHIPMENT);
 
         RentalOrderResponse shipped = rentalOrderService.shipOrder(created.id(),
@@ -120,5 +141,59 @@ class RentalOrderServiceIntegrationTest {
         org.assertj.core.api.Assertions.assertThatThrownBy(() ->
                 rentalOrderService.applyBuyout(created.id(), new OrderBuyoutApplyRequest(userId, BigDecimal.TEN, "买断")))
                 .isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    void shouldRejectPaymentWhenStatusNotSucceeded() {
+        UUID userId = UUID.randomUUID();
+        UUID vendorId = UUID.randomUUID();
+        UUID productId = UUID.randomUUID();
+        UUID skuId = UUID.randomUUID();
+        UUID planId = UUID.randomUUID();
+
+        OrderItemRequest itemRequest = new OrderItemRequest(
+                productId,
+                skuId,
+                planId,
+                "智能共享办公桌",
+                "DESK-001",
+                Map.of("termMonths", 6).toString(),
+                1,
+                new BigDecimal("299.00"),
+                new BigDecimal("500.00"),
+                null
+        );
+
+        RentalOrderResponse created = rentalOrderService.createOrder(new CreateOrderRequest(
+                userId,
+                vendorId,
+                "STANDARD",
+                null,
+                null,
+                List.of(itemRequest)
+        ));
+
+        UUID transactionId = UUID.randomUUID();
+        PaymentTransactionView transactionView = new PaymentTransactionView(
+                transactionId,
+                "P20241023",
+                created.id(),
+                userId,
+                vendorId,
+                PaymentStatus.PENDING,
+                created.totalAmount(),
+                null,
+                List.of()
+        );
+        org.mockito.Mockito.when(paymentClient.loadTransaction(transactionId)).thenReturn(transactionView);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> rentalOrderService.confirmPayment(
+                        created.id(),
+                        new OrderPaymentRequest(userId, transactionId.toString(), created.totalAmount()))
+        ).isInstanceOf(BusinessException.class)
+                .hasMessageContaining("支付尚未完成");
+
+        RentalOrderResponse queried = rentalOrderService.getOrder(created.id());
+        assertThat(queried.status()).isEqualTo(OrderStatus.PENDING_PAYMENT);
     }
 }
