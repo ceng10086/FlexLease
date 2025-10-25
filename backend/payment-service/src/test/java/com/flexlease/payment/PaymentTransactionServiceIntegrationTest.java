@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.flexlease.common.exception.BusinessException;
+import com.flexlease.payment.client.NotificationClient;
 import com.flexlease.payment.domain.PaymentChannel;
 import com.flexlease.payment.domain.PaymentScene;
 import com.flexlease.payment.domain.PaymentStatus;
@@ -25,12 +26,16 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 
 @SpringBootTest
 class PaymentTransactionServiceIntegrationTest {
 
     @Autowired
     private PaymentTransactionService paymentTransactionService;
+
+        @MockBean
+        private NotificationClient notificationClient;
 
     @Test
     void shouldInitConfirmRefundAndSettlePayment() {

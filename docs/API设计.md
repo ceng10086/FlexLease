@@ -167,13 +167,23 @@
 
 > `PaymentTransactionResponse` 返回基础字段、`splits`（分账明细）以及 `refunds`（退款流水）。`PaymentSettlementResponse` 汇总厂商维度的总金额、押金/租金/买断/违约金拆分、已退款金额、净入账金额以及最近一次支付时间；可按支付时间和退款完成时间两个时间窗过滤。
 
-## 7. 通知与运营（notification-service, analytics，规划中）
-| 方法 | URL | 描述 |
-| ---- | --- | ---- |
-| GET | `/notifications/logs` | 通知记录查询 |
-| POST | `/notifications/send` | 调试用发送通知 |
-| GET | `/analytics/dashboard` | 仪表盘指标（订单量、GMV、续租率等）|
-| GET | `/analytics/vendor/{vendorId}` | 厂商维度数据 |
+## 7. 通知与运营（notification-service, analytics）
+### 7.1 通知服务
+| 方法 | URL | 描述 | 请求体要点 | 响应 |
+| ---- | --- | ---- | -------- | ---- |
+| POST | `/notifications/send` | 发送单条通知，支持模板渲染或自定义内容 | `{ templateCode?, channel?, recipient, subject?, content?, variables? }`<br>当 `templateCode` 指定时，可省略 `channel/subject/content`，系统按模板渲染；`variables` 为键值对用于替换 `{{key}}` 占位符。 | `NotificationLogResponse`（包含通知 ID、渠道、状态、发送时间等）|
+| GET | `/notifications/logs` | 查询最近 50 条通知记录，可按状态过滤 | `status?=PENDING|SENT|FAILED` | `List<NotificationLogResponse>` |
+| GET | `/notifications/templates` | 查看系统内置模板 | - | `List<NotificationTemplateResponse>` |
+
+> 目前通知发送为模拟实现：若渠道为 `EMAIL` 且收件人不为合法邮箱格式，将返回校验错误；其它渠道默认视为发送成功并写入通知日志。
+
+### 7.2 运营看板
+| 方法 | URL | 描述 | 响应字段 |
+| ---- | --- | ---- | -------- |
+| GET | `/analytics/dashboard` | 平台级运营指标 | `totalOrders`、`activeOrders`、`totalGmv`、`inLeaseCount`、`pendingReturns`、`ordersByStatus`（Map，键为 `OrderStatus` 枚举）|
+| GET | `/analytics/vendor/{vendorId}` | 指定厂商的运营指标 | `vendorId`、`totalOrders`、`activeOrders`、`totalGmv`、`inLeaseCount`、`pendingReturns`、`ordersByStatus` |
+
+> GMV 合计包含待发货、租赁中、退租中、已完成以及买断相关订单；`activeOrders` 聚合待发货、租赁中、退租处理中及买断申请的订单量。返回金额使用 `BigDecimal`（两位小数）。
 
 ## 8. 网关与前端约定
 - 所有微服务注册到 Nacos，以 `service-name` 暴露，网关根据路径转发：

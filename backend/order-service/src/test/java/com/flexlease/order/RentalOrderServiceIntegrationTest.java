@@ -25,6 +25,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import com.flexlease.order.client.NotificationClient;
 import com.flexlease.order.client.PaymentClient;
 import com.flexlease.order.client.PaymentStatus;
 import com.flexlease.order.client.PaymentTransactionView;
@@ -38,6 +39,9 @@ class RentalOrderServiceIntegrationTest {
 
     @MockBean
     private PaymentClient paymentClient;
+
+        @MockBean
+        private NotificationClient notificationClient;
 
     @Test
     void shouldCompleteFullOrderLifecycle() {

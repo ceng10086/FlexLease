@@ -26,6 +26,8 @@ spring:
 flexlease:
   payment-service:
     base-url: http://localhost:9005/api/v1
+  notification-service:
+    base-url: http://localhost:9006/api/v1
 server:
   port: 9004
 management:

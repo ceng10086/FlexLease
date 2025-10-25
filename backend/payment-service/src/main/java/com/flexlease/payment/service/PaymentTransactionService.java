@@ -2,12 +2,15 @@ package com.flexlease.payment.service;
 
 import com.flexlease.common.exception.BusinessException;
 import com.flexlease.common.exception.ErrorCode;
+import com.flexlease.common.notification.NotificationChannel;
+import com.flexlease.common.notification.NotificationSendRequest;
 import com.flexlease.payment.domain.PaymentScene;
 import com.flexlease.payment.domain.PaymentSplit;
 import com.flexlease.payment.domain.PaymentStatus;
 import com.flexlease.payment.domain.PaymentTransaction;
 import com.flexlease.payment.domain.RefundStatus;
 import com.flexlease.payment.domain.RefundTransaction;
+import com.flexlease.payment.client.NotificationClient;
 import com.flexlease.payment.dto.PaymentCallbackRequest;
 import com.flexlease.payment.dto.PaymentConfirmRequest;
 import com.flexlease.payment.dto.PaymentInitRequest;
@@ -34,11 +37,14 @@ public class PaymentTransactionService {
 
     private final PaymentTransactionRepository paymentTransactionRepository;
     private final PaymentAssembler assembler;
+    private final NotificationClient notificationClient;
 
     public PaymentTransactionService(PaymentTransactionRepository paymentTransactionRepository,
-                                     PaymentAssembler assembler) {
+                                     PaymentAssembler assembler,
+                                     NotificationClient notificationClient) {
         this.paymentTransactionRepository = paymentTransactionRepository;
         this.assembler = assembler;
+        this.notificationClient = notificationClient;
     }
 
     public PaymentTransactionResponse initPayment(UUID orderId, PaymentInitRequest request) {
@@ -88,6 +94,7 @@ public class PaymentTransactionService {
         PaymentTransaction transaction = getTransactionForUpdate(transactionId);
         try {
             transaction.markSucceeded(request.channelTransactionNo(), request.paidAt());
+            notifyPaymentSucceeded(transaction);
         } catch (IllegalStateException ex) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, ex.getMessage());
         }
@@ -103,8 +110,10 @@ public class PaymentTransactionService {
             if (request.status() == PaymentStatus.SUCCEEDED) {
                 OffsetDateTime paidAt = request.paidAt() != null ? request.paidAt() : OffsetDateTime.now();
                 transaction.markSucceeded(request.channelTransactionNo(), paidAt);
+                notifyPaymentSucceeded(transaction);
             } else {
                 transaction.markFailed(request.channelTransactionNo());
+                notifyPaymentFailed(transaction);
             }
         } catch (IllegalStateException ex) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, ex.getMessage());
@@ -118,6 +127,7 @@ public class PaymentTransactionService {
             RefundTransaction refund = transaction.createRefund(request.amount(), request.reason());
             // 模拟通道立即退款成功
             refund.markSucceeded();
+                notifyRefundSucceeded(transaction, refund);
             return assembler.toResponse(transaction).refunds().stream()
                     .filter(r -> r.id().equals(refund.getId()))
                     .findFirst()
@@ -167,6 +177,52 @@ public class PaymentTransactionService {
     private PaymentTransaction getTransactionForUpdate(UUID transactionId) {
         return paymentTransactionRepository.findById(transactionId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "支付流水不存在"));
+    }
+
+    private void notifyPaymentSucceeded(PaymentTransaction transaction) {
+        String sceneName = sceneLabel(transaction.getScene());
+        NotificationSendRequest request = new NotificationSendRequest(
+                null,
+                NotificationChannel.IN_APP,
+                transaction.getUserId().toString(),
+                "支付成功",
+                "订单 %s 的%s支付 ¥%s 已完成。".formatted(transaction.getOrderId(), sceneName, transaction.getAmount()),
+                Map.of("orderId", transaction.getOrderId().toString())
+        );
+        notificationClient.send(request);
+    }
+
+    private void notifyPaymentFailed(PaymentTransaction transaction) {
+        NotificationSendRequest request = new NotificationSendRequest(
+                null,
+                NotificationChannel.IN_APP,
+                transaction.getUserId().toString(),
+                "支付失败",
+                "订单 %s 的支付未成功，请检查后重试。".formatted(transaction.getOrderId()),
+                Map.of("orderId", transaction.getOrderId().toString())
+        );
+        notificationClient.send(request);
+    }
+
+    private void notifyRefundSucceeded(PaymentTransaction transaction, RefundTransaction refund) {
+        NotificationSendRequest request = new NotificationSendRequest(
+                null,
+                NotificationChannel.IN_APP,
+                transaction.getUserId().toString(),
+                "退款成功",
+                "订单 %s 的退款 ¥%s 已退回。".formatted(transaction.getOrderId(), refund.getAmount()),
+                Map.of("orderId", transaction.getOrderId().toString())
+        );
+        notificationClient.send(request);
+    }
+
+    private String sceneLabel(PaymentScene scene) {
+        return switch (scene) {
+            case DEPOSIT -> "押金";
+            case RENT -> "租金";
+            case BUYOUT -> "买断款";
+            case PENALTY -> "违约金";
+        };
     }
 
     private static class SettlementAccumulator {
