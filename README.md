@@ -1,7 +1,7 @@
 # FlexLease 智能共享租赁平台
 
 ## 简介
- FlexLease 是一个面向 B2C 模式的共享租赁平台，覆盖厂商入驻、商品租赁、订单履约与支付结算等核心业务域。项目采用 Spring Boot 多模块微服务 + Vue 3 管理端的形态迭代交付，目前已完成迭代 5。
+ FlexLease 是一个面向 B2C 模式的共享租赁平台，覆盖厂商入驻、商品租赁、订单履约与支付结算等核心业务域。项目采用 Spring Boot 多模块微服务 + Vue 3 管理端的形态迭代交付，当前已推进至迭代 5 并完成通知/运营能力。
 
 ## 当前进展
 - ✅ 项目规划、数据库/API 设计文档维护（`docs/`）
@@ -12,8 +12,7 @@
 - ✅ 产品域集成测试：`backend/product-service` 覆盖商品生命周期 e2e 场景
 - ✅ 订单与履约流程（Iteration 3）：交付独立 `order-service`，支持下单预览、创建、支付确认、发货、收货、续租、退租、买断等状态流转，并提供集成测试覆盖核心闭环
 - ✅ 支付与结算（Iteration 4）：交付 `payment-service` 支付流水/分账/退款能力与厂商结算统计，订单服务集成支付凭证校验并补充跨服务集成测试
-- ✅ 通知与运营看板（Iteration 5）：上线 `notification-service` 模板化通知发送与日志查询，订单/支付服务打通通知推送并补充订单运营指标 API 及集成测试
- - ✅ 通知与运营看板（Iteration 5）：上线 `notification-service` 模板化通知发送与日志查询，订单/支付服务打通通知推送并补充订单运营指标 API、前端仪表盘与端到端测试
+- ✅ 通知与运营看板（Iteration 5）：上线 `notification-service` 模板化通知发送与日志查询，订单/支付服务打通通知推送，新增订单运营指标 API、前端仪表盘与端到端测试
 
 ## 快速开始
 ### 后端服务
@@ -30,7 +29,7 @@ mvn -pl backend/notification-service spring-boot:run  # 通知与运营服务，
 
 > **内部访问令牌**：调用 `auth-service` 的 `/api/v1/internal/**` 接口时需携带 `X-Internal-Token`，默认值 `flexlease-internal-secret` 可在认证服务 `security.jwt.internal-access-token` 和调用方（如用户服务）`flexlease.auth-service.internal-token` 中调整。
 
-完成启动后，可参考 `docs/API设计.md` 流程体验“注册厂商 → 提交入驻 → 审批 → 创建商品 → 审核上架 → 用户下单/履约”链路，并可通过 `notification-service` 验证通知发送/查询与订单运营指标接口（`/api/v1/analytics/**`）。
+完成启动后，可参考 `docs/API设计.md` 流程体验“注册厂商 → 提交入驻 → 审批 → 创建商品 → 审核上架 → 用户下单/履约”链路，并可通过订单服务暴露的 `/api/v1/analytics/**` 接口验证平台及厂商运营指标，再结合 `notification-service` 的 `/api/v1/notifications/**` 验证通知发送与日志查询。
 
 ### 前端管理端
 ```powershell
@@ -40,7 +39,7 @@ npm run dev
 # 端到端测试
 npm run test:e2e
 ```
-开发环境默认通过 Vite 代理联调后台，可在 `vite.config.ts` 中调整。
+开发环境默认通过 Vite 代理联调后台，可在 `vite.config.ts` 中调整；现已内置 `/api/v1/analytics`（订单服务）与 `/api/v1/notifications`（通知服务）等最新迭代的代理配置。如需统一走网关，可设置 `VITE_API_PROXY=http://localhost:8080`。
 
 ### 常用命令
 ```powershell

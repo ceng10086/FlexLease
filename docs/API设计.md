@@ -177,6 +177,8 @@
 
 > 目前通知发送为模拟实现：若渠道为 `EMAIL` 且收件人不为合法邮箱格式，将返回校验错误；其它渠道默认视为发送成功并写入通知日志。
 
+> 说明：运营指标接口实际由订单服务提供，仍透出在 `/api/v1/analytics/**` 路径下，网关/前端需路由至 `order-service`。
+
 ### 7.2 运营看板
 | 方法 | URL | 描述 | 响应字段 |
 | ---- | --- | ---- | -------- |
@@ -192,7 +194,8 @@
   - `/api/v1/products/**` `/api/v1/catalog/**` → product-service
   - `/api/v1/orders/**` → order-service
   - `/api/v1/payments/**` → payment-service
-  - `/api/v1/notifications/**` `/api/v1/analytics/**` → notification-service
+  - `/api/v1/notifications/**` → notification-service
+  - `/api/v1/analytics/**` → order-service
 - 前端 SPA 使用 axios 拦截器统一注入 token 与错误提示。
 
 ## 9. 事件与集成接口

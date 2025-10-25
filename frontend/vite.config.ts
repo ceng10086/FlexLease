@@ -44,6 +44,16 @@ export default defineConfig((configEnv: ConfigEnv) => {
       target: 'http://localhost:9003',
       changeOrigin: true,
       secure: false
+    },
+    '/api/v1/analytics': {
+      target: 'http://localhost:9004',
+      changeOrigin: true,
+      secure: false
+    },
+    '/api/v1/notifications': {
+      target: 'http://localhost:9006',
+      changeOrigin: true,
+      secure: false
     }
   } as const;
 
