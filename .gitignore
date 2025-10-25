@@ -19,6 +19,10 @@ build/
 # Node / Frontend
 node_modules/
 dist/
+playwright-report/
+test-results/
+frontend/test-results/
+frontend/playwright-report/
 yarn-error.log
 pnpm-debug.log
 npm-debug.log

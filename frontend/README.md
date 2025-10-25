@@ -8,6 +8,7 @@
 - 🧭 路由守卫：支持未登录重定向、角色控制（管理员可访问审核页）。
 - 🛠️ 厂商工作台：新增商品、配置租赁方案与 SKU、调整库存、提交审核。
 - ✅ 管理员审核：查看待审商品列表，执行通过/驳回操作。
+- 📊 运营仪表盘：接入 `/api/v1/analytics/dashboard` 展示 GMV、状态分布等核心指标。
 - 🎨 UI 框架：集成 Ant Design Vue，提供布局、表单、表格、抽屉等组件。
 
 ## 快速开始
@@ -15,6 +16,8 @@
 cd frontend
 npm install
 npm run dev
+# 端到端测试
+npm run test:e2e
 ```
 
 开发环境默认通过 Vite 代理分别联调 9001/9002/9003 服务，可在 `vite.config.ts` 调整。
@@ -22,6 +25,11 @@ npm run dev
 ## 生产构建
 ```powershell
 npm run build
+```
+
+## 测试
+```powershell
+npm run test:e2e        # 启动本地预览并运行 Playwright 端到端测试
 ```
 
 产物位于 `frontend/dist`，可交由网关或静态资源服务器托管。

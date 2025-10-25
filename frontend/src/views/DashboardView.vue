@@ -25,6 +25,59 @@
     </header>
 
     <main class="dashboard__content">
+      <a-row :gutter="16" class="dashboard__metrics">
+        <a-col :xs="24" :lg="16">
+          <a-card title="平台运营指标" bordered>
+            <a-spin :spinning="analytics.loading">
+              <template v-if="analytics.error">
+                <a-alert type="error" :message="analytics.error" show-icon />
+              </template>
+              <template v-else>
+                <div v-if="dashboardMetrics" class="metrics-grid">
+                  <a-row :gutter="16">
+                    <a-col :xs="12" :md="8">
+                      <a-statistic title="总订单" :value="dashboardMetrics.totalOrders" />
+                    </a-col>
+                    <a-col :xs="12" :md="8">
+                      <a-statistic title="活跃订单" :value="dashboardMetrics.activeOrders" />
+                    </a-col>
+                    <a-col :xs="12" :md="8">
+                      <a-statistic title="租赁中" :value="dashboardMetrics.inLeaseCount" />
+                    </a-col>
+                    <a-col :xs="12" :md="8">
+                      <a-statistic title="待退租" :value="dashboardMetrics.pendingReturns" />
+                    </a-col>
+                    <a-col :xs="24" :md="8">
+                      <a-statistic title="GMV (¥)" :value="formatCurrency(dashboardMetrics.totalGmv)" />
+                    </a-col>
+                  </a-row>
+                  <div class="status-breakdown" v-if="statusEntries.length">
+                    <span class="status-breakdown__title">状态分布：</span>
+                    <a-space wrap>
+                      <a-tag v-for="entry in statusEntries" :key="entry.status">
+                        {{ entry.status }}：{{ entry.count }}
+                      </a-tag>
+                    </a-space>
+                  </div>
+                </div>
+                <a-empty v-else description="暂无运营数据" />
+              </template>
+            </a-spin>
+          </a-card>
+        </a-col>
+        <a-col :xs="24" :lg="8">
+          <a-card title="重要提醒" bordered>
+            <a-empty v-if="!statusEntries.length" description="暂无需要关注的订单" />
+            <ul v-else class="reminder-list">
+              <li v-for="entry in statusEntries" :key="entry.status">
+                <span class="reminder-list__status">{{ entry.status }}</span>
+                <span class="reminder-list__count">{{ entry.count }}</span>
+              </li>
+            </ul>
+          </a-card>
+        </a-col>
+      </a-row>
+
       <a-row :gutter="16">
         <a-col :xs="24" :md="12" :lg="8">
           <a-card title="我的信息" bordered>
@@ -59,9 +112,13 @@
 import { computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
+import { useAnalyticsStore } from '../stores/analytics';
+import { storeToRefs } from 'pinia';
 
 const auth = useAuthStore();
 const router = useRouter();
+const analytics = useAnalyticsStore();
+const { metrics: dashboardMetrics, statusEntries } = storeToRefs(analytics);
 
 onMounted(async () => {
   if (!auth.user && auth.token) {
@@ -72,6 +129,10 @@ onMounted(async () => {
       auth.clearSession();
       router.replace('/login');
     }
+  }
+
+  if (!analytics.metrics?.value) {
+    await analytics.loadDashboard();
   }
 });
 
@@ -95,6 +156,13 @@ const goAdminProducts = () => {
 const handleLogout = () => {
   auth.logout();
   router.replace('/login');
+};
+
+const formatCurrency = (value: number) => {
+  return value.toLocaleString('zh-CN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
 };
 </script>
 
@@ -142,6 +210,10 @@ const handleLogout = () => {
   padding: 24px;
 }
 
+.dashboard__metrics {
+  margin-bottom: 24px;
+}
+
 .dashboard__actions {
   display: flex;
   align-items: center;
@@ -150,5 +222,38 @@ const handleLogout = () => {
 
 .dashboard__shortcuts {
   margin-top: 24px;
+}
+
+.metrics-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.status-breakdown {
+  margin-top: 16px;
+}
+
+.status-breakdown__title {
+  font-weight: 600;
+  margin-right: 8px;
+}
+
+.reminder-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.reminder-list__status {
+  font-weight: 600;
+  margin-right: 8px;
+}
+
+.reminder-list__count {
+  color: #1677ff;
 }
 </style>
