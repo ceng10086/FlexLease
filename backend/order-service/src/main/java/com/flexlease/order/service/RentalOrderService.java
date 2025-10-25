@@ -115,7 +115,7 @@ public class RentalOrderService {
 
     @Transactional(Transactional.TxType.SUPPORTS)
     public RentalOrderResponse getOrder(UUID orderId) {
-        RentalOrder order = rentalOrderRepository.findWithDetailsById(orderId)
+        RentalOrder order = rentalOrderRepository.findByIdWithDetails(orderId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "订单不存在"));
         return assembler.toOrderResponse(order);
     }
@@ -321,7 +321,7 @@ public class RentalOrderService {
     }
 
     private RentalOrder getOrderForUpdate(UUID orderId) {
-        return rentalOrderRepository.findWithDetailsById(orderId)
+        return rentalOrderRepository.findByIdWithDetails(orderId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "订单不存在"));
     }
 
