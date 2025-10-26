@@ -98,7 +98,10 @@
             <div class="dashboard__shortcuts">
               <a-space>
                 <a-button type="primary" @click="goProducts" v-if="isVendor">管理我的商品</a-button>
+                <a-button @click="goVendorOnboarding" v-if="isVendor">查看入驻申请</a-button>
                 <a-button @click="goAdminProducts" v-if="isAdmin">审核商品</a-button>
+                <a-button @click="goAdminVendors" v-if="isAdmin">厂商审核</a-button>
+                <a-button type="dashed" @click="goOperationsConsole" v-if="isAdmin">运营工具箱</a-button>
               </a-space>
             </div>
           </a-card>
@@ -149,8 +152,20 @@ const goProducts = () => {
   router.push({ name: 'products' });
 };
 
+const goVendorOnboarding = () => {
+  router.push({ name: 'vendor-onboarding' });
+};
+
 const goAdminProducts = () => {
   router.push({ name: 'admin-products' });
+};
+
+const goAdminVendors = () => {
+  router.push({ name: 'admin-vendors' });
+};
+
+const goOperationsConsole = () => {
+  router.push({ name: 'operations-console' });
 };
 
 const handleLogout = () => {

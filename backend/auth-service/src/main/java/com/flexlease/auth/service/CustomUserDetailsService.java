@@ -39,8 +39,8 @@ public class CustomUserDetailsService implements UserDetailsService {
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         UserAccount account = userAccountRepository.findByUsernameIgnoreCase(username)
                 .orElseThrow(() -> new UsernameNotFoundException("用户不存在"));
-        if (account.getStatus() != UserStatus.ENABLED) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "账号未启用");
+        if (account.getStatus() == UserStatus.DISABLED) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "账号已被禁用");
         }
         Set<java.util.UUID> roleIds = userRoleRepository.findByIdUserId(account.getId())
             .stream()

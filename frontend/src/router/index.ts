@@ -24,9 +24,27 @@ const router = createRouter({
       meta: { requiresAuth: true }
     },
     {
+      path: '/vendor/onboarding',
+      name: 'vendor-onboarding',
+      component: () => import('../views/VendorOnboardingView.vue'),
+      meta: { requiresAuth: true, roles: ['VENDOR'] }
+    },
+    {
       path: '/admin/products',
       name: 'admin-products',
       component: () => import('../views/AdminProductView.vue'),
+      meta: { requiresAuth: true, roles: ['ADMIN'] }
+    },
+    {
+      path: '/admin/vendors',
+      name: 'admin-vendors',
+      component: () => import('../views/AdminVendorApplicationsView.vue'),
+      meta: { requiresAuth: true, roles: ['ADMIN'] }
+    },
+    {
+      path: '/admin/operations',
+      name: 'operations-console',
+      component: () => import('../views/OperationsConsoleView.vue'),
       meta: { requiresAuth: true, roles: ['ADMIN'] }
     },
     {
