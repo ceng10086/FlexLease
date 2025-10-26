@@ -302,9 +302,9 @@ const activeTab = ref('orders');
 
 const orderItemsPlaceholder = `[
   {
-    "productId": "...",
-    "skuId": "...",
-    "planId": "...",
+    "productId": "11111111-1111-1111-1111-111111111111",
+    "skuId": "22222222-2222-2222-2222-222222222222",
+    "planId": "33333333-3333-3333-3333-333333333333",
     "productName": "办公桌",
     "skuCode": "DESK-001",
     "planSnapshot": "{\\"termMonths\\":12}",
@@ -390,13 +390,104 @@ const notificationLogs = reactive({
   loading: false
 });
 
+const uuidPattern = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
+const fallbackUuid = (seed: string) => {
+  const text = seed || 'fallback';
+  let hex = '';
+  for (let i = 0; i < text.length && hex.length < 32; i += 1) {
+    hex += text.charCodeAt(i).toString(16).padStart(2, '0');
+  }
+  if (hex.length < 32) {
+    hex = hex.padEnd(32, '0');
+  } else if (hex.length > 32) {
+    hex = hex.slice(0, 32);
+  }
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+};
+
+const normalizeUuid = (value: unknown, fieldLabel: string, required: boolean) => {
+  const raw = value == null ? '' : String(value).trim();
+  if (!raw) {
+    if (required) {
+      throw new Error(`${fieldLabel} 不能为空`);
+    }
+    return undefined;
+  }
+  if (uuidPattern.test(raw)) {
+    return raw;
+  }
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return fallbackUuid(raw);
+};
+
+const normalizeNumber = (value: unknown, fieldLabel: string, options?: { min?: number }) => {
+  const num = Number(value);
+  if (!Number.isFinite(num)) {
+    throw new Error(`${fieldLabel} 必须为数字`);
+  }
+  if (options?.min !== undefined && num < options.min) {
+    throw new Error(`${fieldLabel} 需大于等于 ${options.min}`);
+  }
+  return num;
+};
+
+const normalizeString = (value: unknown, fieldLabel: string, required = false) => {
+  const raw = value == null ? '' : String(value).trim();
+  if (!raw && required) {
+    throw new Error(`${fieldLabel} 不能为空`);
+  }
+  return raw || undefined;
+};
+
+const sanitizeOrderItems = (items: unknown[]) => {
+  return items.map((item, index) => {
+    if (!item || typeof item !== 'object') {
+      throw new Error(`第 ${index + 1} 条订单明细格式不正确`);
+    }
+    const record = item as Record<string, unknown>;
+    const productId = normalizeUuid(record.productId, `第 ${index + 1} 条 productId`, true);
+    const skuId = normalizeUuid(record.skuId, `第 ${index + 1} 条 skuId`, false);
+    const planId = normalizeUuid(record.planId, `第 ${index + 1} 条 planId`, false);
+    const productName = normalizeString(record.productName, `第 ${index + 1} 条 productName`, true);
+    const skuCode = normalizeString(record.skuCode, `第 ${index + 1} 条 skuCode`, false);
+    const planSnapshot = normalizeString(record.planSnapshot, `第 ${index + 1} 条 planSnapshot`, false);
+    const quantity = Number.parseInt(String(record.quantity ?? '1'), 10);
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      throw new Error(`第 ${index + 1} 条 quantity 需为大于 0 的整数`);
+    }
+    const unitRentAmount = normalizeNumber(record.unitRentAmount, `第 ${index + 1} 条 unitRentAmount`, { min: 0 });
+    const unitDepositAmount = normalizeNumber(record.unitDepositAmount, `第 ${index + 1} 条 unitDepositAmount`, { min: 0 });
+    const buyoutPrice = record.buyoutPrice != null && record.buyoutPrice !== ''
+      ? normalizeNumber(record.buyoutPrice, `第 ${index + 1} 条 buyoutPrice`, { min: 0 })
+      : undefined;
+
+    return {
+      productId,
+      skuId,
+      planId,
+      productName: productName!,
+      skuCode,
+      planSnapshot,
+      quantity,
+      unitRentAmount,
+      unitDepositAmount,
+      buyoutPrice
+    };
+  });
+};
+
 const parseItems = () => {
   try {
     const items = JSON.parse(orderPreview.itemsJson || '[]');
     if (!Array.isArray(items) || items.length === 0) {
       throw new Error('请提供至少一条订单明细');
     }
-    return items;
+    const normalized = sanitizeOrderItems(items);
+    orderPreview.itemsJson = JSON.stringify(normalized, null, 2);
+    return normalized;
   } catch (error: any) {
     throw new Error(`订单明细 JSON 解析失败: ${error.message ?? error}`);
   }
