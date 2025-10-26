@@ -45,8 +45,18 @@ export default defineConfig((configEnv: ConfigEnv) => {
       changeOrigin: true,
       secure: false
     },
+    '/api/v1/orders': {
+      target: 'http://localhost:9004',
+      changeOrigin: true,
+      secure: false
+    },
     '/api/v1/analytics': {
       target: 'http://localhost:9004',
+      changeOrigin: true,
+      secure: false
+    },
+    '/api/v1/payments': {
+      target: 'http://localhost:9005',
       changeOrigin: true,
       secure: false
     },
