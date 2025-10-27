@@ -1,6 +1,7 @@
 import { defineConfig, loadEnv } from 'vite';
 import type { ConfigEnv, ProxyOptions } from 'vite';
 import vue from '@vitejs/plugin-vue';
+import path from 'node:path';
 
 export default defineConfig((configEnv: ConfigEnv) => {
   const env = loadEnv(configEnv.mode, process.cwd(), '');
@@ -79,6 +80,11 @@ export default defineConfig((configEnv: ConfigEnv) => {
 
   return {
     plugins: [vue()],
+    resolve: {
+      alias: {
+        '@': path.resolve(__dirname, 'src')
+      }
+    },
     server: {
       port: Number(env.VITE_DEV_PORT ?? 5173),
       proxy: proxyConfig

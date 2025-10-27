@@ -1,43 +1,53 @@
 # FlexLease 前端
 
-基于 **Vite + Vue 3 + TypeScript** 的管理端单页应用，已完成登录、仪表盘，以及迭代 2 新增的厂商商品管理与管理员审核界面。配套 Pinia 状态管理、Vue Router 与 Ant Design Vue 组件库。
+该前端基于 [Vite](https://vitejs.dev/) + [Vue 3](https://vuejs.org/) + [Ant Design Vue](https://www.antdv.com/) 重写，实现了平台管理员、B 端厂商、C 端用户三类角色的完整工作台体验，并按照《项目说明.md》所述业务范围提供了模拟数据与后端对接能力。
 
 ## 功能概览
-- 🔐 登录表单：调用 `/api/v1/auth/token` 完成账号认证，并在 Pinia 中持久化 JWT。
-- 👤 用户信息：登录后自动读取 `/api/v1/auth/me`，展示用户名、角色等摘要。
-- 🧭 路由守卫：支持未登录重定向、角色控制（管理员可访问审核页）。
-- 🛠️ 厂商工作台：新增商品、配置租赁方案与 SKU、调整库存、提交审核。
-- 🧾 入驻申请：厂商可在线提交/查看入驻申请进度，复用 `/api/v1/vendors/applications` 接口。
-- ✅ 管理员审核：查看待审商品列表，执行通过/驳回操作。
-- 🗳️ 厂商审核后台：管理员可筛选厂商入驻申请并完成审批。
-- 🔄 运营工具箱：集成订单、支付、通知的常用操作入口，支持快速验证迭代 3-5 功能。
-- 📊 运营仪表盘：接入 `/api/v1/analytics/dashboard` 展示 GMV、状态分布等核心指标。
-- 🎨 UI 框架：集成 Ant Design Vue，提供布局、表单、表格、抽屉等组件。
 
-## 快速开始
-```powershell
+- **统一登录入口**：支持真实接口登录与三种角色的模拟体验模式。
+- **角色工作台**：
+  - *C 端用户*：租赁概览、商品目录、订单管理、支付账单。
+  - *B 端厂商*：运营指标、商品管理、订单协同、运营分析。
+  - *平台管理员*：平台指标、商品审核、资金结算、厂商入驻。
+- **数据降级机制**：所有 API 模块在接口不可达时使用 `src/utils/sampleData.ts` 中的示例数据，保障演示连贯性。
+- **可扩展的 API 封装**：`src/api` 下按业务领域拆分服务调用，并在 `vite.config.ts` 中提供本地代理配置。
+
+## 目录结构
+
+```
+frontend/
+├── src
+│   ├── api/               # 后端接口封装与降级策略
+│   ├── components/        # 通用组件与布局组件
+│   ├── stores/            # Pinia 状态管理（认证等）
+│   ├── utils/             # 工具函数与示例数据
+│   ├── views/             # 各角色页面
+│   ├── router/            # 路由与守卫
+│   ├── styles/            # 全局样式
+│   └── App.vue / main.ts  # 应用入口
+```
+
+## 本地开发
+
+```bash
 cd frontend
 npm install
 npm run dev
-# 端到端测试
-npm run test:e2e
 ```
 
-开发环境默认通过 Vite 代理分别联调 9001/9002/9003 服务，可在 `vite.config.ts` 调整。
+- 默认端口 `5173`。
+- 若需转发到后端微服务，可在 `.env` 或运行参数中设置 `VITE_API_PROXY`。
+- 当只有部分服务启动时，前端会自动切换到示例数据并在控制台给出提示。
 
-## 生产构建
-```powershell
+## 构建与预览
+
+```bash
 npm run build
+npm run preview
 ```
 
-## 测试
-```powershell
-npm run test:e2e        # 启动本地预览并运行 Playwright 端到端测试
-```
+构建输出位于 `frontend/dist` 目录，可用于静态部署。
 
-产物位于 `frontend/dist`，可交由网关或静态资源服务器托管。
+## 角色模拟说明
 
-## 后续迭代建议
-- 面向 C 端用户的下单体验、订单列表与售后流程仍待补齐。
-- 引入 ESLint + Prettier、组件级单测（Vitest / Testing Library）。
-- 加入响应式布局、文件上传等交互体验优化。
+在登录页选择“快速体验”即可进入各角色工作台。模拟模式会生成虚拟账号并缓存到浏览器 Storage，随时可以在右上角“退出”返回登录页或切换角色。

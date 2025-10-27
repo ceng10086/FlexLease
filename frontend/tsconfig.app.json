@@ -12,7 +12,10 @@
     ],
     "allowJs": false,
     "jsx": "preserve",
-    "baseUrl": "./src"
+    "baseUrl": "./src",
+    "paths": {
+      "@/*": ["./*"]
+    }
   },
   "include": [
     "src/**/*.ts",
