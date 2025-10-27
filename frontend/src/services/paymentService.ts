@@ -1,4 +1,4 @@
-import api from './api';
+import http from './http';
 
 export type PaymentScene = 'DEPOSIT' | 'RENT' | 'BUYOUT' | 'PENALTY';
 export type PaymentChannel = 'MOCK' | 'ALIPAY' | 'WECHAT' | 'BANK_TRANSFER';
@@ -23,13 +23,6 @@ export type PaymentInitPayload = {
 export type PaymentConfirmPayload = {
   channelTransactionNo?: string;
   paidAt?: string;
-};
-
-export type PaymentCallbackPayload = {
-  status: PaymentStatus;
-  channelTransactionNo?: string;
-  paidAt?: string;
-  failureReason?: string;
 };
 
 export type PaymentRefundPayload = {
@@ -57,30 +50,28 @@ type ApiResponse<T> = {
 };
 
 export const initPayment = async (orderId: string, payload: PaymentInitPayload) => {
-  const response = await api.post<ApiResponse<any>>(`/payments/${orderId}/init`, payload);
+  const response = await http.post<ApiResponse<any>>(`/payments/${orderId}/init`, payload);
   return response.data.data;
 };
 
-export const getPayment = async (transactionId: string) => {
-  const response = await api.get<ApiResponse<any>>(`/payments/${transactionId}`);
+export const fetchPayment = async (transactionId: string) => {
+  const response = await http.get<ApiResponse<any>>(`/payments/${transactionId}`);
   return response.data.data;
 };
 
-export const confirmPayment = async (transactionId: string, payload: PaymentConfirmPayload) => {
-  const response = await api.post<ApiResponse<any>>(`/payments/${transactionId}/confirm`, payload);
-  return response.data.data;
-};
-
-export const handlePaymentCallback = async (
+export const confirmPayment = async (
   transactionId: string,
-  payload: PaymentCallbackPayload
+  payload: PaymentConfirmPayload
 ) => {
-  const response = await api.post<ApiResponse<any>>(`/payments/${transactionId}/callback`, payload);
+  const response = await http.post<ApiResponse<any>>(`/payments/${transactionId}/confirm`, payload);
   return response.data.data;
 };
 
-export const refundPayment = async (transactionId: string, payload: PaymentRefundPayload) => {
-  const response = await api.post<ApiResponse<any>>(`/payments/${transactionId}/refund`, payload);
+export const refundPayment = async (
+  transactionId: string,
+  payload: PaymentRefundPayload
+) => {
+  const response = await http.post<ApiResponse<any>>(`/payments/${transactionId}/refund`, payload);
   return response.data.data;
 };
 
@@ -91,7 +82,7 @@ export const listSettlements = async (params: {
   refundFrom?: string;
   refundTo?: string;
 }) => {
-  const response = await api.get<ApiResponse<PaymentSettlementResponse[]>>('/payments/settlements', {
+  const response = await http.get<ApiResponse<PaymentSettlementResponse[]>>('/payments/settlements', {
     params
   });
   return response.data.data;

@@ -1,6 +1,9 @@
-import api from './api';
+import http from './http';
 
 export type ProductStatus = 'DRAFT' | 'PENDING_REVIEW' | 'ACTIVE' | 'INACTIVE' | 'REJECTED';
+export type RentalPlanType = 'STANDARD' | 'RENT_TO_OWN' | 'LEASE_TO_SALE';
+export type RentalPlanStatus = 'DRAFT' | 'ACTIVE' | 'INACTIVE';
+export type ProductSkuStatus = 'ACTIVE' | 'INACTIVE';
 
 export type ProductSummary = {
   id: string;
@@ -13,16 +16,10 @@ export type ProductSummary = {
   createdAt: string;
 };
 
-export type RentalPlanType = 'STANDARD' | 'RENT_TO_OWN' | 'LEASE_TO_SALE';
-
-export type RentalPlanStatus = 'DRAFT' | 'ACTIVE' | 'INACTIVE';
-
-export type ProductSkuStatus = 'ACTIVE' | 'INACTIVE';
-
 export type RentalSku = {
   id: string;
   skuCode: string;
-  attributes: Record<string, unknown>;
+  attributes?: Record<string, unknown> | null;
   stockTotal: number;
   stockAvailable: number;
   status: ProductSkuStatus;
@@ -46,12 +43,12 @@ export type RentalPlan = {
   skus: RentalSku[];
 };
 
-export type PagedResult<T> = {
-  content: T[];
-  page: number;
-  size: number;
-  totalElements: number;
-  totalPages: number;
+export type ProductDetail = ProductSummary & {
+  description?: string | null;
+  coverImageUrl?: string | null;
+  reviewRemark?: string | null;
+  reviewedBy?: string | null;
+  rentalPlans: RentalPlan[];
 };
 
 export type ProductPayload = {
@@ -59,19 +56,6 @@ export type ProductPayload = {
   categoryCode: string;
   description?: string;
   coverImageUrl?: string;
-};
-
-export type ProductDetail = ProductSummary & {
-  description?: string | null;
-  coverImageUrl?: string | null;
-  reviewRemark?: string | null;
-  reviewedBy?: string | null;
-  rentalPlans?: RentalPlan[];
-};
-
-export type ProductApprovalPayload = {
-  reviewerId: string;
-  remark?: string;
 };
 
 export type RentalPlanPayload = {
@@ -99,36 +83,86 @@ export type InventoryAdjustPayload = {
   referenceId?: string;
 };
 
+export type ProductApprovalPayload = {
+  reviewerId: string;
+  remark?: string;
+};
+
+type ApiResponse<T> = {
+  code: number;
+  message: string;
+  data: T;
+};
+
+export type PagedResult<T> = {
+  content: T[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+};
+
 export const listVendorProducts = async (
   vendorId: string,
   params: { page?: number; size?: number; status?: ProductStatus; keyword?: string } = {}
 ): Promise<PagedResult<ProductSummary>> => {
-  const response = await api.get(`/vendors/${vendorId}/products`, { params });
-  return response.data.data as PagedResult<ProductSummary>;
+  const response = await http.get<ApiResponse<PagedResult<ProductSummary>>>(
+    `/vendors/${vendorId}/products`,
+    { params }
+  );
+  return response.data.data;
 };
 
 export const createVendorProduct = async (
   vendorId: string,
   payload: ProductPayload
 ): Promise<ProductDetail> => {
-  const response = await api.post(`/vendors/${vendorId}/products`, payload);
-  return response.data.data as ProductDetail;
+  const response = await http.post<ApiResponse<ProductDetail>>(`/vendors/${vendorId}/products`, payload);
+  return response.data.data;
+};
+
+export const updateVendorProduct = async (
+  vendorId: string,
+  productId: string,
+  payload: ProductPayload
+): Promise<ProductDetail> => {
+  const response = await http.put<ApiResponse<ProductDetail>>(
+    `/vendors/${vendorId}/products/${productId}`,
+    payload
+  );
+  return response.data.data;
 };
 
 export const submitVendorProduct = async (
   vendorId: string,
   productId: string
 ): Promise<ProductDetail> => {
-  const response = await api.post(`/vendors/${vendorId}/products/${productId}/submit`);
-  return response.data.data as ProductDetail;
+  const response = await http.post<ApiResponse<ProductDetail>>(
+    `/vendors/${vendorId}/products/${productId}/submit`
+  );
+  return response.data.data;
 };
 
-export const getVendorProduct = async (
+export const toggleProductShelf = async (
+  vendorId: string,
+  productId: string,
+  publish: boolean
+): Promise<ProductDetail> => {
+  const response = await http.post<ApiResponse<ProductDetail>>(
+    `/vendors/${vendorId}/products/${productId}/shelve`,
+    { publish }
+  );
+  return response.data.data;
+};
+
+export const fetchVendorProduct = async (
   vendorId: string,
   productId: string
 ): Promise<ProductDetail> => {
-  const response = await api.get(`/vendors/${vendorId}/products/${productId}`);
-  return response.data.data as ProductDetail;
+  const response = await http.get<ApiResponse<ProductDetail>>(
+    `/vendors/${vendorId}/products/${productId}`
+  );
+  return response.data.data;
 };
 
 export const createRentalPlan = async (
@@ -136,8 +170,11 @@ export const createRentalPlan = async (
   productId: string,
   payload: RentalPlanPayload
 ): Promise<RentalPlan> => {
-  const response = await api.post(`/vendors/${vendorId}/products/${productId}/rental-plans`, payload);
-  return response.data.data as RentalPlan;
+  const response = await http.post<ApiResponse<RentalPlan>>(
+    `/vendors/${vendorId}/products/${productId}/rental-plans`,
+    payload
+  );
+  return response.data.data;
 };
 
 export const activateRentalPlan = async (
@@ -145,10 +182,10 @@ export const activateRentalPlan = async (
   productId: string,
   planId: string
 ): Promise<RentalPlan> => {
-  const response = await api.post(
+  const response = await http.post<ApiResponse<RentalPlan>>(
     `/vendors/${vendorId}/products/${productId}/rental-plans/${planId}/activate`
   );
-  return response.data.data as RentalPlan;
+  return response.data.data;
 };
 
 export const deactivateRentalPlan = async (
@@ -156,10 +193,10 @@ export const deactivateRentalPlan = async (
   productId: string,
   planId: string
 ): Promise<RentalPlan> => {
-  const response = await api.post(
+  const response = await http.post<ApiResponse<RentalPlan>>(
     `/vendors/${vendorId}/products/${productId}/rental-plans/${planId}/deactivate`
   );
-  return response.data.data as RentalPlan;
+  return response.data.data;
 };
 
 export const createSku = async (
@@ -168,11 +205,11 @@ export const createSku = async (
   planId: string,
   payload: SkuPayload
 ): Promise<RentalSku> => {
-  const response = await api.post(
+  const response = await http.post<ApiResponse<RentalSku>>(
     `/vendors/${vendorId}/products/${productId}/rental-plans/${planId}/skus`,
     payload
   );
-  return response.data.data as RentalSku;
+  return response.data.data;
 };
 
 export const updateSku = async (
@@ -182,46 +219,54 @@ export const updateSku = async (
   skuId: string,
   payload: SkuPayload
 ): Promise<RentalSku> => {
-  const response = await api.put(
+  const response = await http.put<ApiResponse<RentalSku>>(
     `/vendors/${vendorId}/products/${productId}/rental-plans/${planId}/skus/${skuId}`,
     payload
   );
-  return response.data.data as RentalSku;
+  return response.data.data;
 };
 
-export const adjustSkuInventory = async (
+export const adjustInventory = async (
   vendorId: string,
   productId: string,
   planId: string,
   skuId: string,
   payload: InventoryAdjustPayload
 ): Promise<RentalSku> => {
-  const response = await api.post(
+  const response = await http.post<ApiResponse<RentalSku>>(
     `/vendors/${vendorId}/products/${productId}/rental-plans/${planId}/skus/${skuId}/inventory/adjust`,
     payload
   );
-  return response.data.data as RentalSku;
+  return response.data.data;
 };
 
 export const listAdminProducts = async (
   params: { status?: ProductStatus; keyword?: string; page?: number; size?: number } = {}
 ): Promise<PagedResult<ProductSummary>> => {
-  const response = await api.get('/admin/products', { params });
-  return response.data.data as PagedResult<ProductSummary>;
+  const response = await http.get<ApiResponse<PagedResult<ProductSummary>>>('/admin/products', {
+    params
+  });
+  return response.data.data;
 };
 
 export const approveProduct = async (
   productId: string,
   payload: ProductApprovalPayload
 ): Promise<ProductDetail> => {
-  const response = await api.post(`/admin/products/${productId}/approve`, payload);
-  return response.data.data as ProductDetail;
+  const response = await http.post<ApiResponse<ProductDetail>>(
+    `/admin/products/${productId}/approve`,
+    payload
+  );
+  return response.data.data;
 };
 
 export const rejectProduct = async (
   productId: string,
   payload: ProductApprovalPayload
 ): Promise<ProductDetail> => {
-  const response = await api.post(`/admin/products/${productId}/reject`, payload);
-  return response.data.data as ProductDetail;
+  const response = await http.post<ApiResponse<ProductDetail>>(
+    `/admin/products/${productId}/reject`,
+    payload
+  );
+  return response.data.data;
 };

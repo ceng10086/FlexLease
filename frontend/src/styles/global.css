@@ -1,17 +1,47 @@
 :root {
   font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
-  color: #1f1f1f;
+  color: #0f172a;
   background-color: #f5f7fa;
 }
 
-body,
 html,
+body,
 #app {
   margin: 0;
   padding: 0;
   min-height: 100vh;
+  background: #f5f7fa;
 }
 
 a {
   color: inherit;
+}
+
+.page-container {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.page-header__meta {
+  color: #6b7280;
+  margin-top: 4px;
+}
+
+.card-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.section-divider {
+  margin: 24px 0;
 }

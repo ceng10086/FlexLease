@@ -119,25 +119,40 @@ public class ProductAssembler {
         }
     }
 
-    public CatalogProductResponse toCatalog(Product product) {
-        ProductSummaryResponse summary = toSummary(product);
-        List<CatalogProductResponse.RentalPlanCatalogItem> planItems = product.getRentalPlans().stream()
+        public CatalogProductResponse toCatalog(Product product) {
+        List<CatalogProductResponse.RentalPlanItem> planItems = product.getRentalPlans().stream()
             .filter(plan -> plan.getStatus() == RentalPlanStatus.ACTIVE)
-                .map(plan -> new CatalogProductResponse.RentalPlanCatalogItem(
-                        toRentalPlanResponse(plan),
-                        Optional.ofNullable(plan.getSkus())
-                                .orElse(List.of())
-                                .stream()
+            .map(plan -> new CatalogProductResponse.RentalPlanItem(
+                plan.getId(),
+                plan.getPlanType(),
+                plan.getTermMonths(),
+                plan.getDepositAmount(),
+                plan.getRentAmountMonthly(),
+                plan.getBuyoutPrice(),
+                plan.isAllowExtend(),
+                plan.getExtensionUnit(),
+                plan.getExtensionPrice(),
+                Optional.ofNullable(plan.getSkus()).orElse(List.of()).stream()
                     .filter(sku -> sku.getStatus() == ProductSkuStatus.ACTIVE)
-                                .map(sku -> new CatalogProductResponse.CatalogSkuItem(
-                                        sku.getSkuCode(),
-                                        sku.getStockAvailable(),
-                                        plan.getRentAmountMonthly(),
-                                        plan.getDepositAmount()
-                                ))
-                                .collect(Collectors.toList())
-                ))
-                .collect(Collectors.toList());
-        return new CatalogProductResponse(summary, planItems);
-    }
+                    .map(sku -> new CatalogProductResponse.CatalogSkuItem(
+                        sku.getId(),
+                        sku.getSkuCode(),
+                        readAttributes(sku.getAttributes()),
+                        sku.getStockTotal(),
+                        sku.getStockAvailable()
+                    ))
+                    .collect(Collectors.toList())
+            ))
+            .collect(Collectors.toList());
+        return new CatalogProductResponse(
+            product.getId(),
+            product.getVendorId(),
+            product.getName(),
+            product.getCategoryCode(),
+            product.getDescription(),
+            product.getCoverImageUrl(),
+            product.getStatus(),
+            planItems
+        );
+        }
 }

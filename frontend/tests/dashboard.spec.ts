@@ -59,7 +59,7 @@ test.describe('Dashboard analytics', () => {
     await expect(page.getByText('42')).toBeVisible();
     await expect(page.getByText('GMV (¥)')).toBeVisible();
     await expect(page.getByText('123,456.78')).toBeVisible();
-    await expect(page.getByText('状态分布：')).toBeVisible();
+    await expect(page.getByText('订单状态分布：')).toBeVisible();
     await expect(page.getByText('IN_LEASE：12')).toBeVisible();
   });
 });

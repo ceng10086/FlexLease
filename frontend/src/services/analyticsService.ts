@@ -1,4 +1,4 @@
-import api from './api';
+import http from './http';
 
 export type OrderStatusBreakdown = Record<string, number>;
 
@@ -22,16 +22,16 @@ type ApiResponse<T> = {
 };
 
 export const fetchDashboardMetrics = async (): Promise<DashboardMetrics> => {
-  const response = await api.get<ApiResponse<DashboardMetrics>>('/analytics/dashboard');
-  if (!response.data?.data) {
-    throw new Error('未能获取运营指标');
+  const response = await http.get<ApiResponse<DashboardMetrics>>('/analytics/dashboard');
+  if (!response.data.data) {
+    throw new Error('未能获取平台指标');
   }
   return response.data.data;
 };
 
 export const fetchVendorMetrics = async (vendorId: string): Promise<VendorMetrics> => {
-  const response = await api.get<ApiResponse<VendorMetrics>>(`/analytics/vendor/${vendorId}`);
-  if (!response.data?.data) {
+  const response = await http.get<ApiResponse<VendorMetrics>>(`/analytics/vendor/${vendorId}`);
+  if (!response.data.data) {
     throw new Error('未能获取厂商指标');
   }
   return response.data.data;

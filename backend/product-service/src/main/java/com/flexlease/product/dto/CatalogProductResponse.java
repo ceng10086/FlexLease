@@ -1,22 +1,41 @@
 package com.flexlease.product.dto;
 
+import com.flexlease.product.domain.ProductStatus;
+import com.flexlease.product.domain.RentalPlanType;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 public record CatalogProductResponse(
-        ProductSummaryResponse product,
-        List<RentalPlanCatalogItem> plans
+        UUID id,
+        UUID vendorId,
+        String name,
+        String categoryCode,
+        String description,
+        String coverImageUrl,
+        ProductStatus status,
+        List<RentalPlanItem> rentalPlans
 ) {
 
-    public record RentalPlanCatalogItem(
-            RentalPlanResponse plan,
+    public record RentalPlanItem(
+            UUID id,
+            RentalPlanType planType,
+            int termMonths,
+            BigDecimal depositAmount,
+            BigDecimal rentAmountMonthly,
+            BigDecimal buyoutPrice,
+            boolean allowExtend,
+            String extensionUnit,
+            BigDecimal extensionPrice,
             List<CatalogSkuItem> skus
     ) {}
 
     public record CatalogSkuItem(
+            UUID id,
             String skuCode,
-            int stockAvailable,
-            BigDecimal rentAmountMonthly,
-            BigDecimal depositAmount
+            Map<String, Object> attributes,
+            int stockTotal,
+            int stockAvailable
     ) {}
 }

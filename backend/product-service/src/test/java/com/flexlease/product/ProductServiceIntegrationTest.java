@@ -95,10 +95,13 @@ class ProductServiceIntegrationTest {
         PagedResponse<CatalogProductResponse> catalogList = catalogQueryService.listActive(null, null, PageRequest.of(0, 10));
         assertThat(catalogList.content()).hasSize(1);
         CatalogProductResponse catalogProduct = catalogList.content().getFirst();
-        assertThat(catalogProduct.product().status()).isEqualTo(ProductStatus.ACTIVE);
-        assertThat(catalogProduct.plans()).isNotEmpty();
+        assertThat(catalogProduct.status()).isEqualTo(ProductStatus.ACTIVE);
+        assertThat(catalogProduct.rentalPlans()).isNotEmpty();
 
         CatalogProductResponse detail = catalogQueryService.getProduct(createdProduct.id());
-        assertThat(detail.product().id()).isEqualTo(createdProduct.id());
+        assertThat(detail.id()).isEqualTo(createdProduct.id());
+        assertThat(detail.rentalPlans()).allSatisfy(planItem -> assertThat(planItem.skus()).allSatisfy(skuItem ->
+                assertThat(skuItem.stockAvailable()).isGreaterThanOrEqualTo(0)
+        ));
     }
 }

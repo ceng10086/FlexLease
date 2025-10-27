@@ -1,4 +1,4 @@
-import api from './api';
+import http from './http';
 
 export type VendorApplicationStatus = 'SUBMITTED' | 'APPROVED' | 'REJECTED';
 
@@ -46,51 +46,45 @@ export const submitVendorApplication = async (
   ownerUserId: string,
   payload: VendorApplicationPayload
 ): Promise<VendorApplication> => {
-  const response = await api.post<ApiResponse<VendorApplication>>(
-    '/vendors/applications',
-    payload,
-    {
-      headers: {
-        'X-User-Id': ownerUserId
-      }
+  const response = await http.post<ApiResponse<VendorApplication>>('/vendors/applications', payload, {
+    headers: {
+      'X-User-Id': ownerUserId
     }
-  );
+  });
   return response.data.data;
 };
 
 export const listVendorApplications = async (
   status?: VendorApplicationStatus
 ): Promise<VendorApplication[]> => {
-  const response = await api.get<ApiResponse<VendorApplication[]>>('/vendors/applications', {
-    params: {
-      status
-    }
+  const response = await http.get<ApiResponse<VendorApplication[]>>('/vendors/applications', {
+    params: { status }
   });
   return response.data.data;
 };
 
-export const getVendorApplication = async (id: string): Promise<VendorApplication> => {
-  const response = await api.get<ApiResponse<VendorApplication>>(`/vendors/applications/${id}`);
+export const fetchVendorApplication = async (id: string): Promise<VendorApplication> => {
+  const response = await http.get<ApiResponse<VendorApplication>>(`/vendors/applications/${id}`);
   return response.data.data;
 };
 
 export const approveVendorApplication = async (
-  applicationId: string,
+  id: string,
   payload: VendorApplicationReviewPayload
 ): Promise<VendorApplication> => {
-  const response = await api.post<ApiResponse<VendorApplication>>(
-    `/vendors/applications/${applicationId}/approve`,
+  const response = await http.post<ApiResponse<VendorApplication>>(
+    `/vendors/applications/${id}/approve`,
     payload
   );
   return response.data.data;
 };
 
 export const rejectVendorApplication = async (
-  applicationId: string,
+  id: string,
   payload: VendorApplicationReviewPayload
 ): Promise<VendorApplication> => {
-  const response = await api.post<ApiResponse<VendorApplication>>(
-    `/vendors/applications/${applicationId}/reject`,
+  const response = await http.post<ApiResponse<VendorApplication>>(
+    `/vendors/applications/${id}/reject`,
     payload
   );
   return response.data.data;

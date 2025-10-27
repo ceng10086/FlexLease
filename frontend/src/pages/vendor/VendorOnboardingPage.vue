@@ -1,16 +1,16 @@
 <template>
-  <div class="page">
-    <header class="page__header">
+  <div class="page-container">
+    <div class="page-header">
       <div>
-        <h2>厂商入驻申请</h2>
-        <p class="page__subtitle">提交企业资料，等待管理员审核后即可管理共享租赁商品。</p>
+        <h2>厂商入驻</h2>
+        <p class="page-header__meta">提交企业资料，等待平台审核后即可管理共享租赁商品。</p>
       </div>
       <a-button type="default" @click="loadApplications" :loading="loading">刷新</a-button>
-    </header>
+    </div>
 
     <a-row :gutter="16">
       <a-col :xs="24" :lg="10">
-        <a-card title="申请记录" bordered>
+        <a-card title="最新申请">
           <a-spin :spinning="loading">
             <template v-if="latestApplication">
               <div class="status">
@@ -23,9 +23,7 @@
               </div>
               <a-descriptions :column="1" size="small" bordered>
                 <a-descriptions-item label="公司名称">{{ latestApplication.companyName }}</a-descriptions-item>
-                <a-descriptions-item label="统一社会信用代码">
-                  {{ latestApplication.unifiedSocialCode }}
-                </a-descriptions-item>
+                <a-descriptions-item label="统一社会信用代码">{{ latestApplication.unifiedSocialCode }}</a-descriptions-item>
                 <a-descriptions-item label="联系人">{{ latestApplication.contactName }}</a-descriptions-item>
                 <a-descriptions-item label="联系电话">{{ latestApplication.contactPhone }}</a-descriptions-item>
                 <a-descriptions-item label="联系邮箱" v-if="latestApplication.contactEmail">
@@ -49,7 +47,7 @@
                 type="success"
                 show-icon
                 class="mt-16"
-                message="审核已通过，您的账号已激活，可继续创建商品并进行租赁业务。"
+                message="审核已通过，您的账号已激活，可继续配置商品。"
               />
               <a-alert
                 v-else-if="latestApplication.status === 'REJECTED'"
@@ -72,14 +70,14 @@
       </a-col>
 
       <a-col :xs="24" :lg="14">
-        <a-card title="提交新申请" bordered>
+        <a-card title="提交新申请">
           <template v-if="canSubmit">
             <a-form layout="vertical" @submit.prevent>
               <a-form-item label="公司名称" required>
                 <a-input v-model:value="form.companyName" placeholder="请输入公司主体名称" />
               </a-form-item>
               <a-form-item label="统一社会信用代码" required>
-                <a-input v-model:value="form.unifiedSocialCode" placeholder="请输入 18 位统一社会信用代码" />
+                <a-input v-model:value="form.unifiedSocialCode" placeholder="请输入 18 位信用代码" />
               </a-form-item>
               <a-row :gutter="12">
                 <a-col :span="12">
@@ -94,7 +92,7 @@
                 </a-col>
               </a-row>
               <a-form-item label="联系邮箱">
-                <a-input v-model:value="form.contactEmail" placeholder="用于接收通知，可选" />
+                <a-input v-model:value="form.contactEmail" placeholder="用于接收通知（可选）" />
               </a-form-item>
               <a-row :gutter="12">
                 <a-col :span="12">
@@ -116,12 +114,7 @@
               </div>
             </a-form>
           </template>
-          <a-alert
-            v-else
-            type="info"
-            show-icon
-            message="当前申请正在审核或已通过，如需修改资料请等待审核完成后再次提交。"
-          />
+          <a-alert v-else type="info" show-icon message="当前申请正在审核或已通过，如需修改请等待审核完成后再次提交。" />
         </a-card>
       </a-col>
     </a-row>
@@ -129,14 +122,16 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, reactive, ref } from 'vue';
 import { message } from 'ant-design-vue';
-import { useAuthStore } from '../stores/auth';
-import type { VendorApplication, VendorApplicationStatus } from '../utils/vendorApi';
-import { listVendorApplications, submitVendorApplication } from '../utils/vendorApi';
+import { useAuthStore } from '../../stores/auth';
+import {
+  listVendorApplications,
+  submitVendorApplication,
+  type VendorApplication
+} from '../../services/vendorService';
 
 const auth = useAuthStore();
-
 const loading = ref(false);
 const submitting = ref(false);
 const applications = ref<VendorApplication[]>([]);
@@ -166,15 +161,9 @@ const myApplications = computed(() => {
 });
 
 const latestApplication = computed(() => myApplications.value.at(0) ?? null);
+const canSubmit = computed(() => !latestApplication.value || latestApplication.value.status === 'REJECTED');
 
-const canSubmit = computed(() => {
-  if (!latestApplication.value) {
-    return true;
-  }
-  return latestApplication.value.status === 'REJECTED';
-});
-
-const statusMeta = (status: VendorApplicationStatus) => {
+const statusMeta = (status: VendorApplication['status']) => {
   switch (status) {
     case 'APPROVED':
       return { color: 'green', label: '已通过' };
@@ -185,10 +174,7 @@ const statusMeta = (status: VendorApplicationStatus) => {
   }
 };
 
-const formatDate = (value?: string | null) => {
-  if (!value) return '-';
-  return new Date(value).toLocaleString();
-};
+const formatDate = (value?: string | null) => (value ? new Date(value).toLocaleString() : '-');
 
 const loadApplications = async () => {
   loading.value = true;
@@ -232,7 +218,7 @@ const handleSubmit = async () => {
       city: '',
       address: ''
     });
-    loadApplications();
+    await loadApplications();
   } catch (error: any) {
     console.error('提交厂商申请失败', error);
     message.error(error?.response?.data?.message ?? '提交失败，请稍后重试');
@@ -241,30 +227,10 @@ const handleSubmit = async () => {
   }
 };
 
-onMounted(() => {
-  loadApplications();
-});
+loadApplications();
 </script>
 
 <style scoped>
-.page {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding: 24px;
-}
-
-.page__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.page__subtitle {
-  color: #6b7280;
-  margin: 4px 0 0;
-}
-
 .status {
   display: flex;
   align-items: center;
@@ -273,7 +239,7 @@ onMounted(() => {
 }
 
 .status__time {
-  color: #6b7280;
+  color: #64748b;
 }
 
 .form__actions {

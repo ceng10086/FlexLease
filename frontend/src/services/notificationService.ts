@@ -1,4 +1,4 @@
-import api from './api';
+import http from './http';
 
 export type NotificationStatus = 'PENDING' | 'SENT' | 'FAILED';
 export type NotificationChannel = 'IN_APP' | 'EMAIL' | 'SMS';
@@ -41,18 +41,18 @@ export type NotificationTemplate = {
 };
 
 export const sendNotification = async (payload: NotificationSendPayload) => {
-  const response = await api.post<ApiResponse<any>>('/notifications/send', payload);
+  const response = await http.post<ApiResponse<any>>('/notifications/send', payload);
   return response.data.data;
 };
 
 export const listNotificationLogs = async (status?: NotificationStatus) => {
-  const response = await api.get<ApiResponse<NotificationLog[]>>('/notifications/logs', {
+  const response = await http.get<ApiResponse<NotificationLog[]>>('/notifications/logs', {
     params: { status }
   });
   return response.data.data;
 };
 
 export const listNotificationTemplates = async () => {
-  const response = await api.get<ApiResponse<NotificationTemplate[]>>('/notifications/templates');
+  const response = await http.get<ApiResponse<NotificationTemplate[]>>('/notifications/templates');
   return response.data.data;
 };

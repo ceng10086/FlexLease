@@ -1,7 +1,7 @@
 <template>
-  <div class="result">
-    <div class="result__header">
-      <span class="result__title">{{ title }}</span>
+  <div class="result-block">
+    <div class="result-block__header">
+      <span class="result-block__title">{{ title }}</span>
       <a-button type="link" size="small" @click="copy">
         <template #icon>
           <CopyOutlined />
@@ -31,31 +31,30 @@ const copy = async () => {
 </script>
 
 <style scoped>
-.result {
-  background: #0f172a10;
+.result-block {
+  margin-top: 16px;
+  background: #0f172a0f;
   border: 1px solid #e2e8f0;
   border-radius: 8px;
   padding: 12px;
-  margin-top: 16px;
-  overflow-x: auto;
 }
 
-.result__header {
+.result-block__header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 8px;
 }
 
-.result__title {
+.result-block__title {
   font-weight: 600;
   color: #1f2937;
 }
 
 pre {
+  margin: 0;
   white-space: pre-wrap;
   word-break: break-word;
-  margin: 0;
   font-family: 'Fira Code', 'Cascadia Code', Consolas, monospace;
   font-size: 12px;
   line-height: 1.5;

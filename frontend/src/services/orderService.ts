@@ -1,4 +1,4 @@
-import api from './api';
+import http from './http';
 
 export type OrderStatus =
   | 'PENDING_PAYMENT'
@@ -57,14 +57,6 @@ export type RentalOrderSummary = {
   createdAt: string;
 };
 
-export type PagedResponse<T> = {
-  content: T[];
-  page: number;
-  size: number;
-  totalElements: number;
-  totalPages: number;
-};
-
 export type OrderPaymentPayload = {
   userId: string;
   paymentReference: string;
@@ -118,18 +110,28 @@ export type OrderBuyoutDecisionPayload = {
   remark?: string;
 };
 
-export const previewOrder = async (payload: OrderPreviewPayload): Promise<OrderPreviewResponse> => {
-  const response = await api.post<ApiResponse<OrderPreviewResponse>>('/orders/preview', payload);
+export type PagedResponse<T> = {
+  content: T[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+};
+
+export const previewOrder = async (
+  payload: OrderPreviewPayload
+): Promise<OrderPreviewResponse> => {
+  const response = await http.post<ApiResponse<OrderPreviewResponse>>('/orders/preview', payload);
   return response.data.data;
 };
 
 export const createOrder = async (payload: CreateOrderPayload) => {
-  const response = await api.post<ApiResponse<any>>('/orders', payload);
+  const response = await http.post<ApiResponse<any>>('/orders', payload);
   return response.data.data;
 };
 
-export const getOrder = async (orderId: string) => {
-  const response = await api.get<ApiResponse<any>>(`/orders/${orderId}`);
+export const fetchOrder = async (orderId: string) => {
+  const response = await http.get<ApiResponse<any>>(`/orders/${orderId}`);
   return response.data.data;
 };
 
@@ -140,58 +142,88 @@ export const listOrders = async (params: {
   page?: number;
   size?: number;
 }) => {
-  const response = await api.get<ApiResponse<PagedResponse<RentalOrderSummary>>>('/orders', {
+  const response = await http.get<ApiResponse<PagedResponse<RentalOrderSummary>>>('/orders', {
     params
   });
   return response.data.data;
 };
 
-export const confirmOrderPayment = async (orderId: string, payload: OrderPaymentPayload) => {
-  const response = await api.post<ApiResponse<any>>(`/orders/${orderId}/pay`, payload);
+export const confirmOrderPayment = async (
+  orderId: string,
+  payload: OrderPaymentPayload
+) => {
+  const response = await http.post<ApiResponse<any>>(`/orders/${orderId}/pay`, payload);
   return response.data.data;
 };
 
-export const cancelOrder = async (orderId: string, payload: { userId: string; reason?: string }) => {
-  const response = await api.post<ApiResponse<any>>(`/orders/${orderId}/cancel`, payload);
+export const cancelOrder = async (
+  orderId: string,
+  payload: { userId: string; reason?: string }
+) => {
+  const response = await http.post<ApiResponse<any>>(`/orders/${orderId}/cancel`, payload);
   return response.data.data;
 };
 
-export const shipOrder = async (orderId: string, payload: OrderShipmentPayload) => {
-  const response = await api.post<ApiResponse<any>>(`/orders/${orderId}/ship`, payload);
+export const shipOrder = async (
+  orderId: string,
+  payload: OrderShipmentPayload
+) => {
+  const response = await http.post<ApiResponse<any>>(`/orders/${orderId}/ship`, payload);
   return response.data.data;
 };
 
-export const confirmOrderReceive = async (orderId: string, payload: OrderActorPayload) => {
-  const response = await api.post<ApiResponse<any>>(`/orders/${orderId}/confirm-receive`, payload);
+export const confirmOrderReceive = async (
+  orderId: string,
+  payload: OrderActorPayload
+) => {
+  const response = await http.post<ApiResponse<any>>(`/orders/${orderId}/confirm-receive`, payload);
   return response.data.data;
 };
 
-export const applyOrderExtension = async (orderId: string, payload: OrderExtensionApplyPayload) => {
-  const response = await api.post<ApiResponse<any>>(`/orders/${orderId}/extend`, payload);
+export const applyOrderExtension = async (
+  orderId: string,
+  payload: OrderExtensionApplyPayload
+) => {
+  const response = await http.post<ApiResponse<any>>(`/orders/${orderId}/extend`, payload);
   return response.data.data;
 };
 
-export const decideOrderExtension = async (orderId: string, payload: OrderExtensionDecisionPayload) => {
-  const response = await api.post<ApiResponse<any>>(`/orders/${orderId}/extend/approve`, payload);
+export const decideOrderExtension = async (
+  orderId: string,
+  payload: OrderExtensionDecisionPayload
+) => {
+  const response = await http.post<ApiResponse<any>>(`/orders/${orderId}/extend/approve`, payload);
   return response.data.data;
 };
 
-export const applyOrderReturn = async (orderId: string, payload: OrderReturnApplyPayload) => {
-  const response = await api.post<ApiResponse<any>>(`/orders/${orderId}/return`, payload);
+export const applyOrderReturn = async (
+  orderId: string,
+  payload: OrderReturnApplyPayload
+) => {
+  const response = await http.post<ApiResponse<any>>(`/orders/${orderId}/return`, payload);
   return response.data.data;
 };
 
-export const decideOrderReturn = async (orderId: string, payload: OrderReturnDecisionPayload) => {
-  const response = await api.post<ApiResponse<any>>(`/orders/${orderId}/return/approve`, payload);
+export const decideOrderReturn = async (
+  orderId: string,
+  payload: OrderReturnDecisionPayload
+) => {
+  const response = await http.post<ApiResponse<any>>(`/orders/${orderId}/return/approve`, payload);
   return response.data.data;
 };
 
-export const applyOrderBuyout = async (orderId: string, payload: OrderBuyoutApplyPayload) => {
-  const response = await api.post<ApiResponse<any>>(`/orders/${orderId}/buyout`, payload);
+export const applyOrderBuyout = async (
+  orderId: string,
+  payload: OrderBuyoutApplyPayload
+) => {
+  const response = await http.post<ApiResponse<any>>(`/orders/${orderId}/buyout`, payload);
   return response.data.data;
 };
 
-export const decideOrderBuyout = async (orderId: string, payload: OrderBuyoutDecisionPayload) => {
-  const response = await api.post<ApiResponse<any>>(`/orders/${orderId}/buyout/confirm`, payload);
+export const decideOrderBuyout = async (
+  orderId: string,
+  payload: OrderBuyoutDecisionPayload
+) => {
+  const response = await http.post<ApiResponse<any>>(`/orders/${orderId}/buyout/confirm`, payload);
   return response.data.data;
 };
