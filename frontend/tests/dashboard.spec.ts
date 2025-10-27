@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import type { Route } from '@playwright/test';
 
 const mockUserResponse = {
-  code: 0,
+  success: true,
   message: 'ok',
   data: {
     id: '00000000-0000-0000-0000-000000000001',
@@ -13,26 +13,19 @@ const mockUserResponse = {
 };
 
 const mockDashboardResponse = {
-  code: 0,
+  success: true,
   message: 'ok',
-  data: {
-    totalOrders: 42,
-    activeOrders: 18,
-    totalGmv: 123456.78,
-    inLeaseCount: 12,
-    pendingReturns: 3,
-    ordersByStatus: {
-      AWAITING_SHIPMENT: 5,
-      IN_LEASE: 12,
-      RETURN_REQUESTED: 3
-    }
-  }
+  data: [
+    { title: '在租商品', value: 128, trend: 8.6, trendLabel: '较上周' },
+    { title: '月度GMV', value: '¥ 1,280,000', trend: 5.1, trendLabel: '环比' },
+    { title: '履约完成率', value: '96.4%', trend: 2.3, trendLabel: '同比' }
+  ]
 };
 
 test.describe('Dashboard analytics', () => {
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
-      localStorage.setItem('flexlease_token', 'internal-test-token');
+      localStorage.setItem('flexlease/token', 'internal-test-token');
     });
 
     await page.route('**/api/v1/auth/me', async (route: Route) => {
@@ -53,13 +46,13 @@ test.describe('Dashboard analytics', () => {
   });
 
   test('renders dashboard metrics from analytics API', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/admin/overview');
 
-    await expect(page.getByText('总订单')).toBeVisible();
-    await expect(page.getByText('42')).toBeVisible();
-    await expect(page.getByText('GMV (¥)')).toBeVisible();
-    await expect(page.getByText('123,456.78')).toBeVisible();
-    await expect(page.getByText('状态分布：')).toBeVisible();
-    await expect(page.getByText('IN_LEASE：12')).toBeVisible();
+    await expect(page.getByText('在租商品')).toBeVisible();
+    await expect(page.getByText('128')).toBeVisible();
+    await expect(page.getByText('月度GMV')).toBeVisible();
+    await expect(page.getByText('¥ 1,280,000')).toBeVisible();
+    await expect(page.getByText('履约完成率')).toBeVisible();
+    await expect(page.getByText('+8.6% 较上周')).toBeVisible();
   });
 });
