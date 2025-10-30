@@ -67,6 +67,16 @@ public class UserAccountService {
     }
 
     @Transactional
+    public void resetPassword(String username, String oldPassword, String newPassword) {
+        UserAccount account = userAccountRepository.findByUsernameIgnoreCase(username)
+                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "账号不存在"));
+        if (!passwordEncoder.matches(oldPassword, account.getPasswordHash())) {
+            throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, "原密码不正确");
+        }
+        account.updatePasswordHash(passwordEncoder.encode(newPassword));
+    }
+
+    @Transactional
     public UserAccount updateStatus(UUID userId, UserStatus status) {
         UserAccount account = userAccountRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "账号不存在"));

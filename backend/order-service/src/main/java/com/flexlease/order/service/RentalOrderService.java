@@ -136,6 +136,28 @@ public class RentalOrderService {
         return toPagedResponse(page);
     }
 
+    @Transactional(Transactional.TxType.SUPPORTS)
+    public PagedResponse<RentalOrderSummaryResponse> listOrdersForAdmin(UUID userId, UUID vendorId, OrderStatus status, Pageable pageable) {
+        if (userId != null && vendorId != null) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "userId 与 vendorId 不能同时提供");
+        }
+        Page<RentalOrder> page;
+        if (userId != null) {
+            page = status == null
+                    ? rentalOrderRepository.findByUserId(userId, pageable)
+                    : rentalOrderRepository.findByUserIdAndStatus(userId, status, pageable);
+        } else if (vendorId != null) {
+            page = status == null
+                    ? rentalOrderRepository.findByVendorId(vendorId, pageable)
+                    : rentalOrderRepository.findByVendorIdAndStatus(vendorId, status, pageable);
+        } else if (status != null) {
+            page = rentalOrderRepository.findByStatus(status, pageable);
+        } else {
+            page = rentalOrderRepository.findAll(pageable);
+        }
+        return toPagedResponse(page);
+    }
+
     public RentalOrderResponse confirmPayment(UUID orderId, OrderPaymentRequest request) {
         RentalOrder order = getOrderForUpdate(orderId);
         ensureUser(order, request.userId());
@@ -317,6 +339,22 @@ public class RentalOrderService {
             notifyUser(order, "买断被拒", "订单 %s 的买断申请未通过，原因：%s"
                     .formatted(order.getOrderNo(), request.remark() == null ? "无" : request.remark()));
         }
+        return assembler.toOrderResponse(order);
+    }
+
+    public RentalOrderResponse forceClose(UUID orderId, UUID adminId, String reason) {
+        if (adminId == null) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "管理员编号不能为空");
+        }
+        RentalOrder order = getOrderForUpdate(orderId);
+        order.forceClose();
+        String message = reason == null || reason.isBlank()
+                ? "管理员强制关闭订单"
+                : "管理员强制关闭：" + reason;
+        order.addEvent(OrderEvent.record(OrderEventType.ORDER_CANCELLED, message, adminId));
+        notifyUser(order, "订单已关闭", "订单 %s 已被管理员关闭，原因：%s"
+                .formatted(order.getOrderNo(), reason == null || reason.isBlank() ? "无" : reason));
+        notifyVendor(order, "订单已关闭", "订单 %s 已被管理员关闭。".formatted(order.getOrderNo()));
         return assembler.toOrderResponse(order);
     }
 

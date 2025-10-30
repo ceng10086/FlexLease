@@ -20,6 +20,10 @@ import org.springframework.test.web.servlet.MvcResult;
 @AutoConfigureMockMvc
 class AuthServiceApplicationTests {
 
+    static {
+        System.setProperty("jdk.attach.allowAttachSelf", "true");
+    }
+
     @Autowired
     private MockMvc mockMvc;
 
@@ -100,6 +104,71 @@ class AuthServiceApplicationTests {
                                 "username", username,
                                 "password", password
                         ))))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void passwordResetAndTokenRefreshFlow() throws Exception {
+        String username = "tester" + java.util.UUID.randomUUID() + "@example.com";
+        String password = "Initial1";
+        String newPassword = "Updated1";
+
+        mockMvc.perform(post("/api/v1/auth/register/customer")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(java.util.Map.of(
+                                "username", username,
+                                "password", password
+                        ))))
+                .andExpect(status().isOk());
+
+        MvcResult loginResult = mockMvc.perform(post("/api/v1/auth/token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(java.util.Map.of(
+                                "username", username,
+                                "password", password
+                        ))))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode loginNode = objectMapper.readTree(loginResult.getResponse().getContentAsString());
+        String oldToken = loginNode.at("/data/accessToken").asText();
+        assertThat(oldToken).isNotBlank();
+
+        mockMvc.perform(post("/api/v1/auth/password/reset")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(java.util.Map.of(
+                                "username", username,
+                                "oldPassword", password,
+                                "newPassword", newPassword
+                        ))))
+                .andExpect(status().isOk());
+
+        MvcResult newLoginResult = mockMvc.perform(post("/api/v1/auth/token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(java.util.Map.of(
+                                "username", username,
+                                "password", newPassword
+                        ))))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode newLoginNode = objectMapper.readTree(newLoginResult.getResponse().getContentAsString());
+        String freshToken = newLoginNode.at("/data/accessToken").asText();
+        assertThat(freshToken).isNotBlank();
+
+        MvcResult refreshResult = mockMvc.perform(post("/api/v1/auth/token/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(java.util.Map.of(
+                                "refreshToken", freshToken
+                        ))))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode refreshNode = objectMapper.readTree(refreshResult.getResponse().getContentAsString());
+        String refreshedToken = refreshNode.at("/data/accessToken").asText();
+        assertThat(refreshedToken).isNotBlank();
+
+        mockMvc.perform(post("/api/v1/auth/logout"))
                 .andExpect(status().isOk());
     }
 }

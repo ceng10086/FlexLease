@@ -52,4 +52,13 @@ public class AuthService {
         }
         throw new BusinessException(ErrorCode.INVALID_CREDENTIALS, "认证失败");
     }
+
+    @Transactional
+    public void resetPassword(String username, String oldPassword, String newPassword) {
+        userAccountService.resetPassword(username, oldPassword, newPassword);
+    }
+
+    public String refreshToken(String refreshToken) {
+        return tokenService.refreshToken(refreshToken);
+    }
 }

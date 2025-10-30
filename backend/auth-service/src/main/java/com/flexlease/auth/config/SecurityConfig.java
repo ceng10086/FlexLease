@@ -38,6 +38,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/auth/token",
                                 "/api/v1/auth/register/customer",
                                 "/api/v1/auth/register/vendor",
+                                "/api/v1/auth/logout",
+                                "/api/v1/auth/password/reset",
+                                "/api/v1/auth/token/refresh",
                             "/api/v1/internal/**",
                                 "/actuator/health",
                                 "/actuator/info").permitAll()

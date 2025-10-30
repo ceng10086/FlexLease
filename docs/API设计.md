@@ -38,12 +38,12 @@
 
 > 说明：注册接口当前仅返回账号摘要，厂商入驻详情在用户服务中维护；`/auth/token` 使用 JSON 请求体而非表单。
 
-### 2.2 账号管理（规划中）
-| 方法 | URL | 描述 | 状态 |
-| ---- | --- | ---- | ---- |
-| POST | `/auth/logout` | 注销（失效 token） | 待实现 |
-| POST | `/auth/password/reset` | 重置密码 | 待实现 |
-| POST | `/auth/token/refresh` | 刷新令牌 | 待实现 |
+### 2.2 账号管理（已实现）
+| 方法 | URL | 描述 | 请求体要点 | 备注 |
+| ---- | --- | ---- | ---------- | ---- |
+| POST | `/auth/logout` | 客户端主动注销 | - | 无状态实现，前端清理 token 即可 |
+| POST | `/auth/password/reset` | 重置密码 | `{ "username", "oldPassword", "newPassword" }` | 校验旧密码后写入新密文 |
+| POST | `/auth/token/refresh` | 刷新令牌 | `{ "refreshToken" }` | 当前使用访问令牌作为刷新凭证，返回新的短期 `accessToken` |
 
 ### 2.3 内部接口
 > 内部接口供微服务之间调用，需在请求头中携带 `X-Internal-Token`，默认值可在配置中覆盖。
@@ -62,21 +62,21 @@
 | POST | `/vendors/applications/{id}/approve` | 管理员 | 审核通过 | 请求体 `{ reviewerId, remark }`，调用认证服务激活账号 |
 | POST | `/vendors/applications/{id}/reject` | 管理员 | 审核驳回 | 请求体 `{ reviewerId, remark }` |
 
-### 3.2 厂商资料（规划中）
-| 方法 | URL | 角色 | 描述 |
-| ---- | --- | ---- | ---- |
-| GET | `/vendors` | ADMIN | 分页查询厂商 |
-| GET | `/vendors/{vendorId}` | ADMIN/VENDOR | 查看详情 |
-| PUT | `/vendors/{vendorId}` | VENDOR | 更新资料 |
-| POST | `/vendors/{vendorId}/suspend` | ADMIN | 冻结账号 |
+### 3.2 厂商资料（已实现）
+| 方法 | URL | 角色 | 描述 | 请求/响应要点 |
+| ---- | --- | ---- | ---- | ------------- |
+| GET | `/vendors` | ADMIN | 分页查询厂商 | 支持 `status`/`page`/`size`；返回 `PagedResponse<VendorResponse>` |
+| GET | `/vendors/{vendorId}` | ADMIN/VENDOR | 查看详情 | 返回公司资料、联系人、地址、状态等 |
+| PUT | `/vendors/{vendorId}` | VENDOR | 更新资料 | 请求体 `{ contactName, contactPhone, contactEmail?, province?, city?, address? }` |
+| POST | `/vendors/{vendorId}/suspend` | ADMIN | 更新厂商状态 | 请求体 `{ status }`，支持 `ACTIVE`/`SUSPENDED` |
 
-### 3.3 用户资料（规划中）
-| 方法 | URL | 角色 | 描述 |
-| ---- | --- | ---- | ---- |
-| GET | `/customers/profile` | USER | 获取个人资料 |
-| PUT | `/customers/profile` | USER | 编辑个人资料 |
-| GET | `/admin/users` | ADMIN | 查询用户列表 |
-| PUT | `/admin/users/{userId}/status` | ADMIN | 启用/禁用用户 |
+### 3.3 用户资料（已实现）
+| 方法 | URL | 角色 | 描述 | 请求/响应要点 |
+| ---- | --- | ---- | ---- | ------------- |
+| GET | `/customers/profile` | USER | 获取个人资料 | 需携带 `X-User-Id`，自动补建档 |
+| PUT | `/customers/profile` | USER | 编辑个人资料 | 请求体 `{ fullName, gender, phone, email, address }`，`gender` 取值 `UNKNOWN/MALE/FEMALE` |
+| GET | `/admin/users` | ADMIN | 查询用户列表 | 支持 `keyword` 模糊搜索姓名，返回分页 |
+| PUT | `/admin/users/{userId}/status` | ADMIN | 启用/禁用用户 | 请求体 `{ status }`，通过认证服务内部接口生效 |
 
 ## 4. 商品与租赁方案（product-service）
 ### 4.1 商品管理（B 端）
@@ -146,12 +146,12 @@
 | POST | `/orders/{orderId}/contract/sign` | 上传/生成合同 | 待实现 |
 | GET | `/orders/{orderId}/events` | 获取状态日志 | 可通过 `RentalOrderResponse.events` 获取，独立接口待定 |
 
-### 5.4 管理侧订单（规划中）
-| 方法 | URL | 描述 | 状态 |
-| ---- | --- | ---- | ---- |
-| GET | `/admin/orders` | 分页检索订单（多条件）| 待实现 |
-| GET | `/admin/orders/{orderId}` | 详情 | 待实现 |
-| POST | `/admin/orders/{orderId}/force-close` | 强制关闭订单 | 待实现 |
+### 5.4 管理侧订单（已实现）
+| 方法 | URL | 描述 | 请求要点 |
+| ---- | --- | ---- | -------- |
+| GET | `/admin/orders` | 分页检索订单 | 支持 `userId`、`vendorId`、`status`、`page`、`size`；未带过滤条件时返回全量分页 |
+| GET | `/admin/orders/{orderId}` | 查看详情 | 返回与 `/orders/{id}` 相同的订单详情 |
+| POST | `/admin/orders/{orderId}/force-close` | 强制关闭订单 | `{ "adminId", "reason?" }`，将订单置为 `CANCELLED` 并追加事件记录 |
 
 ## 6. 支付与结算（payment-service）
 > 枚举说明：`scene` 取值 `DEPOSIT`/`RENT`/`BUYOUT`/`PENALTY`；`channel` 取值 `MOCK`/`ALIPAY`/`WECHAT`/`BANK_TRANSFER`；`status` 取值 `PENDING`/`SUCCEEDED`/`FAILED`。

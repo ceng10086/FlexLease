@@ -310,6 +310,13 @@ public class RentalOrder {
         this.status = OrderStatus.IN_LEASE;
     }
 
+    public void forceClose() {
+        if (status == OrderStatus.CANCELLED || status == OrderStatus.COMPLETED || status == OrderStatus.BUYOUT_COMPLETED) {
+            throw new IllegalStateException("订单已处于终态，无法强制关闭");
+        }
+        this.status = OrderStatus.CANCELLED;
+    }
+
     public void updateBuyoutAmount(BigDecimal amount) {
         this.buyoutAmount = amount;
     }

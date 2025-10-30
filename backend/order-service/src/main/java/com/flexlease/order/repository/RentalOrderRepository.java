@@ -28,6 +28,8 @@ public interface RentalOrderRepository extends JpaRepository<RentalOrder, UUID> 
 
     Page<RentalOrder> findByVendorIdAndStatus(UUID vendorId, OrderStatus status, Pageable pageable);
 
+    Page<RentalOrder> findByStatus(OrderStatus status, Pageable pageable);
+
     long countByStatus(OrderStatus status);
 
     long countByStatusIn(Collection<OrderStatus> statuses);

@@ -4,23 +4,22 @@ import com.flexlease.auth.config.JwtTokenProvider;
 import com.flexlease.auth.config.SecurityProperties;
 import com.flexlease.auth.domain.UserAccount;
 import com.flexlease.auth.dto.LoginRequest;
+import com.flexlease.auth.dto.PasswordResetRequest;
 import com.flexlease.auth.dto.RegisterRequest;
 import com.flexlease.auth.dto.TokenResponse;
+import com.flexlease.auth.dto.TokenRefreshRequest;
 import com.flexlease.auth.dto.UserSummary;
 import com.flexlease.auth.service.AuthService;
 import com.flexlease.auth.service.RoleService;
 import com.flexlease.auth.service.TokenService;
-import com.flexlease.auth.service.UserAccountService;
 import com.flexlease.common.dto.ApiResponse;
 import com.flexlease.common.exception.ErrorCode;
 import io.jsonwebtoken.Claims;
 import jakarta.validation.Valid;
 import java.util.Optional;
 import java.util.Set;
-import java.util.stream.Collectors;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -64,6 +63,23 @@ public class AuthController {
     @PostMapping("/token")
     public ApiResponse<TokenResponse> token(@Valid @RequestBody LoginRequest request) {
         String accessToken = authService.authenticate(request.username(), request.password());
+        return ApiResponse.success(new TokenResponse(accessToken, securityProperties.getAccessTokenTtlSeconds()));
+    }
+
+    @PostMapping("/logout")
+    public ApiResponse<Void> logout() {
+        return ApiResponse.success();
+    }
+
+    @PostMapping("/password/reset")
+    public ApiResponse<Void> resetPassword(@Valid @RequestBody PasswordResetRequest request) {
+        authService.resetPassword(request.username(), request.oldPassword(), request.newPassword());
+        return ApiResponse.success();
+    }
+
+    @PostMapping("/token/refresh")
+    public ApiResponse<TokenResponse> refreshToken(@Valid @RequestBody TokenRefreshRequest request) {
+        String accessToken = authService.refreshToken(request.refreshToken());
         return ApiResponse.success(new TokenResponse(accessToken, securityProperties.getAccessTokenTtlSeconds()));
     }
 

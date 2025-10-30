@@ -1,6 +1,8 @@
 package com.flexlease.auth.service;
 
 import com.flexlease.auth.config.JwtTokenProvider;
+import com.flexlease.common.exception.BusinessException;
+import com.flexlease.common.exception.ErrorCode;
 import io.jsonwebtoken.Claims;
 import java.util.Arrays;
 import java.util.Optional;
@@ -57,5 +59,19 @@ public class TokenService {
         }
         return Arrays.stream(roles.split(","))
                 .collect(Collectors.toSet());
+    }
+
+    public String refreshToken(String refreshToken) {
+        Claims claims = tokenProvider.parseClaims(refreshToken)
+                .orElseThrow(() -> new BusinessException(ErrorCode.UNAUTHORIZED, "刷新令牌无效或已过期"));
+        String username = claims.get("username", String.class);
+        if (username == null || username.isBlank()) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "刷新令牌缺少用户名信息");
+        }
+        UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+        if (!(userDetails instanceof UserPrincipal userPrincipal)) {
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "无法刷新令牌，用户信息异常");
+        }
+        return generateToken(userPrincipal);
     }
 }

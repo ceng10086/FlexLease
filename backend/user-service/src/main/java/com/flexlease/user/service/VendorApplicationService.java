@@ -18,11 +18,14 @@ public class VendorApplicationService {
 
     private final VendorApplicationRepository vendorApplicationRepository;
     private final AuthServiceClient authServiceClient;
+    private final VendorService vendorService;
 
     public VendorApplicationService(VendorApplicationRepository vendorApplicationRepository,
-                                    AuthServiceClient authServiceClient) {
+                                    AuthServiceClient authServiceClient,
+                                    VendorService vendorService) {
         this.vendorApplicationRepository = vendorApplicationRepository;
         this.authServiceClient = authServiceClient;
+        this.vendorService = vendorService;
     }
 
     @Transactional
@@ -71,6 +74,7 @@ public class VendorApplicationService {
         }
         application.approve(reviewerId, remark);
         authServiceClient.activateAccount(application.getOwnerUserId());
+        vendorService.ensureVendorForApplication(application);
         return toResponse(application);
     }
 

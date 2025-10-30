@@ -5,7 +5,31 @@ spring:
     web-application-type: reactive
   cloud:
     gateway:
-      routes: []
+      routes:
+        - id: auth-service
+          uri: http://localhost:9001
+          predicates:
+            - Path=/api/v1/auth/**
+        - id: user-service
+          uri: http://localhost:9002
+          predicates:
+            - Path=/api/v1/users/**,/api/v1/vendors/**,/api/v1/admin/users/**
+        - id: product-service
+          uri: http://localhost:9003
+          predicates:
+            - Path=/api/v1/products/**,/api/v1/catalog/**,/api/v1/admin/products/**
+        - id: order-service
+          uri: http://localhost:9004
+          predicates:
+            - Path=/api/v1/orders/**,/api/v1/admin/orders/**,/api/v1/analytics/**
+        - id: payment-service
+          uri: http://localhost:9005
+          predicates:
+            - Path=/api/v1/payments/**
+        - id: notification-service
+          uri: http://localhost:9006
+          predicates:
+            - Path=/api/v1/notifications/**
 server:
   port: 8080
 management:

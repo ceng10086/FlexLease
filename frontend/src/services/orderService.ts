@@ -118,6 +118,11 @@ export type PagedResponse<T> = {
   totalPages: number;
 };
 
+export type OrderForceClosePayload = {
+  adminId: string;
+  reason?: string;
+};
+
 export const previewOrder = async (
   payload: OrderPreviewPayload
 ): Promise<OrderPreviewResponse> => {
@@ -143,6 +148,19 @@ export const listOrders = async (params: {
   size?: number;
 }) => {
   const response = await http.get<ApiResponse<PagedResponse<RentalOrderSummary>>>('/orders', {
+    params
+  });
+  return response.data.data;
+};
+
+export const listAdminOrders = async (params: {
+  userId?: string;
+  vendorId?: string;
+  status?: OrderStatus;
+  page?: number;
+  size?: number;
+}) => {
+  const response = await http.get<ApiResponse<PagedResponse<RentalOrderSummary>>>('/admin/orders', {
     params
   });
   return response.data.data;
@@ -225,5 +243,13 @@ export const decideOrderBuyout = async (
   payload: OrderBuyoutDecisionPayload
 ) => {
   const response = await http.post<ApiResponse<any>>(`/orders/${orderId}/buyout/confirm`, payload);
+  return response.data.data;
+};
+
+export const forceCloseOrder = async (
+  orderId: string,
+  payload: OrderForceClosePayload
+) => {
+  const response = await http.post<ApiResponse<any>>(`/admin/orders/${orderId}/force-close`, payload);
   return response.data.data;
 };

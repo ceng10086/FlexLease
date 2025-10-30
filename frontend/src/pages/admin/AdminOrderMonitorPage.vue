@@ -3,7 +3,7 @@
     <div class="page-header">
       <div>
         <h2>订单监控</h2>
-        <p class="page-header__meta">按用户或厂商查询租赁订单，快速定位异常状态。</p>
+        <p class="page-header__meta">灵活按用户、厂商或状态过滤订单，也可查看全量记录。</p>
       </div>
     </div>
 
@@ -29,14 +29,6 @@
           </a-space>
         </a-form-item>
       </a-form>
-
-      <a-alert
-        v-if="!filters.userId && !filters.vendorId"
-        type="info"
-        show-icon
-        message="需提供用户 ID 或厂商 ID 才能查询订单"
-        class="info-alert"
-      />
 
       <a-table
         :data-source="orders"
@@ -109,6 +101,23 @@
             <template #default="{ record }">¥{{ formatCurrency(record.unitDepositAmount) }}</template>
           </a-table-column>
         </a-table>
+
+        <a-divider />
+        <div class="admin-actions">
+          <h4>管理员操作</h4>
+          <a-form layout="vertical">
+            <a-form-item label="关闭原因">
+              <a-textarea v-model:value="forceCloseForm.reason" :rows="3" placeholder="可选" />
+            </a-form-item>
+            <a-button
+              type="primary"
+              danger
+              :loading="forceCloseForm.loading"
+              :disabled="!canForceClose"
+              @click="handleForceClose"
+            >强制关闭订单</a-button>
+          </a-form>
+        </div>
       </template>
       <template v-else>
         <a-empty description="未找到订单详情" />
@@ -118,9 +127,16 @@
 </template>
 
 <script lang="ts" setup>
-import { reactive, ref } from 'vue';
+import { computed, reactive, ref } from 'vue';
 import { message } from 'ant-design-vue';
-import { listOrders, fetchOrder, type RentalOrderSummary, type OrderStatus } from '../../services/orderService';
+import { useAuthStore } from '../../stores/auth';
+import {
+  listAdminOrders,
+  fetchOrder,
+  forceCloseOrder,
+  type RentalOrderSummary,
+  type OrderStatus
+} from '../../services/orderService';
 
 const orderStatusOptions: OrderStatus[] = [
   'PENDING_PAYMENT',
@@ -133,6 +149,8 @@ const orderStatusOptions: OrderStatus[] = [
   'BUYOUT_COMPLETED',
   'CANCELLED'
 ];
+
+const auth = useAuthStore();
 
 const filters = reactive<{ userId?: string; vendorId?: string; status?: OrderStatus }>({});
 const loading = ref(false);
@@ -147,18 +165,29 @@ const detailDrawer = reactive<{ open: boolean; loading: boolean; order: any }>(
   }
 );
 
+const forceCloseForm = reactive({ reason: '', loading: false });
+
+const adminId = () => {
+  if (!auth.user?.id) {
+    throw new Error('未获取到管理员账号');
+  }
+  return auth.user.id;
+};
+
 const formatCurrency = (value: number) => value.toFixed(2);
 const formatDate = (value: string) => new Date(value).toLocaleString();
 
-const loadOrders = async () => {
-  if (!filters.userId && !filters.vendorId) {
-    orders.value = [];
-    pagination.total = 0;
-    return;
+const canForceClose = computed(() => {
+  if (!detailDrawer.order) {
+    return false;
   }
+  return !['COMPLETED', 'CANCELLED', 'BUYOUT_COMPLETED'].includes(detailDrawer.order.status);
+});
+
+const loadOrders = async () => {
   loading.value = true;
   try {
-    const result = await listOrders({
+    const result = await listAdminOrders({
       userId: filters.userId || undefined,
       vendorId: filters.vendorId || undefined,
       status: filters.status,
@@ -186,8 +215,7 @@ const resetFilters = () => {
   filters.vendorId = undefined;
   filters.status = undefined;
   pagination.current = 1;
-  orders.value = [];
-  pagination.total = 0;
+  loadOrders();
 };
 
 const openDetail = async (orderId: string) => {
@@ -195,6 +223,7 @@ const openDetail = async (orderId: string) => {
   detailDrawer.loading = true;
   try {
     detailDrawer.order = await fetchOrder(orderId);
+    forceCloseForm.reason = '';
   } catch (error) {
     console.error('Failed to fetch order detail', error);
     message.error('加载订单详情失败');
@@ -203,6 +232,33 @@ const openDetail = async (orderId: string) => {
     detailDrawer.loading = false;
   }
 };
+
+const handleForceClose = async () => {
+  if (!detailDrawer.order) {
+    return;
+  }
+  if (!canForceClose.value) {
+    message.warning('订单已处于终态');
+    return;
+  }
+  forceCloseForm.loading = true;
+  try {
+    await forceCloseOrder(detailDrawer.order.id, {
+      adminId: adminId(),
+      reason: forceCloseForm.reason || undefined
+    });
+    message.success('订单已强制关闭');
+    await loadOrders();
+    await openDetail(detailDrawer.order.id);
+  } catch (error) {
+    console.error('Force close order failed', error);
+    message.error('强制关闭失败，请稍后再试');
+  } finally {
+    forceCloseForm.loading = false;
+  }
+};
+
+loadOrders();
 </script>
 
 <style scoped>

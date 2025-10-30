@@ -35,17 +35,21 @@ public class AuthServiceClient {
     }
 
     public void activateAccount(UUID userId) {
+        updateAccountStatus(userId, "ENABLED");
+    }
+
+    public void updateAccountStatus(UUID userId, String status) {
         try {
             restClient.patch()
                     .uri("/api/v1/internal/users/{id}/status", userId)
                     .header("X-Internal-Token", properties.getInternalToken())
                     .contentType(MediaType.APPLICATION_JSON)
-                    .body(Map.of("status", "ENABLED"))
+                    .body(Map.of("status", status))
                     .retrieve()
                     .toBodilessEntity();
         } catch (RestClientException ex) {
-            log.error("Failed to activate vendor account {}", userId, ex);
-            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "激活厂商账号失败，请稍后重试");
+            log.error("Failed to update account {} status to {}", userId, status, ex);
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "更新账号状态失败，请稍后重试");
         }
     }
 }

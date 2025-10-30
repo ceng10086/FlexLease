@@ -34,14 +34,18 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 @SpringBootTest
 class RentalOrderServiceIntegrationTest {
 
+    static {
+        System.setProperty("jdk.attach.allowAttachSelf", "true");
+    }
+
     @Autowired
     private RentalOrderService rentalOrderService;
 
     @MockBean
     private PaymentClient paymentClient;
 
-        @MockBean
-        private NotificationClient notificationClient;
+    @MockBean
+    private NotificationClient notificationClient;
 
     @Test
     void shouldCompleteFullOrderLifecycle() {
@@ -145,6 +149,58 @@ class RentalOrderServiceIntegrationTest {
         org.assertj.core.api.Assertions.assertThatThrownBy(() ->
                 rentalOrderService.applyBuyout(created.id(), new OrderBuyoutApplyRequest(userId, BigDecimal.TEN, "买断")))
                 .isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    void adminForceCloseCancelsOrder() {
+        UUID userId = UUID.randomUUID();
+        UUID vendorId = UUID.randomUUID();
+        UUID productId = UUID.randomUUID();
+        UUID skuId = UUID.randomUUID();
+        UUID planId = UUID.randomUUID();
+
+        OrderItemRequest itemRequest = new OrderItemRequest(
+                productId,
+                skuId,
+                planId,
+                "共享投影仪",
+                "PROJ-001",
+                null,
+                1,
+                new BigDecimal("199.00"),
+                new BigDecimal("300.00"),
+                null
+        );
+
+        RentalOrderResponse created = rentalOrderService.createOrder(new CreateOrderRequest(
+                userId,
+                vendorId,
+                "STANDARD",
+                null,
+                null,
+                List.of(itemRequest)
+        ));
+
+        UUID transactionId = UUID.randomUUID();
+        PaymentTransactionView transactionView = new PaymentTransactionView(
+                transactionId,
+                "P20241024",
+                created.id(),
+                userId,
+                vendorId,
+                PaymentStatus.SUCCEEDED,
+                created.totalAmount(),
+                null,
+                List.of()
+        );
+        org.mockito.Mockito.when(paymentClient.loadTransaction(transactionId)).thenReturn(transactionView);
+        rentalOrderService.confirmPayment(created.id(), new OrderPaymentRequest(userId, transactionId.toString(), created.totalAmount()));
+
+        UUID adminId = UUID.randomUUID();
+        RentalOrderResponse forced = rentalOrderService.forceClose(created.id(), adminId, "库存异常");
+        assertThat(forced.status()).isEqualTo(OrderStatus.CANCELLED);
+        assertThat(forced.events()).anyMatch(event -> event.description().contains("管理员强制关闭")
+                || event.description().contains("库存异常"));
     }
 
     @Test
