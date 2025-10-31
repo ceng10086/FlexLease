@@ -28,15 +28,18 @@ public class OrderMaintenanceScheduler {
     private final RentalOrderRepository rentalOrderRepository;
     private final InventoryReservationClient inventoryReservationClient;
     private final NotificationClient notificationClient;
+    private final OrderEventPublisher orderEventPublisher;
     private final OrderMaintenanceProperties properties;
 
     public OrderMaintenanceScheduler(RentalOrderRepository rentalOrderRepository,
                                      InventoryReservationClient inventoryReservationClient,
                                      NotificationClient notificationClient,
+                                     OrderEventPublisher orderEventPublisher,
                                      OrderMaintenanceProperties properties) {
         this.rentalOrderRepository = rentalOrderRepository;
         this.inventoryReservationClient = inventoryReservationClient;
         this.notificationClient = notificationClient;
+        this.orderEventPublisher = orderEventPublisher;
         this.properties = properties;
     }
 
@@ -63,7 +66,9 @@ public class OrderMaintenanceScheduler {
             LOG.debug("Skip auto-cancel for order {} due to state change: {}", order.getId(), ex.getMessage());
             return;
         }
-        order.addEvent(OrderEvent.record(OrderEventType.ORDER_CANCELLED, "系统自动取消订单：支付超时", null));
+        OrderEvent event = OrderEvent.record(OrderEventType.ORDER_CANCELLED, "系统自动取消订单：支付超时", null);
+        order.addEvent(event);
+        orderEventPublisher.publish(order, OrderEventType.ORDER_CANCELLED, event.getDescription(), null, Map.of("reason", "PAYMENT_TIMEOUT"));
         rentalOrderRepository.save(order);
 
         if (!commands.isEmpty()) {

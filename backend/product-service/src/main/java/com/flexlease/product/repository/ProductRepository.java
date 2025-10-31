@@ -29,9 +29,9 @@ public interface ProductRepository extends JpaRepository<Product, UUID> {
 
     Page<Product> findByStatusAndCategoryCodeAndNameContainingIgnoreCase(ProductStatus status, String categoryCode, String keyword, Pageable pageable);
 
-    @EntityGraph(attributePaths = {"rentalPlans"})
+    @EntityGraph(attributePaths = {"rentalPlans", "rentalPlans.skus", "mediaAssets"})
     Optional<Product> findWithPlansById(UUID id);
 
-    @EntityGraph(attributePaths = {"rentalPlans"})
+    @EntityGraph(attributePaths = {"rentalPlans", "rentalPlans.skus", "mediaAssets"})
     Optional<Product> findWithPlansByIdAndVendorId(UUID id, UUID vendorId);
 }

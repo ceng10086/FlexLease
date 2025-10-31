@@ -91,11 +91,13 @@ class ProductServiceIntegrationTest {
         ProductResponse approved = productAdminService.approveProduct(createdProduct.id(), reviewerId, "审核通过");
         assertThat(approved.status()).isEqualTo(ProductStatus.ACTIVE);
         assertThat(approved.reviewedBy()).isEqualTo(reviewerId);
+        assertThat(approved.mediaAssets()).isNotNull();
 
         PagedResponse<CatalogProductResponse> catalogList = catalogQueryService.listActive(null, null, PageRequest.of(0, 10));
         assertThat(catalogList.content()).hasSize(1);
         CatalogProductResponse catalogProduct = catalogList.content().getFirst();
         assertThat(catalogProduct.status()).isEqualTo(ProductStatus.ACTIVE);
+        assertThat(catalogProduct.mediaAssets()).isNotNull();
         assertThat(catalogProduct.rentalPlans()).isNotEmpty();
 
         CatalogProductResponse detail = catalogQueryService.getProduct(createdProduct.id());

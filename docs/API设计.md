@@ -108,13 +108,23 @@
 | PUT | `/vendors/{vendorId}/products/{productId}/rental-plans/{planId}/skus/{skuId}` | 编辑 SKU | SKU 编码唯一校验 |
 | POST | `/vendors/{vendorId}/products/{productId}/rental-plans/{planId}/skus/{skuId}/inventory/adjust` | 调整库存 | `{ changeType, quantity, referenceId? }`，自动记录库存流水 |
 
-### 4.4 C 端商品展示
+### 4.4 商品媒体资源
+| 方法 | URL | 描述 | 请求/响应要点 |
+| ---- | --- | ---- | ------------- |
+| GET | `/vendors/{vendorId}/products/{productId}/media` | 查询商品媒体资源 | 返回按 `sortOrder` 排序的图片列表 |
+| POST | `/vendors/{vendorId}/products/{productId}/media` | 上传媒体文件 | `multipart/form-data`，字段 `file`（必传），`sortOrder?`；返回上传后的 `MediaAsset` |
+| PUT | `/vendors/{vendorId}/products/{productId}/media/{mediaId}/sort-order` | 调整显示顺序 | 请求体 `{ sortOrder }` |
+| DELETE | `/vendors/{vendorId}/products/{productId}/media/{mediaId}` | 删除媒体文件 | 同步移除本地文件并更新列表 |
+
+> 商品媒体目前保存在本地 `storage/uploads` 目录，通过 `product-service` 暴露的 `/media/**` 静态资源访问，可用 `FLEXLEASE_STORAGE_ROOT` 环境变量调整目录。
+
+### 4.5 C 端商品展示
 | 方法 | URL | 描述 | 响应要点 |
 | ---- | --- | ---- | -------- |
 | GET | `/catalog/products` | 商品搜索/分类过滤 | 返回分页数据，包含商品摘要与可用方案/库存概览 |
 | GET | `/catalog/products/{productId}` | 商品详情 | 仅允许查询 `ACTIVE` 商品，返回同上结构 |
 
-### 4.5 库存内部接口
+### 4.6 库存内部接口
 | 方法 | URL | 描述 | 请求体要点 |
 | ---- | --- | ---- | ---------- |
 | POST | `/internal/inventory/reservations` | 批量预占/释放库存（内部调用） | `{ referenceId, items: [{ skuId, quantity, changeType }] }`，`changeType` 取值 `RESERVE`/`RELEASE`/`INBOUND`/`OUTBOUND` |
@@ -217,9 +227,9 @@
 - 前端 SPA 使用 axios 拦截器统一注入 token 与错误提示。
 
 ## 9. 事件与集成接口
-- **订单事件**：`OrderCreated`、`OrderPaid`、`OrderShipped`、`OrderCompleted`、`OrderCancelled`，通过消息队列广播。
-- **支付回调**：支付服务在模拟成功后推送 `PaymentSucceeded`；订单服务监听更新状态。
-- **库存同步**：商品服务监听 `OrderCreated` 扣减库存，`OrderCancelled` 回补。
+- **订单事件消息总线**：`order-service` 将 `OrderCreated`、`OrderPaid`/`PaymentConfirmed`、`OrderShipped`、`OrderCancelled` 等状态以 JSON 消息发布到 RabbitMQ `order.events` 主题交换机（路由键 `order.*`）。`notification-service` 订阅 `order.events.notification` 队列，当前已基于 `ORDER_CREATED` 事件向厂商推送“新订单待处理”站内通知，后续可扩展更多消费者。
+- **支付回调**：支付服务在模拟成功后推送 `PaymentSucceeded` 消息（内部 HTTP 调用），订单服务校验流水后更新订单状态并追加订单事件。
+- **库存同步**：库存预占/释放仍通过 `product-service` 暴露的内部接口完成，待后续视需要迁移至消息驱动模式。
 
 ## 10. 后续细化清单
 - 请求/响应 DTO 需在编码前补充字段类型、示例。

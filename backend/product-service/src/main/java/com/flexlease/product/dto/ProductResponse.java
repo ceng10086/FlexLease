@@ -19,6 +19,7 @@ public record ProductResponse(
         OffsetDateTime reviewedAt,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt,
+        List<MediaAssetResponse> mediaAssets,
         List<RentalPlanResponse> rentalPlans
 ) {
 }

@@ -61,6 +61,7 @@ public class RentalOrderService {
     private final InventoryReservationClient inventoryReservationClient;
     private final CartService cartService;
     private final OrderAssembler assembler;
+    private final OrderEventPublisher orderEventPublisher;
 
     public RentalOrderService(RentalOrderRepository rentalOrderRepository,
                               OrderExtensionRequestRepository extensionRequestRepository,
@@ -69,7 +70,8 @@ public class RentalOrderService {
                               NotificationClient notificationClient,
                               InventoryReservationClient inventoryReservationClient,
                               CartService cartService,
-                              OrderAssembler assembler) {
+                              OrderAssembler assembler,
+                              OrderEventPublisher orderEventPublisher) {
         this.rentalOrderRepository = rentalOrderRepository;
         this.extensionRequestRepository = extensionRequestRepository;
         this.returnRequestRepository = returnRequestRepository;
@@ -78,6 +80,7 @@ public class RentalOrderService {
         this.inventoryReservationClient = inventoryReservationClient;
         this.cartService = cartService;
         this.assembler = assembler;
+        this.orderEventPublisher = orderEventPublisher;
     }
 
     @Transactional(Transactional.TxType.SUPPORTS)
@@ -136,7 +139,7 @@ public class RentalOrderService {
             inventoryReservationClient.reserve(order.getId(), reservationCommands);
         }
         try {
-            order.addEvent(OrderEvent.record(OrderEventType.ORDER_CREATED, "订单创建", request.userId()));
+            recordEvent(order, OrderEventType.ORDER_CREATED, "订单创建", request.userId());
             RentalOrder saved = rentalOrderRepository.save(order);
             if (!cartItems.isEmpty()) {
                 cartService.removeItems(request.userId(), cartItemIds);
@@ -206,9 +209,14 @@ public class RentalOrderService {
         PaymentTransactionView transaction = paymentClient.loadTransaction(transactionId);
         ensurePaymentMatches(order, transaction, request);
         order.markPaid();
-        order.addEvent(OrderEvent.record(OrderEventType.PAYMENT_CONFIRMED,
-            buildPaymentMessage(transaction),
-                request.userId()));
+        recordEvent(order,
+                OrderEventType.PAYMENT_CONFIRMED,
+                buildPaymentMessage(transaction),
+                request.userId(),
+                Map.of(
+                        "paymentReference", request.paymentReference(),
+                        "paidAmount", request.paidAmount()
+                ));
         notifyUser(order, "订单支付成功", "订单 %s 支付成功，实付 ¥%s。".formatted(order.getOrderNo(), request.paidAmount()));
         notifyVendor(order, "订单待发货", "订单 %s 已完成支付，请尽快安排发货。".formatted(order.getOrderNo()));
         return assembler.toOrderResponse(order);
@@ -218,9 +226,9 @@ public class RentalOrderService {
         RentalOrder order = getOrderForUpdate(orderId);
         ensureUser(order, request.userId());
         order.cancel();
-        order.addEvent(OrderEvent.record(OrderEventType.ORDER_CANCELLED,
+        recordEvent(order, OrderEventType.ORDER_CANCELLED,
                 request.reason() == null ? "用户取消订单" : request.reason(),
-                request.userId()));
+                request.userId());
         notifyVendor(order, "订单已取消", "订单 %s 已被用户取消。".formatted(order.getOrderNo()));
         releaseReservedInventory(order);
         return assembler.toOrderResponse(order);
@@ -229,10 +237,11 @@ public class RentalOrderService {
     public RentalOrderResponse shipOrder(UUID orderId, OrderShipmentRequest request) {
         RentalOrder order = getOrderForUpdate(orderId);
         ensureVendor(order, request.vendorId());
-        order.ship(request.carrier(), request.trackingNumber());
-        order.addEvent(OrderEvent.record(OrderEventType.ORDER_SHIPPED,
+       order.ship(request.carrier(), request.trackingNumber());
+        recordEvent(order, OrderEventType.ORDER_SHIPPED,
                 "发货信息: " + request.carrier() + " / " + request.trackingNumber(),
-                request.vendorId()));
+                request.vendorId(),
+                Map.of("carrier", request.carrier(), "trackingNumber", request.trackingNumber()));
         notifyUser(order, "订单已发货", "订单 %s 已发货，承运方 %s，运单号 %s。"
             .formatted(order.getOrderNo(), request.carrier(), request.trackingNumber()));
         return assembler.toOrderResponse(order);
@@ -242,7 +251,7 @@ public class RentalOrderService {
         RentalOrder order = getOrderForUpdate(orderId);
         ensureUser(order, request.actorId());
         order.confirmReceive();
-        order.addEvent(OrderEvent.record(OrderEventType.ORDER_RECEIVED, "用户确认收货", request.actorId()));
+        recordEvent(order, OrderEventType.ORDER_RECEIVED, "用户确认收货", request.actorId());
         notifyVendor(order, "买家确认收货", "订单 %s 已确认收货，租期正式开始计算。".formatted(order.getOrderNo()));
         return assembler.toOrderResponse(order);
     }
@@ -259,9 +268,10 @@ public class RentalOrderService {
                 });
         OrderExtensionRequest extensionRequest = OrderExtensionRequest.create(request.additionalMonths(), request.userId(), request.remark());
         order.addExtensionRequest(extensionRequest);
-        order.addEvent(OrderEvent.record(OrderEventType.EXTENSION_REQUESTED,
+        recordEvent(order, OrderEventType.EXTENSION_REQUESTED,
                 "续租申请: " + request.additionalMonths() + " 个月",
-                request.userId()));
+                request.userId(),
+                Map.of("additionalMonths", request.additionalMonths()));
         notifyVendor(order, "收到续租申请", "订单 %s 用户申请续租 %d 个月。"
             .formatted(order.getOrderNo(), request.additionalMonths()));
         return assembler.toOrderResponse(order);
@@ -276,16 +286,17 @@ public class RentalOrderService {
         if (request.approve()) {
             extensionRequest.approve(request.vendorId(), request.remark());
             order.increaseExtensionCount(extensionRequest.getAdditionalMonths());
-            order.addEvent(OrderEvent.record(OrderEventType.EXTENSION_APPROVED,
+            recordEvent(order, OrderEventType.EXTENSION_APPROVED,
                     "续租通过: " + extensionRequest.getAdditionalMonths() + " 个月",
-                    request.vendorId()));
+                    request.vendorId(),
+                    Map.of("additionalMonths", extensionRequest.getAdditionalMonths()));
             notifyUser(order, "续租申请通过", "订单 %s 续租成功，追加 %d 个月租期。"
                 .formatted(order.getOrderNo(), extensionRequest.getAdditionalMonths()));
         } else {
             extensionRequest.reject(request.vendorId(), request.remark());
-            order.addEvent(OrderEvent.record(OrderEventType.EXTENSION_REJECTED,
+            recordEvent(order, OrderEventType.EXTENSION_REJECTED,
                     request.remark() == null ? "续租申请被拒绝" : request.remark(),
-                    request.vendorId()));
+                    request.vendorId());
             notifyUser(order, "续租申请被拒", "订单 %s 的续租申请未通过，原因：%s"
                 .formatted(order.getOrderNo(), request.remark() == null ? "无" : request.remark()));
         }
@@ -310,9 +321,17 @@ public class RentalOrderService {
                 request.userId()
         );
         order.addReturnRequest(returnRequest);
-        order.addEvent(OrderEvent.record(OrderEventType.RETURN_REQUESTED,
+        Map<String, Object> returnAttributes = new java.util.HashMap<>();
+        if (request.logisticsCompany() != null && !request.logisticsCompany().isBlank()) {
+            returnAttributes.put("logisticsCompany", request.logisticsCompany());
+        }
+        if (request.trackingNumber() != null && !request.trackingNumber().isBlank()) {
+            returnAttributes.put("trackingNumber", request.trackingNumber());
+        }
+        recordEvent(order, OrderEventType.RETURN_REQUESTED,
                 request.reason() == null ? "发起退租" : request.reason(),
-                request.userId()));
+                request.userId(),
+                returnAttributes);
         notifyVendor(order, "收到退租申请", "订单 %s 用户提交退租申请，请及时处理。"
             .formatted(order.getOrderNo()));
         return assembler.toOrderResponse(order);
@@ -327,16 +346,16 @@ public class RentalOrderService {
         if (request.approve()) {
             returnRequest.approve(request.vendorId(), request.remark());
             order.completeReturn();
-            order.addEvent(OrderEvent.record(OrderEventType.RETURN_APPROVED,
+            recordEvent(order, OrderEventType.RETURN_APPROVED,
                     request.remark() == null ? "退租完成" : request.remark(),
-                    request.vendorId()));
+                    request.vendorId());
             notifyUser(order, "退租已完成", "订单 %s 的退租申请已通过。".formatted(order.getOrderNo()));
         } else {
             returnRequest.reject(request.vendorId(), request.remark());
             order.resumeLease();
-            order.addEvent(OrderEvent.record(OrderEventType.RETURN_REJECTED,
+            recordEvent(order, OrderEventType.RETURN_REJECTED,
                     request.remark() == null ? "退租被拒绝" : request.remark(),
-                    request.vendorId()));
+                    request.vendorId());
             notifyUser(order, "退租被拒", "订单 %s 的退租申请未通过，原因：%s"
                     .formatted(order.getOrderNo(), request.remark() == null ? "无" : request.remark()));
         }
@@ -353,9 +372,10 @@ public class RentalOrderService {
         if (request.buyoutAmount() != null) {
             order.updateBuyoutAmount(request.buyoutAmount());
         }
-        order.addEvent(OrderEvent.record(OrderEventType.BUYOUT_REQUESTED,
+        recordEvent(order, OrderEventType.BUYOUT_REQUESTED,
                 request.remark() == null ? "申请买断" : request.remark(),
-                request.userId()));
+                request.userId(),
+                request.buyoutAmount() == null ? Map.of() : Map.of("buyoutAmount", request.buyoutAmount()));
         notifyVendor(order, "收到买断申请", "订单 %s 用户申请买断，请尽快处理。"
             .formatted(order.getOrderNo()));
         return assembler.toOrderResponse(order);
@@ -369,15 +389,15 @@ public class RentalOrderService {
         }
         if (request.approve()) {
             order.confirmBuyout();
-            order.addEvent(OrderEvent.record(OrderEventType.BUYOUT_CONFIRMED,
+            recordEvent(order, OrderEventType.BUYOUT_CONFIRMED,
                     request.remark() == null ? "买断完成" : request.remark(),
-                    request.vendorId()));
+                    request.vendorId());
             notifyUser(order, "买断完成", "订单 %s 买断成功。".formatted(order.getOrderNo()));
         } else {
             order.rejectBuyout();
-            order.addEvent(OrderEvent.record(OrderEventType.BUYOUT_REJECTED,
+            recordEvent(order, OrderEventType.BUYOUT_REJECTED,
                     request.remark() == null ? "买断被拒绝" : request.remark(),
-                    request.vendorId()));
+                    request.vendorId());
             notifyUser(order, "买断被拒", "订单 %s 的买断申请未通过，原因：%s"
                     .formatted(order.getOrderNo(), request.remark() == null ? "无" : request.remark()));
         }
@@ -394,7 +414,7 @@ public class RentalOrderService {
         String message = reason == null || reason.isBlank()
                 ? "管理员强制关闭订单"
                 : "管理员强制关闭：" + reason;
-        order.addEvent(OrderEvent.record(OrderEventType.ORDER_CANCELLED, message, adminId));
+        recordEvent(order, OrderEventType.ORDER_CANCELLED, message, adminId);
         notifyUser(order, "订单已关闭", "订单 %s 已被管理员关闭，原因：%s"
                 .formatted(order.getOrderNo(), reason == null || reason.isBlank() ? "无" : reason));
         notifyVendor(order, "订单已关闭", "订单 %s 已被管理员关闭。".formatted(order.getOrderNo()));
@@ -558,6 +578,22 @@ public class RentalOrderService {
         if (!commands.isEmpty()) {
             inventoryReservationClient.release(order.getId(), commands);
         }
+    }
+
+    private void recordEvent(RentalOrder order,
+                             OrderEventType eventType,
+                             String description,
+                             UUID actorId) {
+        recordEvent(order, eventType, description, actorId, Map.of());
+    }
+
+    private void recordEvent(RentalOrder order,
+                             OrderEventType eventType,
+                             String description,
+                             UUID actorId,
+                             Map<String, Object> attributes) {
+        order.addEvent(OrderEvent.record(eventType, description, actorId));
+        orderEventPublisher.publish(order, eventType, description, actorId, attributes);
     }
 
     private record Totals(BigDecimal depositAmount, BigDecimal rentAmount, BigDecimal buyoutAmount, BigDecimal totalAmount) {

@@ -19,6 +19,9 @@
 - ✅ 服务注册与内部通讯收敛（Iteration 7）：引入 Eureka 注册中心，统一改造各服务为负载均衡的 RestTemplate/RestClient 调用
 - ✅ 购物车与库存预占闭环：提供购物车增删改查 API，下单时自动预占/释放库存并新增产品服务内部库存接口
 - ✅ 订单维护调度：新增超时未支付订单的定时自动取消任务并推送通知
+- ✅ 订单事件消息总线：基于 RabbitMQ 推送订单状态事件并由通知服务异步订阅
+- ✅ 商品媒体资源管理：支持厂商上传商品图片并通过本地文件系统托管与分发
+- ✅ Redis 缓存支撑：通知模板读取支持 Redis 缓存，可通过 `flexlease.redis.enabled` 开关控制
 
 ## 快速开始
 ### 后端服务
@@ -37,6 +40,8 @@ mvn -pl backend/notification-service spring-boot:run  # 通知与运营服务，
 > 常用端口：Auth 9001、User 9002、Product 9003、Order 9004、Payment 9005、Notification 9006、Gateway 8080。
 
 > **内部访问令牌**：调用 `auth-service` 的 `/api/v1/internal/**` 接口时需携带 `X-Internal-Token`，默认值 `flexlease-internal-secret` 可在认证服务 `security.jwt.internal-access-token` 和调用方（如用户服务）`flexlease.auth-service.internal-token` 中调整。
+
+> **运行依赖**：RabbitMQ 与 Redis 已包含在 `docker-compose.yml` 中，按需执行 `docker compose up rabbitmq redis` 即可本地启动。商品媒体文件默认写入 `storage/uploads`，可通过环境变量 `FLEXLEASE_STORAGE_ROOT` 自定义。
 
 完成启动后，可参考 `docs/API设计.md` 流程体验“注册厂商 → 提交入驻 → 审批 → 创建商品 → 审核上架 → 用户下单/履约”链路，并可通过订单服务暴露的 `/api/v1/analytics/**` 接口验证平台及厂商运营指标，再结合 `notification-service` 的 `/api/v1/notifications/**` 验证通知发送与日志查询。
 

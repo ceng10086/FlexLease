@@ -26,21 +26,24 @@ import org.springframework.stereotype.Service;
 public class NotificationService {
 
     private final NotificationTemplateRepository templateRepository;
+    private final NotificationTemplateProvider templateProvider;
     private final NotificationLogRepository logRepository;
     private final ObjectMapper objectMapper;
 
     public NotificationService(NotificationTemplateRepository templateRepository,
                                NotificationLogRepository logRepository,
-                               ObjectMapper objectMapper) {
+                               ObjectMapper objectMapper,
+                               NotificationTemplateProvider templateProvider) {
         this.templateRepository = templateRepository;
         this.logRepository = logRepository;
         this.objectMapper = objectMapper;
+        this.templateProvider = templateProvider;
     }
 
     public NotificationLogResponse sendNotification(NotificationSendRequest request) {
         NotificationTemplate template = null;
         if (request.hasTemplate()) {
-            template = templateRepository.findByCode(request.templateCode())
+            template = templateProvider.findByCode(request.templateCode())
                     .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "通知模板不存在"));
         }
 

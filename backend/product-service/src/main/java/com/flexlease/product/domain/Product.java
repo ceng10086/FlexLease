@@ -7,12 +7,13 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import java.time.OffsetDateTime;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.UUID;
 
 @Entity
@@ -61,7 +62,11 @@ public class Product {
     private OffsetDateTime updatedAt;
 
     @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<RentalPlan> rentalPlans = new ArrayList<>();
+    private Set<RentalPlan> rentalPlans = new LinkedHashSet<>();
+
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("sortOrder ASC, createdAt ASC")
+    private Set<MediaAsset> mediaAssets = new LinkedHashSet<>();
 
     protected Product() {
         // JPA
@@ -153,8 +158,12 @@ public class Product {
         return updatedAt;
     }
 
-    public List<RentalPlan> getRentalPlans() {
+    public Set<RentalPlan> getRentalPlans() {
         return rentalPlans;
+    }
+
+    public Set<MediaAsset> getMediaAssets() {
+        return mediaAssets;
     }
 
     public void updateBasicInfo(String name,
@@ -165,6 +174,16 @@ public class Product {
         this.categoryCode = categoryCode;
         this.description = description;
         this.coverImageUrl = coverImageUrl;
+    }
+
+    public void addMediaAsset(MediaAsset asset) {
+        mediaAssets.add(asset);
+        asset.setProduct(this);
+    }
+
+    public void removeMediaAsset(MediaAsset asset) {
+        mediaAssets.remove(asset);
+        asset.setProduct(null);
     }
 
     public void submitForReview() {

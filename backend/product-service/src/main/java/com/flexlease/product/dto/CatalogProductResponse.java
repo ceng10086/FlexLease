@@ -15,8 +15,15 @@ public record CatalogProductResponse(
         String description,
         String coverImageUrl,
         ProductStatus status,
+        List<MediaAssetItem> mediaAssets,
         List<RentalPlanItem> rentalPlans
 ) {
+
+    public record MediaAssetItem(
+            UUID id,
+            String fileUrl,
+            Integer sortOrder
+    ) {}
 
     public record RentalPlanItem(
             UUID id,

@@ -10,13 +10,14 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
+import jakarta.persistence.OrderBy;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.UUID;
 
 @Entity
@@ -67,7 +68,8 @@ public class RentalPlan {
     private OffsetDateTime updatedAt;
 
     @OneToMany(mappedBy = "rentalPlan", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<ProductSku> skus = new ArrayList<>();
+    @OrderBy("createdAt ASC")
+    private Set<ProductSku> skus = new LinkedHashSet<>();
 
     protected RentalPlan() {
         // JPA
@@ -172,7 +174,7 @@ public class RentalPlan {
         return updatedAt;
     }
 
-    public List<ProductSku> getSkus() {
+    public Set<ProductSku> getSkus() {
         return skus;
     }
 

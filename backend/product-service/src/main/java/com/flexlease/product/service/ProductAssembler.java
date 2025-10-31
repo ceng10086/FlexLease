@@ -2,12 +2,14 @@ package com.flexlease.product.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.flexlease.product.domain.MediaAsset;
 import com.flexlease.product.domain.Product;
 import com.flexlease.product.domain.ProductSku;
 import com.flexlease.product.domain.ProductSkuStatus;
 import com.flexlease.product.domain.RentalPlan;
 import com.flexlease.product.domain.RentalPlanStatus;
 import com.flexlease.product.dto.CatalogProductResponse;
+import com.flexlease.product.dto.MediaAssetResponse;
 import com.flexlease.product.dto.ProductResponse;
 import com.flexlease.product.dto.ProductSummaryResponse;
 import com.flexlease.product.dto.RentalPlanResponse;
@@ -15,7 +17,6 @@ import com.flexlease.product.dto.SkuResponse;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
@@ -32,6 +33,9 @@ public class ProductAssembler {
         List<RentalPlanResponse> plans = product.getRentalPlans().stream()
                 .map(this::toRentalPlanResponse)
                 .toList();
+        List<MediaAssetResponse> mediaAssets = product.getMediaAssets().stream()
+                .map(this::toMediaAssetResponse)
+                .toList();
         return new ProductResponse(
                 product.getId(),
                 product.getVendorId(),
@@ -46,6 +50,7 @@ public class ProductAssembler {
                 product.getReviewedAt(),
                 product.getCreatedAt(),
                 product.getUpdatedAt(),
+                mediaAssets,
                 plans
         );
     }
@@ -64,9 +69,7 @@ public class ProductAssembler {
     }
 
     public RentalPlanResponse toRentalPlanResponse(RentalPlan plan) {
-        List<SkuResponse> skus = plan.getSkus() == null
-                ? List.of()
-                : plan.getSkus().stream().map(this::toSkuResponse).toList();
+        List<SkuResponse> skus = plan.getSkus().stream().map(this::toSkuResponse).toList();
         return new RentalPlanResponse(
                 plan.getId(),
                 plan.getPlanType(),
@@ -119,40 +122,61 @@ public class ProductAssembler {
         }
     }
 
-        public CatalogProductResponse toCatalog(Product product) {
+    public CatalogProductResponse toCatalog(Product product) {
+        List<CatalogProductResponse.MediaAssetItem> mediaItems = product.getMediaAssets().stream()
+                .map(asset -> new CatalogProductResponse.MediaAssetItem(
+                        asset.getId(),
+                        asset.getFileUrl(),
+                        asset.getSortOrder()
+                ))
+                .toList();
         List<CatalogProductResponse.RentalPlanItem> planItems = product.getRentalPlans().stream()
-            .filter(plan -> plan.getStatus() == RentalPlanStatus.ACTIVE)
-            .map(plan -> new CatalogProductResponse.RentalPlanItem(
-                plan.getId(),
-                plan.getPlanType(),
-                plan.getTermMonths(),
-                plan.getDepositAmount(),
-                plan.getRentAmountMonthly(),
-                plan.getBuyoutPrice(),
-                plan.isAllowExtend(),
-                plan.getExtensionUnit(),
-                plan.getExtensionPrice(),
-                Optional.ofNullable(plan.getSkus()).orElse(List.of()).stream()
-                    .filter(sku -> sku.getStatus() == ProductSkuStatus.ACTIVE)
-                    .map(sku -> new CatalogProductResponse.CatalogSkuItem(
-                        sku.getId(),
-                        sku.getSkuCode(),
-                        readAttributes(sku.getAttributes()),
-                        sku.getStockTotal(),
-                        sku.getStockAvailable()
-                    ))
-                    .collect(Collectors.toList())
-            ))
-            .collect(Collectors.toList());
+                .filter(plan -> plan.getStatus() == RentalPlanStatus.ACTIVE)
+                .map(plan -> new CatalogProductResponse.RentalPlanItem(
+                        plan.getId(),
+                        plan.getPlanType(),
+                        plan.getTermMonths(),
+                        plan.getDepositAmount(),
+                        plan.getRentAmountMonthly(),
+                        plan.getBuyoutPrice(),
+                        plan.isAllowExtend(),
+                        plan.getExtensionUnit(),
+                        plan.getExtensionPrice(),
+                        plan.getSkus().stream()
+                                .filter(sku -> sku.getStatus() == ProductSkuStatus.ACTIVE)
+                                .map(sku -> new CatalogProductResponse.CatalogSkuItem(
+                                        sku.getId(),
+                                        sku.getSkuCode(),
+                                        readAttributes(sku.getAttributes()),
+                                        sku.getStockTotal(),
+                                        sku.getStockAvailable()
+                                ))
+                                .collect(Collectors.toList())
+                ))
+                .collect(Collectors.toList());
         return new CatalogProductResponse(
-            product.getId(),
-            product.getVendorId(),
-            product.getName(),
-            product.getCategoryCode(),
-            product.getDescription(),
-            product.getCoverImageUrl(),
-            product.getStatus(),
-            planItems
+                product.getId(),
+                product.getVendorId(),
+                product.getName(),
+                product.getCategoryCode(),
+                product.getDescription(),
+                product.getCoverImageUrl(),
+                product.getStatus(),
+                mediaItems,
+                planItems
         );
-        }
+    }
+
+    public MediaAssetResponse toMediaAssetResponse(MediaAsset asset) {
+        return new MediaAssetResponse(
+                asset.getId(),
+                asset.getFileName(),
+                asset.getFileUrl(),
+                asset.getContentType(),
+                asset.getFileSize(),
+                asset.getSortOrder(),
+                asset.getCreatedAt(),
+                asset.getUpdatedAt()
+        );
+    }
 }

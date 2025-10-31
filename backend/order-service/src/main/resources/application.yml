@@ -23,6 +23,11 @@ spring:
     console:
       enabled: true
       path: /h2-console
+  rabbitmq:
+    host: ${SPRING_RABBITMQ_HOST:localhost}
+    port: ${SPRING_RABBITMQ_PORT:5672}
+    username: ${SPRING_RABBITMQ_USERNAME:guest}
+    password: ${SPRING_RABBITMQ_PASSWORD:guest}
 eureka:
   client:
     service-url:
@@ -39,6 +44,8 @@ flexlease:
   maintenance:
     pending-payment-expire-minutes: 30
     scan-interval-ms: 60000
+  messaging:
+    enabled: true
 server:
   port: 9004
 management:
