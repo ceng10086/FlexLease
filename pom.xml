@@ -34,6 +34,7 @@
         <module>backend/payment-service</module>
         <module>backend/notification-service</module>
         <module>backend/gateway-service</module>
+        <module>backend/registry-service</module>
     </modules>
 
     <dependencyManagement>

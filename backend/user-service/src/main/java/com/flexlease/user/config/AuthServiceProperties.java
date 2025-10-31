@@ -5,7 +5,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "flexlease.auth-service")
 public class AuthServiceProperties {
 
-    private String baseUrl = "http://localhost:9001";
+    private String baseUrl = "http://auth-service";
     private String internalToken = "flexlease-internal-secret";
 
     public String getBaseUrl() {

@@ -1,0 +1,20 @@
+spring:
+  application:
+    name: registry-service
+  main:
+    allow-bean-definition-overriding: true
+
+server:
+  port: 8761
+
+eureka:
+  client:
+    register-with-eureka: false
+    fetch-registry: false
+  server:
+    enable-self-preservation: false
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

@@ -1,7 +1,6 @@
 package com.flexlease.order.dto;
 
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -13,6 +12,7 @@ public record CreateOrderRequest(
         String planType,
         OffsetDateTime leaseStartAt,
         OffsetDateTime leaseEndAt,
-        @Valid @NotEmpty List<OrderItemRequest> items
+        @Valid List<OrderItemRequest> items,
+        List<UUID> cartItemIds
 ) {
 }

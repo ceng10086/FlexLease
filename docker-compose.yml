@@ -1,5 +1,12 @@
-version: "3.9"
 services:
+  registry-service:
+    build:
+      context: .
+      dockerfile: backend/registry-service/Dockerfile
+    container_name: flexlease-registry
+    restart: unless-stopped
+    ports:
+      - "8761:8761"
   postgres:
     image: postgres:16-alpine
     container_name: flexlease-postgres

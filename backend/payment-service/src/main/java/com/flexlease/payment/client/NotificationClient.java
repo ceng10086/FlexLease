@@ -6,7 +6,6 @@ import com.flexlease.common.notification.NotificationSendRequest;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
@@ -24,15 +23,17 @@ public class NotificationClient {
             };
 
     private final RestTemplate restTemplate;
+    private final String baseUrl;
 
-    public NotificationClient(RestTemplateBuilder restTemplateBuilder, NotificationServiceProperties properties) {
-        this.restTemplate = restTemplateBuilder.rootUri(properties.getBaseUrl()).build();
+    public NotificationClient(RestTemplate restTemplate, NotificationServiceProperties properties) {
+        this.restTemplate = restTemplate;
+        this.baseUrl = properties.getBaseUrl();
     }
 
     public void send(NotificationSendRequest request) {
         try {
             ResponseEntity<ApiResponse<Map<String, Object>>> response = restTemplate.exchange(
-                    "/notifications/send",
+                    baseUrl + "/notifications/send",
                     HttpMethod.POST,
                     new HttpEntity<>(request),
                     RESPONSE_TYPE

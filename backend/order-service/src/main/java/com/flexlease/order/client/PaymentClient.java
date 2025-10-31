@@ -10,7 +10,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClientException;
-import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.web.client.RestTemplate;
 
 @Component
@@ -21,15 +20,17 @@ public class PaymentClient {
             };
 
     private final RestTemplate restTemplate;
+    private final String baseUrl;
 
-    public PaymentClient(RestTemplateBuilder restTemplateBuilder, PaymentServiceProperties properties) {
-        this.restTemplate = restTemplateBuilder.rootUri(properties.getBaseUrl()).build();
+    public PaymentClient(RestTemplate restTemplate, PaymentServiceProperties properties) {
+        this.restTemplate = restTemplate;
+        this.baseUrl = properties.getBaseUrl();
     }
 
     public PaymentTransactionView loadTransaction(UUID transactionId) {
         try {
             ResponseEntity<ApiResponse<PaymentTransactionView>> response = restTemplate.exchange(
-                    "/payments/{transactionId}",
+                    baseUrl + "/payments/{transactionId}",
                     HttpMethod.GET,
                     null,
                     PAYMENT_RESPONSE_TYPE,

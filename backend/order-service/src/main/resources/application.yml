@@ -23,11 +23,22 @@ spring:
     console:
       enabled: true
       path: /h2-console
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka
+  instance:
+    prefer-ip-address: true
 flexlease:
   payment-service:
-    base-url: http://localhost:9005/api/v1
+    base-url: http://payment-service/api/v1
   notification-service:
-    base-url: http://localhost:9006/api/v1
+    base-url: http://notification-service/api/v1
+  product-service:
+    base-url: http://product-service/api/v1
+  maintenance:
+    pending-payment-expire-minutes: 30
+    scan-interval-ms: 60000
 server:
   port: 9004
 management:

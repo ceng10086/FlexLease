@@ -9,7 +9,7 @@ import org.springframework.validation.annotation.Validated;
 public class PaymentServiceProperties {
 
     @NotBlank
-    private String baseUrl = "http://localhost:9005/api/v1";
+    private String baseUrl = "http://payment-service/api/v1";
 
     public String getBaseUrl() {
         return baseUrl;

@@ -114,12 +114,19 @@
 | GET | `/catalog/products` | 商品搜索/分类过滤 | 返回分页数据，包含商品摘要与可用方案/库存概览 |
 | GET | `/catalog/products/{productId}` | 商品详情 | 仅允许查询 `ACTIVE` 商品，返回同上结构 |
 
+### 4.5 库存内部接口
+| 方法 | URL | 描述 | 请求体要点 |
+| ---- | --- | ---- | ---------- |
+| POST | `/internal/inventory/reservations` | 批量预占/释放库存（内部调用） | `{ referenceId, items: [{ skuId, quantity, changeType }] }`，`changeType` 取值 `RESERVE`/`RELEASE`/`INBOUND`/`OUTBOUND` |
+
+> 请求需由内部服务发起，没有厂商上下文限制，系统会以悲观锁处理库存并记录 `inventory_snapshot` 流水。
+
 ## 5. 订单与租赁流程（order-service，已实现）
 ### 5.1 下单与草稿
 | 方法 | URL | 描述 | 请求体要点 | 响应要点 |
 | ---- | --- | ---- | ---------- | -------- |
 | POST | `/orders/preview` | 价格试算（押金、租金、合计） | `{ userId, vendorId, planType?, leaseStartAt?, leaseEndAt?, items: [{ productId, skuId?, planId?, productName, skuCode?, planSnapshot?, quantity, unitRentAmount, unitDepositAmount, buyoutPrice? }] }` | `depositAmount`, `rentAmount`, `totalAmount` |
-| POST | `/orders` | 创建订单（与预览结构一致，服务端生成 `orderNo` 并固化明细快照） | 同上 | `RentalOrderResponse`（含订单基础信息、明细、事件、续租/退租记录） |
+| POST | `/orders` | 创建订单（可传 `items` 或 `cartItemIds`，服务端生成 `orderNo` 并固化明细快照） | `{ userId, vendorId, planType?, leaseStartAt?, leaseEndAt?, items?: [...], cartItemIds?: [] }`<br>当 `cartItemIds` 提供时自动从购物车加载明细并清空对应条目 | `RentalOrderResponse`（含订单基础信息、明细、事件、续租/退租记录） |
 | GET | `/orders/{orderId}` | 查看订单详情 | - | `RentalOrderResponse` |
 | GET | `/orders` | 查询订单列表 | 需提供 `userId` 或 `vendorId` 其一，可选 `status`、`page`、`size` | `PagedResponse<RentalOrderSummaryResponse>` |
 
@@ -152,6 +159,17 @@
 | GET | `/admin/orders` | 分页检索订单 | 支持 `userId`、`vendorId`、`status`、`page`、`size`；未带过滤条件时返回全量分页 |
 | GET | `/admin/orders/{orderId}` | 查看详情 | 返回与 `/orders/{id}` 相同的订单详情 |
 | POST | `/admin/orders/{orderId}/force-close` | 强制关闭订单 | `{ "adminId", "reason?" }`，将订单置为 `CANCELLED` 并追加事件记录 |
+
+### 5.5 购物车接口
+| 方法 | URL | 描述 | 请求体要点 | 备注 |
+| ---- | --- | ---- | ---------- | ---- |
+| GET | `/cart` | 查询用户购物车 | `userId`（query 参数） | 返回 `List<CartItemResponse>` |
+| POST | `/cart/items` | 新增/合并条目 | `{ userId, vendorId, productId, skuId, planId?, productName, skuCode?, planSnapshot?, quantity, unitRentAmount, unitDepositAmount, buyoutPrice? }` | 相同用户+SKU 会合并数量并刷新定价 |
+| PUT | `/cart/items/{itemId}` | 更新数量 | `{ userId, quantity }` | 数量需 ≥1 |
+| DELETE | `/cart/items/{itemId}` | 删除条目 | `userId`（query 参数） | - |
+| DELETE | `/cart` | 清空购物车 | `userId`（query 参数） | - |
+
+> 下单传入 `cartItemIds` 后端会自动加载并移除对应购物车条目，同时触发库存预占。
 
 ## 6. 支付与结算（payment-service）
 > 枚举说明：`scene` 取值 `DEPOSIT`/`RENT`/`BUYOUT`/`PENALTY`；`channel` 取值 `MOCK`/`ALIPAY`/`WECHAT`/`BANK_TRANSFER`；`status` 取值 `PENDING`/`SUCCEEDED`/`FAILED`。
@@ -188,11 +206,11 @@
 > GMV 合计包含待发货、租赁中、退租中、已完成以及买断相关订单；`activeOrders` 聚合待发货、租赁中、退租处理中及买断申请的订单量。返回金额使用 `BigDecimal`（两位小数）。
 
 ## 8. 网关与前端约定
-- 所有微服务注册到 Nacos，以 `service-name` 暴露，网关根据路径转发：
+- 所有微服务注册到 Eureka（`registry-service`，端口 8761），网关根据路径转发：
   - `/api/v1/auth/**` → auth-service
   - `/api/v1/users/**` `/api/v1/vendors/**` → user-service
   - `/api/v1/products/**` `/api/v1/catalog/**` → product-service
-  - `/api/v1/orders/**` → order-service
+  - `/api/v1/orders/**` `/api/v1/cart/**` → order-service
   - `/api/v1/payments/**` → payment-service
   - `/api/v1/notifications/**` → notification-service
   - `/api/v1/analytics/**` → order-service

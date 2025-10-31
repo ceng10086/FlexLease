@@ -16,10 +16,16 @@
 - ✅ 通知与运营看板（Iteration 5）：上线 `notification-service` 模板化通知发送与日志查询，订单/支付服务打通通知推送，新增订单运营指标 API、前端仪表盘与端到端测试
 - ✅ 账号管理增强：支持注销、密码重置、令牌刷新，开放管理员启停账号接口
 - ✅ 厂商/用户资料中心与管理员订单干预（Iteration 6+）：提供厂商资料分页、用户档案维护及后台订单强制关闭能力，前端管理端同步支持
+- ✅ 服务注册与内部通讯收敛（Iteration 7）：引入 Eureka 注册中心，统一改造各服务为负载均衡的 RestTemplate/RestClient 调用
+- ✅ 购物车与库存预占闭环：提供购物车增删改查 API，下单时自动预占/释放库存并新增产品服务内部库存接口
+- ✅ 订单维护调度：新增超时未支付订单的定时自动取消任务并推送通知
 
 ## 快速开始
 ### 后端服务
 ```powershell
+# 先启动注册中心
+mvn -pl backend/registry-service spring-boot:run          # 注册中心，端口 8761
+
 # 在仓库根目录依次启动需要的服务
 mvn -pl backend/auth-service spring-boot:run      # 认证服务，端口 9001
 mvn -pl backend/user-service spring-boot:run      # 用户/厂商服务，端口 9002
@@ -58,6 +64,10 @@ mvn -pl backend/product-service test
 # 全量构建
 mvn clean package
 ```
+
+### 接口调试
+- 提供 Postman 集合：`docs/postman/cart-api.postman_collection.json`，覆盖购物车增删改查与基于购物车的下单流程，导入后配置环境变量 `baseUrl`、`userId` 等即可调用。
+- 使用 Docker Compose 时可直接运行 `docker compose up registry-service` 启动注册中心，其余依赖（Postgres/Redis/RabbitMQ）同一命令即可完成。
 
 ## 目录结构
 ```

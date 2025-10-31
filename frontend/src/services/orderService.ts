@@ -45,7 +45,9 @@ export type OrderPreviewResponse = {
   totalAmount: number;
 };
 
-export type CreateOrderPayload = OrderPreviewPayload;
+export type CreateOrderPayload = OrderPreviewPayload & {
+  cartItemIds?: string[];
+};
 
 export type RentalOrderSummary = {
   id: string;

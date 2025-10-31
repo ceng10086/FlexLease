@@ -9,7 +9,7 @@ import org.springframework.validation.annotation.Validated;
 public class NotificationServiceProperties {
 
     @NotBlank
-    private String baseUrl = "http://localhost:9006/api/v1";
+    private String baseUrl = "http://notification-service/api/v1";
 
     public String getBaseUrl() {
         return baseUrl;

@@ -4,10 +4,13 @@ import com.flexlease.common.exception.BusinessException;
 import com.flexlease.common.exception.ErrorCode;
 import com.flexlease.common.notification.NotificationChannel;
 import com.flexlease.common.notification.NotificationSendRequest;
+import com.flexlease.order.client.InventoryReservationClient;
+import com.flexlease.order.client.InventoryReservationClient.InventoryCommand;
 import com.flexlease.order.client.PaymentClient;
 import com.flexlease.order.client.PaymentStatus;
 import com.flexlease.order.client.PaymentTransactionView;
 import com.flexlease.order.client.NotificationClient;
+import com.flexlease.order.domain.CartItem;
 import com.flexlease.order.domain.ExtensionRequestStatus;
 import com.flexlease.order.domain.OrderEvent;
 import com.flexlease.order.domain.OrderEventType;
@@ -55,6 +58,8 @@ public class RentalOrderService {
     private final OrderReturnRequestRepository returnRequestRepository;
     private final PaymentClient paymentClient;
     private final NotificationClient notificationClient;
+    private final InventoryReservationClient inventoryReservationClient;
+    private final CartService cartService;
     private final OrderAssembler assembler;
 
     public RentalOrderService(RentalOrderRepository rentalOrderRepository,
@@ -62,12 +67,16 @@ public class RentalOrderService {
                               OrderReturnRequestRepository returnRequestRepository,
                               PaymentClient paymentClient,
                               NotificationClient notificationClient,
+                              InventoryReservationClient inventoryReservationClient,
+                              CartService cartService,
                               OrderAssembler assembler) {
         this.rentalOrderRepository = rentalOrderRepository;
         this.extensionRequestRepository = extensionRequestRepository;
         this.returnRequestRepository = returnRequestRepository;
         this.paymentClient = paymentClient;
         this.notificationClient = notificationClient;
+        this.inventoryReservationClient = inventoryReservationClient;
+        this.cartService = cartService;
         this.assembler = assembler;
     }
 
@@ -78,7 +87,35 @@ public class RentalOrderService {
     }
 
     public RentalOrderResponse createOrder(CreateOrderRequest request) {
-        Totals totals = calculateTotals(request.items());
+        List<OrderItemRequest> directItems = request.items() == null ? List.of() : request.items();
+        List<UUID> cartItemIds = request.cartItemIds() == null ? List.of() : request.cartItemIds();
+        if (!directItems.isEmpty() && !cartItemIds.isEmpty()) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "请勿同时提供购物车条目和订单明细");
+        }
+
+        List<CartItem> cartItems = List.of();
+        List<OrderItemRequest> orderItems = directItems;
+        if (orderItems.isEmpty()) {
+            cartItems = cartService.loadCartItems(request.userId(), cartItemIds);
+            if (cartItems.isEmpty()) {
+                throw new BusinessException(ErrorCode.VALIDATION_ERROR, "订单缺少商品明细");
+            }
+            long vendorCount = cartItems.stream().map(CartItem::getVendorId).distinct().count();
+            if (vendorCount != 1) {
+                throw new BusinessException(ErrorCode.VALIDATION_ERROR, "购物车条目属于不同厂商，无法合并下单");
+            }
+            UUID cartVendorId = cartItems.get(0).getVendorId();
+            if (!cartVendorId.equals(request.vendorId())) {
+                throw new BusinessException(ErrorCode.VALIDATION_ERROR, "厂商信息不一致");
+            }
+            orderItems = cartItems.stream().map(this::toOrderItemRequest).toList();
+        }
+
+        if (orderItems.isEmpty()) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "订单缺少商品明细");
+        }
+
+        Totals totals = calculateTotals(orderItems);
 
         RentalOrder order = RentalOrder.create(
                 request.userId(),
@@ -92,25 +129,29 @@ public class RentalOrderService {
                 request.leaseEndAt()
         );
 
-        for (OrderItemRequest itemRequest : request.items()) {
-            RentalOrderItem item = RentalOrderItem.create(
-                    itemRequest.productId(),
-                    itemRequest.skuId(),
-                    itemRequest.planId(),
-                    itemRequest.productName(),
-                    itemRequest.skuCode(),
-                    itemRequest.planSnapshot(),
-                    itemRequest.quantity(),
-                    itemRequest.unitRentAmount(),
-                    itemRequest.unitDepositAmount(),
-                    itemRequest.buyoutPrice()
-            );
-            order.addItem(item);
-        }
+        orderItems.forEach(itemRequest -> order.addItem(toOrderItem(itemRequest)));
 
-        order.addEvent(OrderEvent.record(OrderEventType.ORDER_CREATED, "订单创建", request.userId()));
-        RentalOrder saved = rentalOrderRepository.save(order);
-        return assembler.toOrderResponse(saved);
+        List<InventoryCommand> reservationCommands = toInventoryCommands(orderItems);
+        if (!reservationCommands.isEmpty()) {
+            inventoryReservationClient.reserve(order.getId(), reservationCommands);
+        }
+        try {
+            order.addEvent(OrderEvent.record(OrderEventType.ORDER_CREATED, "订单创建", request.userId()));
+            RentalOrder saved = rentalOrderRepository.save(order);
+            if (!cartItems.isEmpty()) {
+                cartService.removeItems(request.userId(), cartItemIds);
+            }
+            return assembler.toOrderResponse(saved);
+        } catch (RuntimeException ex) {
+            if (!reservationCommands.isEmpty()) {
+                try {
+                    inventoryReservationClient.release(order.getId(), reservationCommands);
+                } catch (RuntimeException ignored) {
+                    // release failure will be surfaced via monitoring, original exception still thrown
+                }
+            }
+            throw ex;
+        }
     }
 
     @Transactional(Transactional.TxType.SUPPORTS)
@@ -181,6 +222,7 @@ public class RentalOrderService {
                 request.reason() == null ? "用户取消订单" : request.reason(),
                 request.userId()));
         notifyVendor(order, "订单已取消", "订单 %s 已被用户取消。".formatted(order.getOrderNo()));
+        releaseReservedInventory(order);
         return assembler.toOrderResponse(order);
     }
 
@@ -347,6 +389,7 @@ public class RentalOrderService {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "管理员编号不能为空");
         }
         RentalOrder order = getOrderForUpdate(orderId);
+        OrderStatus previousStatus = order.getStatus();
         order.forceClose();
         String message = reason == null || reason.isBlank()
                 ? "管理员强制关闭订单"
@@ -355,6 +398,9 @@ public class RentalOrderService {
         notifyUser(order, "订单已关闭", "订单 %s 已被管理员关闭，原因：%s"
                 .formatted(order.getOrderNo(), reason == null || reason.isBlank() ? "无" : reason));
         notifyVendor(order, "订单已关闭", "订单 %s 已被管理员关闭。".formatted(order.getOrderNo()));
+        if (previousStatus == OrderStatus.PENDING_PAYMENT || previousStatus == OrderStatus.AWAITING_SHIPMENT) {
+            releaseReservedInventory(order);
+        }
         return assembler.toOrderResponse(order);
     }
 
@@ -461,6 +507,57 @@ public class RentalOrderService {
                 Map.of("orderNo", order.getOrderNo())
         );
         notificationClient.send(request);
+    }
+
+    private OrderItemRequest toOrderItemRequest(CartItem cartItem) {
+        return new OrderItemRequest(
+                cartItem.getProductId(),
+                cartItem.getSkuId(),
+                cartItem.getPlanId(),
+                cartItem.getProductName(),
+                cartItem.getSkuCode(),
+                cartItem.getPlanSnapshot(),
+                cartItem.getQuantity(),
+                cartItem.getUnitRentAmount(),
+                cartItem.getUnitDepositAmount(),
+                cartItem.getBuyoutPrice()
+        );
+    }
+
+    private RentalOrderItem toOrderItem(OrderItemRequest itemRequest) {
+        return RentalOrderItem.create(
+                itemRequest.productId(),
+                itemRequest.skuId(),
+                itemRequest.planId(),
+                itemRequest.productName(),
+                itemRequest.skuCode(),
+                itemRequest.planSnapshot(),
+                itemRequest.quantity(),
+                itemRequest.unitRentAmount(),
+                itemRequest.unitDepositAmount(),
+                itemRequest.buyoutPrice()
+        );
+    }
+
+    private List<InventoryCommand> toInventoryCommands(List<OrderItemRequest> items) {
+        return items.stream()
+                .map(item -> {
+                    if (item.skuId() == null) {
+                        throw new BusinessException(ErrorCode.VALIDATION_ERROR, "缺少 SKU 信息，无法预占库存");
+                    }
+                    return new InventoryCommand(item.skuId(), item.quantity());
+                })
+                .toList();
+    }
+
+    private void releaseReservedInventory(RentalOrder order) {
+        List<InventoryCommand> commands = order.getItems().stream()
+                .filter(item -> item.getSkuId() != null)
+                .map(item -> new InventoryCommand(item.getSkuId(), item.getQuantity()))
+                .toList();
+        if (!commands.isEmpty()) {
+            inventoryReservationClient.release(order.getId(), commands);
+        }
     }
 
     private record Totals(BigDecimal depositAmount, BigDecimal rentAmount, BigDecimal buyoutAmount, BigDecimal totalAmount) {

@@ -3,6 +3,7 @@ package com.flexlease.order.repository;
 import com.flexlease.order.domain.OrderStatus;
 import com.flexlease.order.domain.RentalOrder;
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -19,6 +20,9 @@ public interface RentalOrderRepository extends JpaRepository<RentalOrder, UUID> 
     @EntityGraph(attributePaths = {"items"})
     @Query("select o from RentalOrder o where o.id = :id")
     Optional<RentalOrder> findByIdWithDetails(@Param("id") UUID id);
+
+    @EntityGraph(attributePaths = {"items"})
+    List<RentalOrder> findByStatusAndCreatedAtBefore(OrderStatus status, OffsetDateTime createdAt);
 
     Page<RentalOrder> findByUserId(UUID userId, Pageable pageable);
 

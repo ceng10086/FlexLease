@@ -3,6 +3,8 @@ package com.flexlease.order;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.flexlease.order.domain.OrderStatus;
+import com.flexlease.order.dto.AddCartItemRequest;
+import com.flexlease.order.dto.CartItemResponse;
 import com.flexlease.order.dto.CreateOrderRequest;
 import com.flexlease.order.dto.OrderActorRequest;
 import com.flexlease.common.exception.BusinessException;
@@ -17,7 +19,9 @@ import com.flexlease.order.dto.OrderReturnDecisionRequest;
 import com.flexlease.order.dto.OrderShipmentRequest;
 import com.flexlease.order.dto.OrderPreviewResponse;
 import com.flexlease.order.dto.RentalOrderResponse;
+import com.flexlease.order.service.OrderMaintenanceScheduler;
 import com.flexlease.order.service.RentalOrderService;
+import com.flexlease.order.service.CartService;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
@@ -25,6 +29,8 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.TestPropertySource;
+import com.flexlease.order.client.InventoryReservationClient;
 import com.flexlease.order.client.NotificationClient;
 import com.flexlease.order.client.PaymentClient;
 import com.flexlease.order.client.PaymentStatus;
@@ -32,6 +38,7 @@ import com.flexlease.order.client.PaymentTransactionView;
 import org.springframework.boot.test.mock.mockito.MockBean;
 
 @SpringBootTest
+@TestPropertySource(properties = "flexlease.order.maintenance.pending-payment-expire-minutes=0")
 class RentalOrderServiceIntegrationTest {
 
     static {
@@ -46,6 +53,15 @@ class RentalOrderServiceIntegrationTest {
 
     @MockBean
     private NotificationClient notificationClient;
+
+    @MockBean
+    private InventoryReservationClient inventoryReservationClient;
+
+    @Autowired
+    private CartService cartService;
+
+    @Autowired
+    private OrderMaintenanceScheduler orderMaintenanceScheduler;
 
     @Test
     void shouldCompleteFullOrderLifecycle() {
@@ -87,7 +103,8 @@ class RentalOrderServiceIntegrationTest {
                 "STANDARD",
                 null,
                 null,
-                List.of(itemRequest)
+                List.of(itemRequest),
+                List.of()
         ));
         assertThat(created.status()).isEqualTo(OrderStatus.PENDING_PAYMENT);
 
@@ -178,7 +195,8 @@ class RentalOrderServiceIntegrationTest {
                 "STANDARD",
                 null,
                 null,
-                List.of(itemRequest)
+                List.of(itemRequest),
+                List.of()
         ));
 
         UUID transactionId = UUID.randomUUID();
@@ -230,7 +248,8 @@ class RentalOrderServiceIntegrationTest {
                 "STANDARD",
                 null,
                 null,
-                List.of(itemRequest)
+                List.of(itemRequest),
+                List.of()
         ));
 
         UUID transactionId = UUID.randomUUID();
@@ -255,5 +274,82 @@ class RentalOrderServiceIntegrationTest {
 
         RentalOrderResponse queried = rentalOrderService.getOrder(created.id());
         assertThat(queried.status()).isEqualTo(OrderStatus.PENDING_PAYMENT);
+    }
+
+    @Test
+    void shouldCreateOrderUsingCartItems() {
+        UUID userId = UUID.randomUUID();
+        UUID vendorId = UUID.randomUUID();
+        UUID productId = UUID.randomUUID();
+        UUID skuId = UUID.randomUUID();
+        UUID planId = UUID.randomUUID();
+
+        CartItemResponse cartItem = cartService.addItem(new AddCartItemRequest(
+                userId,
+                vendorId,
+                productId,
+                skuId,
+                planId,
+                "共享咖啡机",
+                "COFFEE-01",
+                null,
+                1,
+                new BigDecimal("99.00"),
+                new BigDecimal("200.00"),
+                null
+        ));
+
+        RentalOrderResponse created = rentalOrderService.createOrder(new CreateOrderRequest(
+                userId,
+                vendorId,
+                "STANDARD",
+                null,
+                null,
+                List.of(),
+                List.of(cartItem.id())
+        ));
+
+        assertThat(created.status()).isEqualTo(OrderStatus.PENDING_PAYMENT);
+        assertThat(cartService.listCartItems(userId)).isEmpty();
+    }
+
+    @Test
+    void schedulerCancelsExpiredOrders() {
+        UUID userId = UUID.randomUUID();
+        UUID vendorId = UUID.randomUUID();
+        UUID productId = UUID.randomUUID();
+        UUID skuId = UUID.randomUUID();
+        UUID planId = UUID.randomUUID();
+
+        OrderItemRequest itemRequest = new OrderItemRequest(
+                productId,
+                skuId,
+                planId,
+                "共享音箱",
+                "SPEAKER-01",
+                null,
+                1,
+                new BigDecimal("59.00"),
+                new BigDecimal("100.00"),
+                null
+        );
+
+        RentalOrderResponse created = rentalOrderService.createOrder(new CreateOrderRequest(
+                userId,
+                vendorId,
+                "STANDARD",
+                null,
+                null,
+                List.of(itemRequest),
+                List.of()
+        ));
+
+        orderMaintenanceScheduler.cancelExpiredPendingOrders();
+
+        org.mockito.Mockito.verify(inventoryReservationClient, org.mockito.Mockito.atLeastOnce())
+                .release(org.mockito.ArgumentMatchers.eq(created.id()), org.mockito.ArgumentMatchers.anyList());
+
+        RentalOrderResponse refreshed = rentalOrderService.getOrder(created.id());
+        assertThat(refreshed.status()).isEqualTo(OrderStatus.CANCELLED);
     }
 }
