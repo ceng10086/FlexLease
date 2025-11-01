@@ -85,6 +85,7 @@ import { useRoute, useRouter } from 'vue-router';
 import {
   DashboardOutlined,
   AppstoreOutlined,
+  ShoppingOutlined,
   ShoppingCartOutlined,
   BellOutlined,
   ControlOutlined,
@@ -113,6 +114,7 @@ const iconMap: Record<string, any> = {
   DashboardOutlined,
   AppstoreOutlined,
   ShoppingCartOutlined,
+  ShoppingOutlined,
   BellOutlined,
   ControlOutlined,
   TeamOutlined,

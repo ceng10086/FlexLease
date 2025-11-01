@@ -64,7 +64,7 @@ npm run test:e2e
 ### 常用命令
 ```powershell
 # 单个服务测试
-mvn -pl backend/product-service test
+mvn -pl backend/product-service -am test
 
 # 全量构建
 mvn clean package

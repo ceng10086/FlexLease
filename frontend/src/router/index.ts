@@ -40,6 +40,12 @@ const router = createRouter({
           meta: { navKey: 'catalog', roles: ['USER'] }
         },
         {
+          path: 'cart',
+          name: 'cart',
+          component: () => import('../pages/customer/CartPage.vue'),
+          meta: { navKey: 'cart', roles: ['USER'] }
+        },
+        {
           path: 'catalog/:productId',
           name: 'catalog-product',
           component: () => import('../pages/customer/ProductDetailPage.vue'),

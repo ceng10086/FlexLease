@@ -23,6 +23,13 @@ const NAV_SCHEMA: NavItem[] = [
     roles: ['USER']
   },
   {
+    key: 'cart',
+    label: '购物车',
+    path: '/app/cart',
+    icon: 'ShoppingOutlined',
+    roles: ['USER']
+  },
+  {
     key: 'orders',
     label: '我的订单',
     path: '/app/orders',

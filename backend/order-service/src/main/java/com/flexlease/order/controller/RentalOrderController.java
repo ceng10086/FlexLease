@@ -9,6 +9,8 @@ import com.flexlease.order.dto.OrderActorRequest;
 import com.flexlease.order.dto.OrderBuyoutApplyRequest;
 import com.flexlease.order.dto.OrderBuyoutDecisionRequest;
 import com.flexlease.order.dto.OrderCancelRequest;
+import com.flexlease.order.dto.OrderContractResponse;
+import com.flexlease.order.dto.OrderContractSignRequest;
 import com.flexlease.order.dto.OrderExtensionApplyRequest;
 import com.flexlease.order.dto.OrderExtensionDecisionRequest;
 import com.flexlease.order.dto.OrderPaymentRequest;
@@ -20,6 +22,7 @@ import com.flexlease.order.dto.OrderShipmentRequest;
 import com.flexlease.order.dto.PagedResponse;
 import com.flexlease.order.dto.RentalOrderResponse;
 import com.flexlease.order.dto.RentalOrderSummaryResponse;
+import com.flexlease.order.service.OrderContractService;
 import com.flexlease.order.service.RentalOrderService;
 import jakarta.validation.Valid;
 import java.util.UUID;
@@ -39,9 +42,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class RentalOrderController {
 
     private final RentalOrderService rentalOrderService;
+    private final OrderContractService orderContractService;
 
-    public RentalOrderController(RentalOrderService rentalOrderService) {
+    public RentalOrderController(RentalOrderService rentalOrderService,
+                                 OrderContractService orderContractService) {
         this.rentalOrderService = rentalOrderService;
+        this.orderContractService = orderContractService;
     }
 
     @PostMapping("/preview")
@@ -76,6 +82,17 @@ public class RentalOrderController {
     @GetMapping("/{orderId}")
     public ApiResponse<RentalOrderResponse> getOrder(@PathVariable UUID orderId) {
         return ApiResponse.success(rentalOrderService.getOrder(orderId));
+    }
+
+    @GetMapping("/{orderId}/contract")
+    public ApiResponse<OrderContractResponse> getContract(@PathVariable UUID orderId) {
+        return ApiResponse.success(orderContractService.getContract(orderId));
+    }
+
+    @PostMapping("/{orderId}/contract/sign")
+    public ApiResponse<OrderContractResponse> signContract(@PathVariable UUID orderId,
+                                                           @Valid @RequestBody OrderContractSignRequest request) {
+        return ApiResponse.success(orderContractService.signContract(orderId, request));
     }
 
     @PostMapping("/{orderId}/pay")

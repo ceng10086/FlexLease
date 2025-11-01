@@ -156,11 +156,11 @@
 
 > 订单支付确认会回调支付服务核验流水，`paymentReference` 需提供支付服务返回的交易 UUID，金额必须与订单应付一致。
 
-### 5.3 合同与票据（规划中）
-| 方法 | URL | 描述 | 状态 |
-| ---- | --- | ---- | ---- |
-| GET | `/orders/{orderId}/contract` | 获取合同信息 | 待实现 |
-| POST | `/orders/{orderId}/contract/sign` | 上传/生成合同 | 待实现 |
+### 5.3 合同与票据（已实现）
+| 方法 | URL | 描述 | 请求要点 |
+| ---- | --- | ---- | -------- |
+| GET | `/orders/{orderId}/contract` | 获取订单合同（若不存在则生成草稿） | Header 需携带访问令牌；返回 `OrderContractResponse`，包含编号、内容、签署状态 |
+| POST | `/orders/{orderId}/contract/sign` | 用户签署订单合同 | `{ userId, signature }`；仅订单所属用户可签署，成功后返回更新后的 `OrderContractResponse` |
 | GET | `/orders/{orderId}/events` | 获取状态日志 | 可通过 `RentalOrderResponse.events` 获取，独立接口待定 |
 
 ### 5.4 管理侧订单（已实现）

@@ -49,3 +49,8 @@ flexlease:
     enabled: true
   redis:
     enabled: true
+security:
+  jwt:
+    secret: ${SECURITY_JWT_SECRET:flexlease-default-secret-please-change}
+    issuer: ${SECURITY_JWT_ISSUER:flexlease-auth-service}
+    internal-access-token: ${SECURITY_JWT_INTERNAL:flexlease-internal-secret}

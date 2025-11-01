@@ -37,6 +37,8 @@ import com.flexlease.order.dto.OrderShipmentRequest;
 import com.flexlease.order.dto.PagedResponse;
 import com.flexlease.order.dto.RentalOrderResponse;
 import com.flexlease.order.dto.RentalOrderSummaryResponse;
+import com.flexlease.common.security.FlexleasePrincipal;
+import com.flexlease.common.security.SecurityUtils;
 import com.flexlease.order.repository.OrderExtensionRequestRepository;
 import com.flexlease.order.repository.OrderReturnRequestRepository;
 import com.flexlease.order.repository.RentalOrderRepository;
@@ -44,6 +46,7 @@ import jakarta.transaction.Transactional;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -85,11 +88,21 @@ public class RentalOrderService {
 
     @Transactional(Transactional.TxType.SUPPORTS)
     public OrderPreviewResponse previewOrder(OrderPreviewRequest request) {
+        SecurityUtils.getCurrentUserId().ifPresent(currentUser -> {
+            if (request.userId() != null && !currentUser.equals(request.userId())) {
+                throw new BusinessException(ErrorCode.FORBIDDEN, "请求用户与当前登录用户不一致");
+            }
+        });
         Totals totals = calculateTotals(request.items());
         return new OrderPreviewResponse(totals.depositAmount, totals.rentAmount, totals.totalAmount);
     }
 
     public RentalOrderResponse createOrder(CreateOrderRequest request) {
+        SecurityUtils.getCurrentUserId().ifPresent(currentUser -> {
+            if (!currentUser.equals(request.userId())) {
+                throw new BusinessException(ErrorCode.FORBIDDEN, "请求用户与当前登录用户不一致");
+            }
+        });
         List<OrderItemRequest> directItems = request.items() == null ? List.of() : request.items();
         List<UUID> cartItemIds = request.cartItemIds() == null ? List.of() : request.cartItemIds();
         if (!directItems.isEmpty() && !cartItemIds.isEmpty()) {
@@ -408,6 +421,16 @@ public class RentalOrderService {
         if (adminId == null) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "管理员编号不能为空");
         }
+        SecurityUtils.getCurrentPrincipal().ifPresent(principal -> {
+            if (!principal.hasRole("ADMIN")) {
+                throw new BusinessException(ErrorCode.FORBIDDEN, "仅管理员可以执行此操作");
+            }
+            SecurityUtils.getCurrentUserId().ifPresent(current -> {
+                if (!current.equals(adminId)) {
+                    throw new BusinessException(ErrorCode.FORBIDDEN, "管理员编号与当前登录用户不一致");
+                }
+            });
+        });
         RentalOrder order = getOrderForUpdate(orderId);
         OrderStatus previousStatus = order.getStatus();
         order.forceClose();
@@ -430,14 +453,32 @@ public class RentalOrderService {
     }
 
     private void ensureUser(RentalOrder order, UUID userId) {
-        if (!order.getUserId().equals(userId)) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "无权操作此订单");
-        }
+        SecurityUtils.getCurrentUserId().ifPresentOrElse(currentUserId -> {
+            if (userId != null && !userId.equals(currentUserId)) {
+                throw new BusinessException(ErrorCode.FORBIDDEN, "请求用户与当前登录用户不一致");
+            }
+            if (!order.getUserId().equals(currentUserId)) {
+                throw new BusinessException(ErrorCode.FORBIDDEN, "无权操作此订单");
+            }
+        }, () -> {
+            if (userId != null && !order.getUserId().equals(userId)) {
+                throw new BusinessException(ErrorCode.FORBIDDEN, "无权操作此订单");
+            }
+        });
     }
 
     private void ensureVendor(RentalOrder order, UUID vendorId) {
-        if (!order.getVendorId().equals(vendorId)) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "无权操作此订单");
+        Optional<FlexleasePrincipal> principal = SecurityUtils.getCurrentPrincipal();
+        principal.ifPresent(p -> {
+            if (!p.hasRole("VENDOR") && !p.hasRole("ADMIN")) {
+                throw new BusinessException(ErrorCode.FORBIDDEN, "当前身份不允许执行此操作");
+            }
+        });
+        if (principal.isPresent() || vendorId != null) {
+            UUID expectedVendorId = vendorId != null ? vendorId : order.getVendorId();
+            if (!order.getVendorId().equals(expectedVendorId)) {
+                throw new BusinessException(ErrorCode.FORBIDDEN, "厂商信息不匹配");
+            }
         }
     }
 
