@@ -121,7 +121,6 @@ export type PagedResponse<T> = {
 };
 
 export type OrderForceClosePayload = {
-  adminId: string;
   reason?: string;
 };
 

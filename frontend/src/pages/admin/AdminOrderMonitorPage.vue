@@ -129,7 +129,6 @@
 <script lang="ts" setup>
 import { computed, reactive, ref } from 'vue';
 import { message } from 'ant-design-vue';
-import { useAuthStore } from '../../stores/auth';
 import {
   listAdminOrders,
   fetchOrder,
@@ -150,8 +149,6 @@ const orderStatusOptions: OrderStatus[] = [
   'CANCELLED'
 ];
 
-const auth = useAuthStore();
-
 const filters = reactive<{ userId?: string; vendorId?: string; status?: OrderStatus }>({});
 const loading = ref(false);
 const orders = ref<RentalOrderSummary[]>([]);
@@ -167,12 +164,6 @@ const detailDrawer = reactive<{ open: boolean; loading: boolean; order: any }>(
 
 const forceCloseForm = reactive({ reason: '', loading: false });
 
-const adminId = () => {
-  if (!auth.user?.id) {
-    throw new Error('未获取到管理员账号');
-  }
-  return auth.user.id;
-};
 
 const formatCurrency = (value: number) => value.toFixed(2);
 const formatDate = (value: string) => new Date(value).toLocaleString();
@@ -244,7 +235,6 @@ const handleForceClose = async () => {
   forceCloseForm.loading = true;
   try {
     await forceCloseOrder(detailDrawer.order.id, {
-      adminId: adminId(),
       reason: forceCloseForm.reason || undefined
     });
     message.success('订单已强制关闭');

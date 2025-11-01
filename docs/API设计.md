@@ -56,11 +56,11 @@
 ### 3.1 厂商入驻
 | 方法 | URL | 角色 | 描述 | 备注 |
 | ---- | --- | ---- | ---- | ---- |
-| POST | `/vendors/applications` | 厂商 | 提交入驻资料 | 需要 `X-User-Id` 头标识申请人 |
+| POST | `/vendors/applications` | 厂商 | 提交入驻资料 | 需厂商账号登录 |
 | GET | `/vendors/applications/{id}` | 管理员/申请人 | 查看申请详情 | - |
 | GET | `/vendors/applications` | 管理员 | 列表查询 | 支持 `status` 过滤 |
-| POST | `/vendors/applications/{id}/approve` | 管理员 | 审核通过 | 请求体 `{ reviewerId, remark }`，调用认证服务激活账号 |
-| POST | `/vendors/applications/{id}/reject` | 管理员 | 审核驳回 | 请求体 `{ reviewerId, remark }` |
+| POST | `/vendors/applications/{id}/approve` | 管理员 | 审核通过 | 请求体 `{ remark? }`，调用认证服务激活账号 |
+| POST | `/vendors/applications/{id}/reject` | 管理员 | 审核驳回 | 请求体 `{ remark? }` |
 
 ### 3.2 厂商资料（已实现）
 | 方法 | URL | 角色 | 描述 | 请求/响应要点 |
@@ -73,7 +73,7 @@
 ### 3.3 用户资料（已实现）
 | 方法 | URL | 角色 | 描述 | 请求/响应要点 |
 | ---- | --- | ---- | ---- | ------------- |
-| GET | `/customers/profile` | USER | 获取个人资料 | 需携带 `X-User-Id`，自动补建档 |
+| GET | `/customers/profile` | USER | 获取个人资料 | 登录消费者账号后自动补建档 |
 | PUT | `/customers/profile` | USER | 编辑个人资料 | 请求体 `{ fullName, gender, phone, email, address }`，`gender` 取值 `UNKNOWN/MALE/FEMALE` |
 | GET | `/admin/users` | ADMIN | 查询用户列表 | 支持 `keyword` 模糊搜索姓名，返回分页 |
 | PUT | `/admin/users/{userId}/status` | ADMIN | 启用/禁用用户 | 请求体 `{ status }`，通过认证服务内部接口生效 |
@@ -93,8 +93,8 @@
 | 方法 | URL | 描述 | 备注 |
 | ---- | --- | ---- | ---- |
 | GET | `/admin/products` | 商品列表 | 默认筛选待审核，可指定 `status` |
-| POST | `/admin/products/{productId}/approve` | 审核通过 | 请求体 `{ reviewerId, remark? }`，置状态 `ACTIVE` |
-| POST | `/admin/products/{productId}/reject` | 审核驳回 | 请求体 `{ reviewerId, remark? }`，置状态 `REJECTED` |
+| POST | `/admin/products/{productId}/approve` | 审核通过 | 登录管理员后请求体 `{ remark? }`，置状态 `ACTIVE` |
+| POST | `/admin/products/{productId}/reject` | 审核驳回 | 登录管理员后请求体 `{ remark? }`，置状态 `REJECTED` |
 
 ### 4.3 租赁方案与 SKU
 | 方法 | URL | 描述 | 备注 |

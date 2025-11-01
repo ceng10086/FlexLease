@@ -14,7 +14,6 @@ export type VendorApplicationPayload = {
 };
 
 export type VendorApplicationReviewPayload = {
-  reviewerId: string;
   remark?: string;
 };
 
@@ -43,14 +42,9 @@ type ApiResponse<T> = {
 };
 
 export const submitVendorApplication = async (
-  ownerUserId: string,
   payload: VendorApplicationPayload
 ): Promise<VendorApplication> => {
-  const response = await http.post<ApiResponse<VendorApplication>>('/vendors/applications', payload, {
-    headers: {
-      'X-User-Id': ownerUserId
-    }
-  });
+  const response = await http.post<ApiResponse<VendorApplication>>('/vendors/applications', payload);
   return response.data.data;
 };
 
@@ -72,10 +66,7 @@ export const approveVendorApplication = async (
   id: string,
   payload: VendorApplicationReviewPayload
 ): Promise<VendorApplication> => {
-  const response = await http.post<ApiResponse<VendorApplication>>(
-    `/vendors/applications/${id}/approve`,
-    payload
-  );
+  const response = await http.post<ApiResponse<VendorApplication>>(`/vendors/applications/${id}/approve`, payload);
   return response.data.data;
 };
 
@@ -83,9 +74,6 @@ export const rejectVendorApplication = async (
   id: string,
   payload: VendorApplicationReviewPayload
 ): Promise<VendorApplication> => {
-  const response = await http.post<ApiResponse<VendorApplication>>(
-    `/vendors/applications/${id}/reject`,
-    payload
-  );
+  const response = await http.post<ApiResponse<VendorApplication>>(`/vendors/applications/${id}/reject`, payload);
   return response.data.data;
 };

@@ -129,7 +129,6 @@
 <script lang="ts" setup>
 import { reactive, ref } from 'vue';
 import { message } from 'ant-design-vue';
-import { useAuthStore } from '../../stores/auth';
 import {
   listAdminProducts,
   approveProduct,
@@ -140,7 +139,6 @@ import {
   type ProductStatus
 } from '../../services/productService';
 
-const auth = useAuthStore();
 const loading = ref(false);
 const products = ref<ProductSummary[]>([]);
 
@@ -200,13 +198,6 @@ const statusColor = (status: ProductStatus) => {
 const formatDate = (value?: string | null) => (value ? new Date(value).toLocaleString() : '-');
 const formatCurrency = (value?: number | null) => value?.toFixed(2) ?? '0.00';
 
-const reviewerId = () => {
-  if (!auth.user?.id) {
-    throw new Error('未找到当前管理员信息');
-  }
-  return auth.user.id;
-};
-
 const loadProducts = async () => {
   loading.value = true;
   try {
@@ -247,7 +238,7 @@ const openDetail = async (record: ProductSummary) => {
 
 const approve = async (record: ProductSummary) => {
   try {
-    await approveProduct(record.id, { reviewerId: reviewerId(), remark: '审核通过' });
+    await approveProduct(record.id, { remark: '审核通过' });
     message.success('已通过商品审核');
     detailDrawer.open = false;
     await loadProducts();
@@ -270,7 +261,6 @@ const handleReject = async () => {
   rejectModal.submitting = true;
   try {
     await rejectProduct(rejectModal.product.id, {
-      reviewerId: reviewerId(),
       remark: rejectModal.remark
     });
     message.success('已驳回商品');

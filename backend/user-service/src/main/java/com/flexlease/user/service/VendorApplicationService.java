@@ -65,6 +65,14 @@ public class VendorApplicationService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<VendorApplicationResponse> listForOwner(UUID ownerUserId, VendorApplicationStatus status) {
+        return vendorApplicationRepository.findAllByOwnerUserId(ownerUserId).stream()
+                .filter(application -> status == null || application.getStatus() == status)
+                .map(this::toResponse)
+                .toList();
+    }
+
     @Transactional
     public VendorApplicationResponse approve(UUID applicationId, UUID reviewerId, String remark) {
         VendorApplication application = vendorApplicationRepository.findById(applicationId)

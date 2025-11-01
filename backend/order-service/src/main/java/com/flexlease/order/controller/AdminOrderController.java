@@ -3,6 +3,7 @@ package com.flexlease.order.controller;
 import com.flexlease.common.dto.ApiResponse;
 import com.flexlease.common.exception.BusinessException;
 import com.flexlease.common.exception.ErrorCode;
+import com.flexlease.common.security.SecurityUtils;
 import com.flexlease.order.domain.OrderStatus;
 import com.flexlease.order.dto.OrderForceCloseRequest;
 import com.flexlease.order.dto.PagedResponse;
@@ -42,19 +43,22 @@ public class AdminOrderController {
         UUID userUuid = parseUuid(userId, "userId");
         UUID vendorUuid = parseUuid(vendorId, "vendorId");
         OrderStatus statusEnum = parseStatus(status);
+        SecurityUtils.requireRole("ADMIN");
         Pageable pageable = PageRequest.of(Math.max(page - 1, 0), Math.max(1, Math.min(size, 100)), Sort.by(Sort.Direction.DESC, "createdAt"));
         return ApiResponse.success(rentalOrderService.listOrdersForAdmin(userUuid, vendorUuid, statusEnum, pageable));
     }
 
     @GetMapping("/{orderId}")
     public ApiResponse<RentalOrderResponse> getOrder(@PathVariable UUID orderId) {
+        SecurityUtils.requireRole("ADMIN");
         return ApiResponse.success(rentalOrderService.getOrder(orderId));
     }
 
     @PostMapping("/{orderId}/force-close")
     public ApiResponse<RentalOrderResponse> forceClose(@PathVariable UUID orderId,
                                                        @Valid @RequestBody OrderForceCloseRequest request) {
-        return ApiResponse.success(rentalOrderService.forceClose(orderId, request.adminId(), request.reason()));
+        SecurityUtils.requireRole("ADMIN");
+        return ApiResponse.success(rentalOrderService.forceClose(orderId, request.reason()));
     }
 
     private UUID parseUuid(String raw, String fieldName) {

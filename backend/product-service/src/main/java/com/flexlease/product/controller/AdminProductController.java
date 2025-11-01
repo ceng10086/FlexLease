@@ -1,6 +1,8 @@
 package com.flexlease.product.controller;
 
 import com.flexlease.common.dto.ApiResponse;
+import com.flexlease.common.security.FlexleasePrincipal;
+import com.flexlease.common.security.SecurityUtils;
 import com.flexlease.product.domain.ProductStatus;
 import com.flexlease.product.dto.PagedResponse;
 import com.flexlease.product.dto.ProductApprovalRequest;
@@ -37,6 +39,7 @@ public class AdminProductController {
                                                                             @RequestParam(defaultValue = "") String keyword,
                                                                             @RequestParam(defaultValue = "1") int page,
                                                                             @RequestParam(defaultValue = "10") int size) {
+        SecurityUtils.requireRole("ADMIN");
         Pageable pageable = PageRequest.of(Math.max(page - 1, 0), Math.max(1, Math.min(size, 100)), Sort.by(Sort.Direction.DESC, "createdAt"));
         return ApiResponse.success(productAdminService.listProducts(status, keyword, pageable));
     }
@@ -44,23 +47,29 @@ public class AdminProductController {
     @PostMapping("/{productId}/approve")
     public ApiResponse<ProductResponse> approve(@PathVariable UUID productId,
                                                  @Valid @RequestBody ProductApprovalRequest request) {
-        UUID reviewerId = parseReviewerId(request.reviewerId());
-        return ApiResponse.success(productAdminService.approveProduct(productId, reviewerId, request.remark()))
-                ;
+        FlexleasePrincipal principal = SecurityUtils.requirePrincipal();
+        if (!principal.hasRole("ADMIN")) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "仅管理员可审核商品");
+        }
+        UUID reviewerId = ensureReviewerId(principal);
+        return ApiResponse.success(productAdminService.approveProduct(productId, reviewerId, request.remark()));
     }
 
     @PostMapping("/{productId}/reject")
     public ApiResponse<ProductResponse> reject(@PathVariable UUID productId,
                                                 @Valid @RequestBody ProductApprovalRequest request) {
-        UUID reviewerId = parseReviewerId(request.reviewerId());
+        FlexleasePrincipal principal = SecurityUtils.requirePrincipal();
+        if (!principal.hasRole("ADMIN")) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "仅管理员可审核商品");
+        }
+        UUID reviewerId = ensureReviewerId(principal);
         return ApiResponse.success(productAdminService.rejectProduct(productId, reviewerId, request.remark()));
     }
 
-    private UUID parseReviewerId(String reviewerId) {
-        try {
-            return UUID.fromString(reviewerId);
-        } catch (IllegalArgumentException ex) {
-            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "reviewerId 需为合法 UUID");
+    private UUID ensureReviewerId(FlexleasePrincipal principal) {
+        if (principal.userId() == null) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "当前身份缺少用户标识");
         }
+        return principal.userId();
     }
 }

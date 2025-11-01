@@ -17,4 +17,7 @@ public interface VendorApplicationRepository extends JpaRepository<VendorApplica
 
     @Query("select v from VendorApplication v where (:status is null or v.status = :status) order by v.createdAt desc")
     List<VendorApplication> findAllByStatus(@Param("status") VendorApplicationStatus status);
+
+    @Query("select v from VendorApplication v where v.ownerUserId = :owner order by v.createdAt desc")
+    List<VendorApplication> findAllByOwnerUserId(@Param("owner") UUID ownerUserId);
 }

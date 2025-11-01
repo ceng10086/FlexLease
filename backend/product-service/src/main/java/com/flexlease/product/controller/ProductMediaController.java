@@ -1,6 +1,10 @@
 package com.flexlease.product.controller;
 
 import com.flexlease.common.dto.ApiResponse;
+import com.flexlease.common.exception.BusinessException;
+import com.flexlease.common.exception.ErrorCode;
+import com.flexlease.common.security.FlexleasePrincipal;
+import com.flexlease.common.security.SecurityUtils;
 import com.flexlease.product.dto.MediaAssetResponse;
 import com.flexlease.product.dto.MediaSortUpdateRequest;
 import com.flexlease.product.service.ProductMediaService;
@@ -32,7 +36,8 @@ public class ProductMediaController {
     @GetMapping
     public ApiResponse<List<MediaAssetResponse>> list(@PathVariable UUID vendorId,
                                                       @PathVariable UUID productId) {
-        return ApiResponse.success(productMediaService.listMedia(vendorId, productId));
+        UUID effectiveVendorId = resolveVendorId(vendorId);
+        return ApiResponse.success(productMediaService.listMedia(effectiveVendorId, productId));
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -40,7 +45,8 @@ public class ProductMediaController {
                                                   @PathVariable UUID productId,
                                                   @RequestParam("file") MultipartFile file,
                                                   @RequestParam(value = "sortOrder", required = false) Integer sortOrder) {
-        return ApiResponse.success(productMediaService.upload(vendorId, productId, file, sortOrder));
+        UUID effectiveVendorId = resolveVendorId(vendorId);
+        return ApiResponse.success(productMediaService.upload(effectiveVendorId, productId, file, sortOrder));
     }
 
     @PutMapping("/{mediaId}/sort-order")
@@ -48,14 +54,33 @@ public class ProductMediaController {
                                                            @PathVariable UUID productId,
                                                            @PathVariable UUID mediaId,
                                                            @Valid @RequestBody MediaSortUpdateRequest request) {
-        return ApiResponse.success(productMediaService.updateSortOrder(vendorId, productId, mediaId, request.sortOrder()));
+        UUID effectiveVendorId = resolveVendorId(vendorId);
+        return ApiResponse.success(productMediaService.updateSortOrder(effectiveVendorId, productId, mediaId, request.sortOrder()));
     }
 
     @DeleteMapping("/{mediaId}")
     public ApiResponse<Void> delete(@PathVariable UUID vendorId,
                                     @PathVariable UUID productId,
                                     @PathVariable UUID mediaId) {
-        productMediaService.delete(vendorId, productId, mediaId);
+        UUID effectiveVendorId = resolveVendorId(vendorId);
+        productMediaService.delete(effectiveVendorId, productId, mediaId);
         return ApiResponse.success();
+    }
+
+    private UUID resolveVendorId(UUID vendorId) {
+        FlexleasePrincipal principal = SecurityUtils.requirePrincipal();
+        if (principal.hasRole("ADMIN")) {
+            return vendorId;
+        }
+        if (!principal.hasRole("VENDOR")) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "当前账号无权访问厂商资源");
+        }
+        if (principal.userId() == null) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "当前身份缺少用户标识");
+        }
+        if (!principal.userId().equals(vendorId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "禁止访问其他厂商资源");
+        }
+        return vendorId;
     }
 }

@@ -4,6 +4,8 @@ import com.flexlease.common.exception.BusinessException;
 import com.flexlease.common.exception.ErrorCode;
 import com.flexlease.common.notification.NotificationChannel;
 import com.flexlease.common.notification.NotificationSendRequest;
+import com.flexlease.common.security.FlexleasePrincipal;
+import com.flexlease.common.security.SecurityUtils;
 import com.flexlease.payment.domain.PaymentScene;
 import com.flexlease.payment.domain.PaymentSplit;
 import com.flexlease.payment.domain.PaymentStatus;
@@ -48,6 +50,7 @@ public class PaymentTransactionService {
     }
 
     public PaymentTransactionResponse initPayment(UUID orderId, PaymentInitRequest request) {
+        SecurityUtils.getCurrentPrincipal().ifPresent(principal -> validateInitPermission(principal, request));
         paymentTransactionRepository.findFirstByOrderIdAndSceneAndStatus(orderId, request.scene(), PaymentStatus.PENDING)
                 .ifPresent(existing -> {
                     throw new BusinessException(ErrorCode.VALIDATION_ERROR, "存在待支付的同类流水");
@@ -87,10 +90,16 @@ public class PaymentTransactionService {
     public PaymentTransactionResponse getTransaction(UUID transactionId) {
         PaymentTransaction transaction = paymentTransactionRepository.findById(transactionId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "支付流水不存在"));
+        SecurityUtils.getCurrentPrincipal().ifPresent(principal -> validateViewPermission(principal, transaction));
         return assembler.toResponse(transaction);
     }
 
     public PaymentTransactionResponse confirmPayment(UUID transactionId, PaymentConfirmRequest request) {
+        SecurityUtils.getCurrentPrincipal().ifPresent(principal -> {
+            if (!principal.hasRole("ADMIN") && !principal.hasRole("INTERNAL")) {
+                throw new BusinessException(ErrorCode.FORBIDDEN, "当前身份无权确认支付");
+            }
+        });
         PaymentTransaction transaction = getTransactionForUpdate(transactionId);
         try {
             transaction.markSucceeded(request.channelTransactionNo(), request.paidAt());
@@ -105,6 +114,11 @@ public class PaymentTransactionService {
         if (request.status() == PaymentStatus.PENDING) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "回调状态不合法");
         }
+        SecurityUtils.getCurrentPrincipal().ifPresent(principal -> {
+            if (!principal.hasRole("INTERNAL") && !principal.hasRole("ADMIN")) {
+                throw new BusinessException(ErrorCode.FORBIDDEN, "当前身份无权执行回调");
+            }
+        });
         PaymentTransaction transaction = getTransactionForUpdate(transactionId);
         try {
             if (request.status() == PaymentStatus.SUCCEEDED) {
@@ -122,6 +136,11 @@ public class PaymentTransactionService {
     }
 
     public RefundTransactionResponse createRefund(UUID transactionId, PaymentRefundRequest request) {
+        SecurityUtils.getCurrentPrincipal().ifPresent(principal -> {
+            if (!principal.hasRole("ADMIN")) {
+                throw new BusinessException(ErrorCode.FORBIDDEN, "当前身份无权发起退款");
+            }
+        });
         PaymentTransaction transaction = getTransactionForUpdate(transactionId);
         try {
             RefundTransaction refund = transaction.createRefund(request.amount(), request.reason());
@@ -177,6 +196,41 @@ public class PaymentTransactionService {
     private PaymentTransaction getTransactionForUpdate(UUID transactionId) {
         return paymentTransactionRepository.findById(transactionId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "支付流水不存在"));
+    }
+
+    private void validateInitPermission(FlexleasePrincipal principal, PaymentInitRequest request) {
+        if (principal.hasRole("ADMIN") || principal.hasRole("INTERNAL")) {
+            return;
+        }
+        if (!principal.hasRole("USER")) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "当前身份无权创建支付");
+        }
+        if (principal.userId() == null || !principal.userId().equals(request.userId())) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "禁止使用他人账号创建支付");
+        }
+    }
+
+    private void validateViewPermission(FlexleasePrincipal principal, PaymentTransaction transaction) {
+        if (principal.hasRole("ADMIN") || principal.hasRole("INTERNAL")) {
+            return;
+        }
+        UUID principalId = principal.userId();
+        if (principalId == null) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "当前身份缺少用户标识");
+        }
+        if (principal.hasRole("USER")) {
+            if (transaction.getUserId() == null || !transaction.getUserId().equals(principalId)) {
+                throw new BusinessException(ErrorCode.FORBIDDEN, "无权查看该支付流水");
+            }
+            return;
+        }
+        if (principal.hasRole("VENDOR")) {
+            if (transaction.getVendorId() == null || !transaction.getVendorId().equals(principalId)) {
+                throw new BusinessException(ErrorCode.FORBIDDEN, "无权查看该支付流水");
+            }
+            return;
+        }
+        throw new BusinessException(ErrorCode.FORBIDDEN, "当前身份无权查看支付流水");
     }
 
     private void notifyPaymentSucceeded(PaymentTransaction transaction) {

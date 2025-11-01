@@ -128,7 +128,6 @@
 <script lang="ts" setup>
 import { reactive, ref } from 'vue';
 import { message } from 'ant-design-vue';
-import { useAuthStore } from '../../stores/auth';
 import {
   listVendorApplications,
   approveVendorApplication,
@@ -137,7 +136,6 @@ import {
   type VendorApplicationStatus
 } from '../../services/vendorService';
 
-const auth = useAuthStore();
 const loading = ref(false);
 const applications = ref<VendorApplication[]>([]);
 const filters = reactive<{ status?: VendorApplicationStatus }>({ status: 'SUBMITTED' });
@@ -174,13 +172,6 @@ const formatDate = (value?: string | null) => {
   return new Date(value).toLocaleString();
 };
 
-const reviewerId = () => {
-  if (!auth.user?.id) {
-    throw new Error('未找到当前管理员信息');
-  }
-  return auth.user.id;
-};
-
 const loadApplications = async () => {
   loading.value = true;
   try {
@@ -203,7 +194,7 @@ const approve = async (record: VendorApplication | null) => {
     return;
   }
   try {
-    await approveVendorApplication(record.id, { reviewerId: reviewerId(), remark: '审核通过' });
+    await approveVendorApplication(record.id, { remark: '审核通过' });
     message.success('已通过申请');
     detailDrawer.open = false;
     await loadApplications();
@@ -226,7 +217,6 @@ const handleReject = async () => {
   rejectModal.submitting = true;
   try {
     await rejectVendorApplication(rejectModal.record.id, {
-      reviewerId: reviewerId(),
       remark: rejectModal.remark
     });
     message.success('已驳回申请');

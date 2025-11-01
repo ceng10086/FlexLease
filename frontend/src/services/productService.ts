@@ -84,7 +84,6 @@ export type InventoryAdjustPayload = {
 };
 
 export type ProductApprovalPayload = {
-  reviewerId: string;
   remark?: string;
 };
 

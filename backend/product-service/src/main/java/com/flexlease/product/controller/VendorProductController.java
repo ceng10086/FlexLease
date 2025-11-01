@@ -1,6 +1,10 @@
 package com.flexlease.product.controller;
 
 import com.flexlease.common.dto.ApiResponse;
+import com.flexlease.common.exception.BusinessException;
+import com.flexlease.common.exception.ErrorCode;
+import com.flexlease.common.security.FlexleasePrincipal;
+import com.flexlease.common.security.SecurityUtils;
 import com.flexlease.product.domain.ProductStatus;
 import com.flexlease.product.dto.InventoryAdjustRequest;
 import com.flexlease.product.dto.PagedResponse;
@@ -41,26 +45,30 @@ public class VendorProductController {
     @PostMapping
     public ApiResponse<ProductResponse> createProduct(@PathVariable UUID vendorId,
                                                        @Valid @RequestBody ProductRequest request) {
-        return ApiResponse.success(vendorProductService.createProduct(vendorId, request));
+        UUID effectiveVendorId = resolveVendorId(vendorId);
+        return ApiResponse.success(vendorProductService.createProduct(effectiveVendorId, request));
     }
 
     @PutMapping("/{productId}")
     public ApiResponse<ProductResponse> updateProduct(@PathVariable UUID vendorId,
                                                        @PathVariable UUID productId,
                                                        @Valid @RequestBody ProductRequest request) {
-        return ApiResponse.success(vendorProductService.updateProduct(vendorId, productId, request));
+        UUID effectiveVendorId = resolveVendorId(vendorId);
+        return ApiResponse.success(vendorProductService.updateProduct(effectiveVendorId, productId, request));
     }
 
     @PostMapping("/{productId}/submit")
     public ApiResponse<ProductResponse> submitProduct(@PathVariable UUID vendorId,
                                                        @PathVariable UUID productId) {
-        return ApiResponse.success(vendorProductService.submitForReview(vendorId, productId));
+        UUID effectiveVendorId = resolveVendorId(vendorId);
+        return ApiResponse.success(vendorProductService.submitForReview(effectiveVendorId, productId));
     }
 
     @GetMapping("/{productId}")
     public ApiResponse<ProductResponse> getProduct(@PathVariable UUID vendorId,
                                                     @PathVariable UUID productId) {
-        return ApiResponse.success(vendorProductService.getProduct(vendorId, productId));
+        UUID effectiveVendorId = resolveVendorId(vendorId);
+        return ApiResponse.success(vendorProductService.getProduct(effectiveVendorId, productId));
     }
 
     @GetMapping
@@ -69,28 +77,32 @@ public class VendorProductController {
                                                                             @RequestParam(defaultValue = "10") int size,
                                                                             @RequestParam(required = false) ProductStatus status,
                                                                             @RequestParam(required = false) String keyword) {
+        UUID effectiveVendorId = resolveVendorId(vendorId);
         Pageable pageable = PageRequest.of(Math.max(page - 1, 0), Math.max(1, Math.min(size, 100)), Sort.by(Sort.Direction.DESC, "createdAt"));
-        return ApiResponse.success(vendorProductService.listProducts(vendorId, status, keyword, pageable));
+        return ApiResponse.success(vendorProductService.listProducts(effectiveVendorId, status, keyword, pageable));
     }
 
     @PostMapping("/{productId}/shelve")
     public ApiResponse<ProductResponse> shelve(@PathVariable UUID vendorId,
                                                 @PathVariable UUID productId,
                                                 @Valid @RequestBody ProductShelveRequest request) {
-        return ApiResponse.success(vendorProductService.changeShelveStatus(vendorId, productId, request));
+        UUID effectiveVendorId = resolveVendorId(vendorId);
+        return ApiResponse.success(vendorProductService.changeShelveStatus(effectiveVendorId, productId, request));
     }
 
     @GetMapping("/{productId}/rental-plans")
     public ApiResponse<List<RentalPlanResponse>> listPlans(@PathVariable UUID vendorId,
                                                            @PathVariable UUID productId) {
-        return ApiResponse.success(vendorProductService.listPlans(vendorId, productId));
+        UUID effectiveVendorId = resolveVendorId(vendorId);
+        return ApiResponse.success(vendorProductService.listPlans(effectiveVendorId, productId));
     }
 
     @PostMapping("/{productId}/rental-plans")
     public ApiResponse<RentalPlanResponse> createRentalPlan(@PathVariable UUID vendorId,
                                                              @PathVariable UUID productId,
                                                              @Valid @RequestBody RentalPlanRequest request) {
-        return ApiResponse.success(vendorProductService.createPlan(vendorId, productId, request));
+        UUID effectiveVendorId = resolveVendorId(vendorId);
+        return ApiResponse.success(vendorProductService.createPlan(effectiveVendorId, productId, request));
     }
 
     @PutMapping("/{productId}/rental-plans/{planId}")
@@ -98,21 +110,24 @@ public class VendorProductController {
                                                              @PathVariable UUID productId,
                                                              @PathVariable UUID planId,
                                                              @Valid @RequestBody RentalPlanRequest request) {
-        return ApiResponse.success(vendorProductService.updatePlan(vendorId, productId, planId, request));
+        UUID effectiveVendorId = resolveVendorId(vendorId);
+        return ApiResponse.success(vendorProductService.updatePlan(effectiveVendorId, productId, planId, request));
     }
 
     @PostMapping("/{productId}/rental-plans/{planId}/activate")
     public ApiResponse<RentalPlanResponse> activateRentalPlan(@PathVariable UUID vendorId,
                                                                @PathVariable UUID productId,
                                                                @PathVariable UUID planId) {
-        return ApiResponse.success(vendorProductService.activatePlan(vendorId, productId, planId));
+        UUID effectiveVendorId = resolveVendorId(vendorId);
+        return ApiResponse.success(vendorProductService.activatePlan(effectiveVendorId, productId, planId));
     }
 
     @PostMapping("/{productId}/rental-plans/{planId}/deactivate")
     public ApiResponse<RentalPlanResponse> deactivateRentalPlan(@PathVariable UUID vendorId,
                                                                  @PathVariable UUID productId,
                                                                  @PathVariable UUID planId) {
-        return ApiResponse.success(vendorProductService.deactivatePlan(vendorId, productId, planId));
+        UUID effectiveVendorId = resolveVendorId(vendorId);
+        return ApiResponse.success(vendorProductService.deactivatePlan(effectiveVendorId, productId, planId));
     }
 
     @PostMapping("/{productId}/rental-plans/{planId}/skus")
@@ -120,7 +135,8 @@ public class VendorProductController {
                                                @PathVariable UUID productId,
                                                @PathVariable UUID planId,
                                                @Valid @RequestBody SkuRequest request) {
-        return ApiResponse.success(vendorProductService.createSku(vendorId, productId, planId, request));
+        UUID effectiveVendorId = resolveVendorId(vendorId);
+        return ApiResponse.success(vendorProductService.createSku(effectiveVendorId, productId, planId, request));
     }
 
     @PutMapping("/{productId}/rental-plans/{planId}/skus/{skuId}")
@@ -129,7 +145,8 @@ public class VendorProductController {
                                                @PathVariable UUID planId,
                                                @PathVariable UUID skuId,
                                                @Valid @RequestBody SkuRequest request) {
-        return ApiResponse.success(vendorProductService.updateSku(vendorId, productId, planId, skuId, request));
+        UUID effectiveVendorId = resolveVendorId(vendorId);
+        return ApiResponse.success(vendorProductService.updateSku(effectiveVendorId, productId, planId, skuId, request));
     }
 
     @PostMapping("/{productId}/rental-plans/{planId}/skus/{skuId}/inventory/adjust")
@@ -138,6 +155,24 @@ public class VendorProductController {
                                                      @PathVariable UUID planId,
                                                      @PathVariable UUID skuId,
                                                      @Valid @RequestBody InventoryAdjustRequest request) {
-        return ApiResponse.success(vendorProductService.adjustInventory(vendorId, productId, planId, skuId, request));
+        UUID effectiveVendorId = resolveVendorId(vendorId);
+        return ApiResponse.success(vendorProductService.adjustInventory(effectiveVendorId, productId, planId, skuId, request));
+    }
+
+    private UUID resolveVendorId(UUID vendorId) {
+        FlexleasePrincipal principal = SecurityUtils.requirePrincipal();
+        if (principal.hasRole("ADMIN")) {
+            return vendorId;
+        }
+        if (!principal.hasRole("VENDOR")) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "当前账号无权访问厂商资源");
+        }
+        if (principal.userId() == null) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "当前身份缺少用户标识");
+        }
+        if (!principal.userId().equals(vendorId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "禁止访问其他厂商资源");
+        }
+        return vendorId;
     }
 }

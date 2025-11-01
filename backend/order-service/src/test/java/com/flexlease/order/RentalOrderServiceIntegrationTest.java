@@ -2,6 +2,7 @@ package com.flexlease.order;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.flexlease.common.security.FlexleasePrincipal;
 import com.flexlease.order.domain.OrderStatus;
 import com.flexlease.order.dto.AddCartItemRequest;
 import com.flexlease.order.dto.CartItemResponse;
@@ -25,6 +26,7 @@ import com.flexlease.order.service.CartService;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -36,6 +38,8 @@ import com.flexlease.order.client.PaymentClient;
 import com.flexlease.order.client.PaymentStatus;
 import com.flexlease.order.client.PaymentTransactionView;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 @SpringBootTest
 @TestPropertySource(properties = "flexlease.order.maintenance.pending-payment-expire-minutes=0")
@@ -226,11 +230,17 @@ class RentalOrderServiceIntegrationTest {
         org.mockito.Mockito.when(paymentClient.loadTransaction(transactionId)).thenReturn(transactionView);
         rentalOrderService.confirmPayment(created.id(), new OrderPaymentRequest(userId, transactionId.toString(), created.totalAmount()));
 
-        UUID adminId = UUID.randomUUID();
-        RentalOrderResponse forced = rentalOrderService.forceClose(created.id(), adminId, "库存异常");
-        assertThat(forced.status()).isEqualTo(OrderStatus.CANCELLED);
-        assertThat(forced.events()).anyMatch(event -> event.description().contains("管理员强制关闭")
-                || event.description().contains("库存异常"));
+                UUID adminId = UUID.randomUUID();
+                FlexleasePrincipal principal = new FlexleasePrincipal(adminId, "admin-user", Set.of("ADMIN"));
+                SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(principal, null));
+                try {
+                        RentalOrderResponse forced = rentalOrderService.forceClose(created.id(), "库存异常");
+                        assertThat(forced.status()).isEqualTo(OrderStatus.CANCELLED);
+                        assertThat(forced.events()).anyMatch(event -> event.description().contains("管理员强制关闭")
+                                        || event.description().contains("库存异常"));
+                } finally {
+                        SecurityContextHolder.clearContext();
+                }
     }
 
     @Test

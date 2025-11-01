@@ -481,20 +481,12 @@ public class RentalOrderService {
         return assembler.toOrderResponse(order);
     }
 
-    public RentalOrderResponse forceClose(UUID orderId, UUID adminId, String reason) {
-        if (adminId == null) {
-            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "管理员编号不能为空");
+    public RentalOrderResponse forceClose(UUID orderId, String reason) {
+        FlexleasePrincipal principal = SecurityUtils.requirePrincipal();
+        if (!principal.hasRole("ADMIN")) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "仅管理员可以执行此操作");
         }
-        SecurityUtils.getCurrentPrincipal().ifPresent(principal -> {
-            if (!principal.hasRole("ADMIN")) {
-                throw new BusinessException(ErrorCode.FORBIDDEN, "仅管理员可以执行此操作");
-            }
-            SecurityUtils.getCurrentUserId().ifPresent(current -> {
-                if (!current.equals(adminId)) {
-                    throw new BusinessException(ErrorCode.FORBIDDEN, "管理员编号与当前登录用户不一致");
-                }
-            });
-        });
+        UUID adminId = SecurityUtils.requireUserId();
         RentalOrder order = getOrderForUpdate(orderId);
         OrderStatus previousStatus = order.getStatus();
         order.forceClose();

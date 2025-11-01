@@ -3,6 +3,8 @@ package com.flexlease.user.controller;
 import com.flexlease.common.dto.ApiResponse;
 import com.flexlease.common.exception.BusinessException;
 import com.flexlease.common.exception.ErrorCode;
+import com.flexlease.common.security.FlexleasePrincipal;
+import com.flexlease.common.security.SecurityUtils;
 import com.flexlease.user.domain.VendorStatus;
 import com.flexlease.user.dto.PagedResponse;
 import com.flexlease.user.dto.VendorResponse;
@@ -35,24 +37,52 @@ public class VendorController {
     public ApiResponse<PagedResponse<VendorResponse>> listVendors(@RequestParam(required = false) String status,
                                                                   @RequestParam(defaultValue = "1") int page,
                                                                   @RequestParam(defaultValue = "10") int size) {
+        if (!SecurityUtils.hasRole("ADMIN")) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "仅管理员可查询厂商列表");
+        }
         VendorStatus statusEnum = parseStatus(status);
         return ApiResponse.success(vendorService.list(statusEnum, page, size));
     }
 
     @GetMapping("/{vendorId}")
     public ApiResponse<VendorResponse> getVendor(@PathVariable UUID vendorId) {
-        return ApiResponse.success(vendorService.get(vendorId));
+        VendorResponse response = vendorService.get(vendorId);
+        FlexleasePrincipal principal = SecurityUtils.requirePrincipal();
+        if (principal.hasRole("ADMIN")) {
+            return ApiResponse.success(response);
+        }
+        if (!principal.hasRole("VENDOR")) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "仅厂商可查看自身信息");
+        }
+        if (principal.userId() == null || !principal.userId().equals(response.ownerUserId())) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "无权查看该厂商信息");
+        }
+        return ApiResponse.success(response);
     }
 
     @PutMapping("/{vendorId}")
     public ApiResponse<VendorResponse> updateVendor(@PathVariable UUID vendorId,
                                                     @Valid @RequestBody VendorUpdateRequest request) {
+        FlexleasePrincipal principal = SecurityUtils.requirePrincipal();
+        if (principal.hasRole("ADMIN")) {
+            return ApiResponse.success(vendorService.update(vendorId, request));
+        }
+        if (!principal.hasRole("VENDOR")) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "仅厂商可更新资料");
+        }
+        VendorResponse response = vendorService.get(vendorId);
+        if (principal.userId() == null || !principal.userId().equals(response.ownerUserId())) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "无权更新该厂商资料");
+        }
         return ApiResponse.success(vendorService.update(vendorId, request));
     }
 
     @PostMapping("/{vendorId}/suspend")
     public ApiResponse<VendorResponse> updateVendorStatus(@PathVariable UUID vendorId,
                                                           @Valid @RequestBody VendorStatusUpdateRequest request) {
+        if (!SecurityUtils.hasRole("ADMIN")) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "仅管理员可变更厂商状态");
+        }
         return ApiResponse.success(vendorService.updateStatus(vendorId, request.status()));
     }
 

@@ -206,7 +206,7 @@ const handleSubmit = async () => {
   }
   submitting.value = true;
   try {
-    await submitVendorApplication(auth.user.id, { ...form });
+    await submitVendorApplication({ ...form });
     message.success('申请已提交，请等待审核');
     Object.assign(form, {
       companyName: '',

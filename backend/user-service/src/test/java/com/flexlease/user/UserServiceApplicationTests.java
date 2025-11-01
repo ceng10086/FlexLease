@@ -51,10 +51,9 @@ class UserServiceApplicationTests {
         );
 
         MvcResult submitResult = mockMvc.perform(post("/api/v1/vendors/applications")
-                .header(HttpHeaders.AUTHORIZATION, vendorToken)
-                .header("X-User-Id", ownerId)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(requestPayload)))
+            .header(HttpHeaders.AUTHORIZATION, vendorToken)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsString(requestPayload)))
             .andExpect(status().isOk())
             .andReturn();
 
@@ -66,8 +65,7 @@ class UserServiceApplicationTests {
                 .header(HttpHeaders.AUTHORIZATION, adminToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(java.util.Map.of(
-                    "remark", "材料齐全",
-                    "reviewerId", UUID.randomUUID().toString()
+                    "remark", "材料齐全"
                 ))))
             .andExpect(status().isOk())
             .andReturn();
