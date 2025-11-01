@@ -54,6 +54,9 @@ public class RentalOrder {
     @Column(name = "buyout_amount")
     private BigDecimal buyoutAmount;
 
+    @Column(name = "payment_transaction_id")
+    private UUID paymentTransactionId;
+
     @Column(name = "lease_start_at")
     private OffsetDateTime leaseStartAt;
 
@@ -177,6 +180,10 @@ public class RentalOrder {
 
     public BigDecimal getBuyoutAmount() {
         return buyoutAmount;
+    }
+
+    public UUID getPaymentTransactionId() {
+        return paymentTransactionId;
     }
 
     public OffsetDateTime getLeaseStartAt() {
@@ -319,6 +326,10 @@ public class RentalOrder {
 
     public void updateBuyoutAmount(BigDecimal amount) {
         this.buyoutAmount = amount;
+    }
+
+    public void setPaymentTransactionId(UUID paymentTransactionId) {
+        this.paymentTransactionId = paymentTransactionId;
     }
 
     public void increaseExtensionCount(int additionalMonths) {

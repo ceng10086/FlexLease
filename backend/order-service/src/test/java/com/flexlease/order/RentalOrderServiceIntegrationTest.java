@@ -125,6 +125,7 @@ class RentalOrderServiceIntegrationTest {
         RentalOrderResponse paid = rentalOrderService.confirmPayment(created.id(),
                 new OrderPaymentRequest(userId, transactionId.toString(), preview.totalAmount()));
         assertThat(paid.status()).isEqualTo(OrderStatus.AWAITING_SHIPMENT);
+        assertThat(paid.paymentTransactionId()).isEqualTo(transactionId);
 
         RentalOrderResponse shipped = rentalOrderService.shipOrder(created.id(),
                 new OrderShipmentRequest(vendorId, "SF", "SF123456789"));
@@ -161,6 +162,17 @@ class RentalOrderServiceIntegrationTest {
         assertThat(returnApproved.returns()
                 .get(returnApproved.returns().size() - 1)
                 .status().name()).isEqualTo("APPROVED");
+
+        org.mockito.Mockito.verify(inventoryReservationClient, org.mockito.Mockito.atLeastOnce())
+                .outbound(org.mockito.ArgumentMatchers.eq(created.id()), org.mockito.ArgumentMatchers.anyList());
+        org.mockito.Mockito.verify(inventoryReservationClient, org.mockito.Mockito.atLeastOnce())
+                .release(org.mockito.ArgumentMatchers.eq(created.id()), org.mockito.ArgumentMatchers.anyList());
+        org.mockito.Mockito.verify(inventoryReservationClient, org.mockito.Mockito.atLeastOnce())
+                .inbound(org.mockito.ArgumentMatchers.eq(created.id()), org.mockito.ArgumentMatchers.anyList());
+        org.mockito.Mockito.verify(paymentClient)
+                .createRefund(org.mockito.ArgumentMatchers.eq(transactionId),
+                        org.mockito.ArgumentMatchers.argThat(amount -> amount.compareTo(preview.depositAmount()) == 0),
+                        org.mockito.ArgumentMatchers.anyString());
 
         // After completion, buyout should not be allowed; expect validation error
         org.assertj.core.api.Assertions.assertThatThrownBy(() ->

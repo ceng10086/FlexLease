@@ -17,6 +17,7 @@ public record RentalOrderResponse(
         BigDecimal depositAmount,
         BigDecimal rentAmount,
         BigDecimal buyoutAmount,
+        UUID paymentTransactionId,
         OffsetDateTime leaseStartAt,
         OffsetDateTime leaseEndAt,
         int extensionCount,

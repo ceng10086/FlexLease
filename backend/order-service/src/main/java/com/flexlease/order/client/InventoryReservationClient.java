@@ -41,6 +41,10 @@ public class InventoryReservationClient {
         dispatch(referenceId, commands, InventoryOperation.OUTBOUND);
     }
 
+    public void inbound(UUID referenceId, List<InventoryCommand> commands) {
+        dispatch(referenceId, commands, InventoryOperation.INBOUND);
+    }
+
     private void dispatch(UUID referenceId, List<InventoryCommand> commands, InventoryOperation operation) {
         if (commands == null || commands.isEmpty()) {
             return;
@@ -81,6 +85,7 @@ public class InventoryReservationClient {
     public enum InventoryOperation {
         RESERVE,
         RELEASE,
-        OUTBOUND
+        OUTBOUND,
+        INBOUND
     }
 }

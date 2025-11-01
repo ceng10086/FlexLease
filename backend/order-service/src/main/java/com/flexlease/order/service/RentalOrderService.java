@@ -44,10 +44,13 @@ import com.flexlease.order.repository.OrderReturnRequestRepository;
 import com.flexlease.order.repository.RentalOrderRepository;
 import jakarta.transaction.Transactional;
 import java.math.BigDecimal;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -55,6 +58,8 @@ import org.springframework.stereotype.Service;
 @Service
 @Transactional
 public class RentalOrderService {
+
+    private static final Logger LOG = LoggerFactory.getLogger(RentalOrderService.class);
 
     private final RentalOrderRepository rentalOrderRepository;
     private final OrderExtensionRequestRepository extensionRequestRepository;
@@ -222,6 +227,7 @@ public class RentalOrderService {
         PaymentTransactionView transaction = paymentClient.loadTransaction(transactionId);
         ensurePaymentMatches(order, transaction, request);
         order.markPaid();
+        order.setPaymentTransactionId(transaction.id());
         recordEvent(order,
                 OrderEventType.PAYMENT_CONFIRMED,
                 buildPaymentMessage(transaction),
@@ -250,11 +256,42 @@ public class RentalOrderService {
     public RentalOrderResponse shipOrder(UUID orderId, OrderShipmentRequest request) {
         RentalOrder order = getOrderForUpdate(orderId);
         ensureVendor(order, request.vendorId());
-       order.ship(request.carrier(), request.trackingNumber());
+        List<InventoryCommand> commands = buildInventoryCommands(order);
+        boolean outboundDone = false;
+        boolean releaseDone = false;
+        try {
+            order.ship(request.carrier(), request.trackingNumber());
+            if (!commands.isEmpty()) {
+                inventoryReservationClient.outbound(order.getId(), commands);
+                outboundDone = true;
+                inventoryReservationClient.release(order.getId(), commands);
+                releaseDone = true;
+            }
+        } catch (RuntimeException ex) {
+            if (releaseDone && !commands.isEmpty()) {
+                try {
+                    inventoryReservationClient.reserve(order.getId(), commands);
+                } catch (RuntimeException compensationEx) {
+                    LOG.warn("Failed to compensate inventory reserve for order {}: {}", order.getOrderNo(), compensationEx.getMessage());
+                }
+            }
+            if (outboundDone && !commands.isEmpty()) {
+                try {
+                    inventoryReservationClient.inbound(order.getId(), commands);
+                } catch (RuntimeException compensationEx) {
+                    LOG.warn("Failed to compensate inventory inbound for order {}: {}", order.getOrderNo(), compensationEx.getMessage());
+                }
+            }
+            throw ex;
+        }
+        Map<String, Object> shipmentAttributes = Map.of(
+                "carrier", request.carrier(),
+                "trackingNumber", request.trackingNumber()
+        );
         recordEvent(order, OrderEventType.ORDER_SHIPPED,
                 "发货信息: " + request.carrier() + " / " + request.trackingNumber(),
                 request.vendorId(),
-                Map.of("carrier", request.carrier(), "trackingNumber", request.trackingNumber()));
+                shipmentAttributes);
         notifyUser(order, "订单已发货", "订单 %s 已发货，承运方 %s，运单号 %s。"
             .formatted(order.getOrderNo(), request.carrier(), request.trackingNumber()));
         return assembler.toOrderResponse(order);
@@ -334,7 +371,7 @@ public class RentalOrderService {
                 request.userId()
         );
         order.addReturnRequest(returnRequest);
-        Map<String, Object> returnAttributes = new java.util.HashMap<>();
+        Map<String, Object> returnAttributes = new HashMap<>();
         if (request.logisticsCompany() != null && !request.logisticsCompany().isBlank()) {
             returnAttributes.put("logisticsCompany", request.logisticsCompany());
         }
@@ -358,10 +395,37 @@ public class RentalOrderService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "没有待处理的退租申请"));
         if (request.approve()) {
             returnRequest.approve(request.vendorId(), request.remark());
+            List<InventoryCommand> commands = buildInventoryCommands(order);
+            boolean inboundDone = false;
+            BigDecimal refundedAmount = BigDecimal.ZERO;
+            try {
+                if (!commands.isEmpty()) {
+                    inventoryReservationClient.inbound(order.getId(), commands);
+                    inboundDone = true;
+                }
+                refundedAmount = issueDepositRefundIfNeeded(order);
+            } catch (RuntimeException ex) {
+                if (inboundDone && !commands.isEmpty()) {
+                    try {
+                        inventoryReservationClient.outbound(order.getId(), commands);
+                    } catch (RuntimeException compensationEx) {
+                        LOG.warn("Failed to compensate inventory outbound for order {} after inbound: {}", order.getOrderNo(), compensationEx.getMessage());
+                    }
+                }
+                throw ex;
+            }
             order.completeReturn();
+            Map<String, Object> attributes = new HashMap<>();
+            if (request.remark() != null && !request.remark().isBlank()) {
+                attributes.put("remark", request.remark());
+            }
+            if (refundedAmount.compareTo(BigDecimal.ZERO) > 0) {
+                attributes.put("refundAmount", refundedAmount);
+            }
             recordEvent(order, OrderEventType.RETURN_APPROVED,
                     request.remark() == null ? "退租完成" : request.remark(),
-                    request.vendorId());
+                    request.vendorId(),
+                    attributes);
             notifyUser(order, "退租已完成", "订单 %s 的退租申请已通过。".formatted(order.getOrderNo()));
         } else {
             returnRequest.reject(request.vendorId(), request.remark());
@@ -555,7 +619,11 @@ public class RentalOrderService {
                 content,
                 Map.of("orderNo", order.getOrderNo())
         );
-        notificationClient.send(request);
+        try {
+            notificationClient.send(request);
+        } catch (RuntimeException ex) {
+            LOG.warn("Failed to send user notification '{}' for order {}: {}", subject, order.getOrderNo(), ex.getMessage());
+        }
     }
 
     private void notifyVendor(RentalOrder order, String subject, String content) {
@@ -567,7 +635,11 @@ public class RentalOrderService {
                 content,
                 Map.of("orderNo", order.getOrderNo())
         );
-        notificationClient.send(request);
+        try {
+            notificationClient.send(request);
+        } catch (RuntimeException ex) {
+            LOG.warn("Failed to send vendor notification '{}' for order {}: {}", subject, order.getOrderNo(), ex.getMessage());
+        }
     }
 
     private OrderItemRequest toOrderItemRequest(CartItem cartItem) {
@@ -611,11 +683,43 @@ public class RentalOrderService {
                 .toList();
     }
 
-    private void releaseReservedInventory(RentalOrder order) {
-        List<InventoryCommand> commands = order.getItems().stream()
+    private List<InventoryCommand> buildInventoryCommands(RentalOrder order) {
+        return order.getItems().stream()
                 .filter(item -> item.getSkuId() != null)
                 .map(item -> new InventoryCommand(item.getSkuId(), item.getQuantity()))
                 .toList();
+    }
+
+    private BigDecimal issueDepositRefundIfNeeded(RentalOrder order) {
+        if (order.getPaymentTransactionId() == null) {
+            return BigDecimal.ZERO;
+        }
+        if (order.getDepositAmount() == null || order.getDepositAmount().compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO;
+        }
+        PaymentTransactionView transaction = paymentClient.loadTransaction(order.getPaymentTransactionId());
+        if (transaction.orderId() != null && !transaction.orderId().equals(order.getId())) {
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "支付流水与订单信息不匹配，无法退款");
+        }
+        if (transaction.status() != PaymentStatus.SUCCEEDED) {
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "支付流水状态异常，无法退款");
+        }
+        BigDecimal refunded = transaction.refunds() == null
+                ? BigDecimal.ZERO
+                : transaction.refunds().stream()
+                .map(PaymentTransactionView.RefundView::amount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal deposit = order.getDepositAmount();
+        BigDecimal remaining = deposit.subtract(refunded);
+        if (remaining.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO;
+        }
+        paymentClient.createRefund(order.getPaymentTransactionId(), remaining, "订单退租押金退款");
+        return remaining;
+    }
+
+    private void releaseReservedInventory(RentalOrder order) {
+        List<InventoryCommand> commands = buildInventoryCommands(order);
         if (!commands.isEmpty()) {
             inventoryReservationClient.release(order.getId(), commands);
         }

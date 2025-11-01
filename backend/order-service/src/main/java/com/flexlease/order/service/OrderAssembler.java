@@ -30,6 +30,7 @@ public class OrderAssembler {
                 order.getDepositAmount(),
                 order.getRentAmount(),
                 order.getBuyoutAmount(),
+                order.getPaymentTransactionId(),
                 order.getLeaseStartAt(),
                 order.getLeaseEndAt(),
                 order.getExtensionCount(),
