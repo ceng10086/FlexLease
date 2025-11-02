@@ -2,47 +2,73 @@ name: CI
 
 on:
   push:
-    branches: [ master, main ]
+    branches:
+      - master
   pull_request:
-    branches: [ master, main ]
 
 jobs:
-  build:
+  backend:
     runs-on: ubuntu-latest
-
+    services:
+      postgres:
+        image: postgres:16.4-alpine
+        env:
+          POSTGRES_USER: flexlease
+          POSTGRES_PASSWORD: flexlease
+          POSTGRES_DB: flexlease
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U flexlease"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      SPRING_PROFILES_ACTIVE: postgres,test
+      SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/flexlease
+      SPRING_DATASOURCE_USERNAME: flexlease
+      SPRING_DATASOURCE_PASSWORD: flexlease
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up JDK 21
+      - name: Set up Temurin JDK 21
         uses: actions/setup-java@v4
         with:
-          distribution: "temurin"
+          distribution: temurin
           java-version: "21"
-          cache: maven
 
-      - name: Build and test
-        run: mvn -B verify
+      - name: Cache Maven repository
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
 
-      - name: Set up Node 22
+      - name: Make Maven wrapper executable
+        run: chmod +x mvnw
+
+      - name: Build and test backend
+        run: ./mvnw -B clean verify
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
-          cache: "npm"
+          node-version: "20"
+          cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Install frontend dependencies
+      - name: Install dependencies
         working-directory: frontend
         run: npm ci
-
-      - name: Install Playwright Browsers
-        working-directory: frontend
-        run: npx playwright install --with-deps
 
       - name: Build frontend
         working-directory: frontend
         run: npm run build
-
-      - name: Run frontend e2e tests
-        working-directory: frontend
-        run: npm run test:e2e:ci

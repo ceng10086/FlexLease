@@ -41,7 +41,21 @@ mvn -pl backend/notification-service spring-boot:run  # 通知与运营服务，
 
 > **内部访问令牌**：调用 `auth-service` 的 `/api/v1/internal/**` 接口时需携带 `X-Internal-Token`，默认值 `flexlease-internal-secret` 可在认证服务 `security.jwt.internal-access-token` 和调用方（如用户服务）`flexlease.auth-service.internal-token` 中调整。
 
-> **运行依赖**：RabbitMQ 与 Redis 已包含在 `docker-compose.yml` 中，按需执行 `docker compose up rabbitmq redis` 即可本地启动。商品媒体文件默认写入 `storage/uploads`，可通过环境变量 `FLEXLEASE_STORAGE_ROOT` 自定义。
+> **运行依赖**：PostgreSQL 16.4、RabbitMQ 与 Redis 已包含在 `docker-compose.yml` 中，可执行 `docker compose up postgres rabbitmq redis` 一次性启动。商品媒体文件默认写入 `storage/uploads`，可通过环境变量 `FLEXLEASE_STORAGE_ROOT` 自定义。
+
+### 使用 PostgreSQL 运行
+
+项目默认在 H2 内存库中运行以便测试，但生产化部署需启用 PostgreSQL：
+
+```powershell
+docker compose up postgres
+set SPRING_PROFILES_ACTIVE=postgres
+set SPRING_DATASOURCE_USERNAME=flexlease
+set SPRING_DATASOURCE_PASSWORD=flexlease
+mvn -pl backend/order-service spring-boot:run
+```
+
+> 每个微服务都提供 `application-postgres.yml`，通过 `SPRING_PROFILES_ACTIVE=postgres` 即可切换；Flyway 迁移包含 `V000__create_schema.sql`，会在 PostgreSQL 中自动建好命名空间，其他服务启动命令与上述示例一致。
 
 完成启动后，可参考 `docs/API设计.md` 流程体验“注册厂商 → 提交入驻 → 审批 → 创建商品 → 审核上架 → 用户下单/履约”链路，并可通过订单服务暴露的 `/api/v1/analytics/**` 接口验证平台及厂商运营指标，再结合 `notification-service` 的 `/api/v1/notifications/**` 验证通知发送与日志查询。
 
@@ -74,6 +88,12 @@ mvn clean package
 - 提供 Postman 集合：`docs/postman/cart-api.postman_collection.json`，覆盖购物车增删改查与基于购物车的下单流程，导入后配置环境变量 `baseUrl`、`userId` 等即可调用。
 - 使用 Docker Compose 时可直接运行 `docker compose up registry-service` 启动注册中心，其余依赖（Postgres/Redis/RabbitMQ）同一命令即可完成。
 
+## CI 与质量保障
+
+- GitHub Actions 工作流位于 `.github/workflows/ci.yml`，后端作业会在 PostgreSQL（容器）下执行 `./mvnw clean verify`，前端作业运行 `npm ci` 与 `npm run build`。
+- Flyway 迁移脚本已覆盖所有 schema 的 `V000__create_schema.sql`，确保在 PostgreSQL 中先建命名空间再执行业务表结构迁移。
+- 代码默认使用 H2 进行快速测试，若需在本地复现 CI 行为，可参照前文 PostgreSQL 运行步骤。
+
 ## 目录结构
 ```
 backend/            后端微服务源码
@@ -92,4 +112,4 @@ frontend/           管理端前端（Vite + Vue 3）
 ```
 
 ## 后续计划
-详见 `docs/项目规划与任务分解.md`，后续将聚焦管理端仪表盘联调、通知渠道扩展与持续交付流水线优化。
+详见 `docs/项目规划与任务分解.md`。根据迭代决议，FlexLease 不订制对接速卖通、eBay 等外部电商商品接口——平台使用模拟支付闭环即可完成主业务场景，后续重点放在通知渠道扩展与持续交付流水线优化。
