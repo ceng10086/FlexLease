@@ -20,11 +20,13 @@
             <a-descriptions-item label="创建时间">{{ formatDate(order.createdAt) }}</a-descriptions-item>
             <a-descriptions-item label="开始日期" v-if="order.leaseStartAt">{{ formatDate(order.leaseStartAt) }}</a-descriptions-item>
             <a-descriptions-item label="结束日期" v-if="order.leaseEndAt">{{ formatDate(order.leaseEndAt) }}</a-descriptions-item>
+            <a-descriptions-item label="承运方" v-if="order.shippingCarrier">{{ order.shippingCarrier }}</a-descriptions-item>
+            <a-descriptions-item label="运单号" v-if="order.shippingTrackingNo">{{ order.shippingTrackingNo }}</a-descriptions-item>
           </a-descriptions>
         </a-card>
 
         <a-card title="租赁明细" class="mt-16">
-          <a-table :data-source="order.orderItems" :pagination="false" row-key="id">
+          <a-table :data-source="order.items" :pagination="false" row-key="id">
             <a-table-column title="商品" data-index="productName" key="product" />
             <a-table-column title="SKU" data-index="skuCode" key="sku" />
             <a-table-column title="数量" data-index="quantity" key="quantity" />
@@ -38,13 +40,13 @@
         </a-card>
 
         <a-card title="操作记录" class="mt-16">
-          <a-empty v-if="!order.timeline?.length" description="暂无记录" />
+          <a-empty v-if="!order.events?.length" description="暂无记录" />
           <a-timeline v-else>
-            <a-timeline-item v-for="item in order.timeline" :key="item.timestamp">
+            <a-timeline-item v-for="item in order.events" :key="item.id">
               <div class="timeline-item">
-                <strong>{{ item.event }}</strong>
-                <span>{{ formatDate(item.timestamp) }}</span>
-                <p v-if="item.remark">{{ item.remark }}</p>
+                <strong>{{ item.eventType }}</strong>
+                <span>{{ formatDate(item.createdAt) }}</span>
+                <p v-if="item.description">{{ item.description }}</p>
               </div>
             </a-timeline-item>
           </a-timeline>
@@ -212,7 +214,7 @@ const handleExtension = async () => {
   try {
     await applyOrderExtension(order.value.id, {
       userId: auth.user.id,
-      extensionMonths: extensionForm.months,
+      additionalMonths: extensionForm.months,
       remark: '用户发起续租'
     });
     message.success('续租申请已提交');

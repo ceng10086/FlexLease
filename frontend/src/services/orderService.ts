@@ -124,6 +124,77 @@ export type OrderForceClosePayload = {
   reason?: string;
 };
 
+export type RentalOrderItem = {
+  id: string;
+  productId: string;
+  skuId?: string | null;
+  planId?: string | null;
+  productName: string;
+  skuCode?: string | null;
+  planSnapshot?: string | null;
+  quantity: number;
+  unitRentAmount: number;
+  unitDepositAmount: number;
+  buyoutPrice?: number | null;
+};
+
+export type OrderEvent = {
+  id: string;
+  eventType: string;
+  description: string;
+  createdBy?: string | null;
+  createdAt: string;
+};
+
+export type OrderExtension = {
+  id: string;
+  status: string;
+  additionalMonths: number;
+  requestedBy: string;
+  requestedAt: string;
+  decisionBy?: string | null;
+  decisionAt?: string | null;
+  remark?: string | null;
+};
+
+export type OrderReturn = {
+  id: string;
+  status: string;
+  reason?: string | null;
+  logisticsCompany?: string | null;
+  trackingNumber?: string | null;
+  requestedBy: string;
+  requestedAt: string;
+  decisionBy?: string | null;
+  decisionAt?: string | null;
+  remark?: string | null;
+};
+
+export type RentalOrderDetail = {
+  id: string;
+  orderNo: string;
+  userId: string;
+  vendorId: string;
+  status: OrderStatus;
+  planType?: string | null;
+  totalAmount: number;
+  depositAmount: number;
+  rentAmount: number;
+  buyoutAmount?: number | null;
+  paymentTransactionId?: string | null;
+  leaseStartAt?: string | null;
+  leaseEndAt?: string | null;
+  extensionCount: number;
+  shippingCarrier?: string | null;
+  shippingTrackingNo?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  items: RentalOrderItem[];
+  events: OrderEvent[];
+  extensions: OrderExtension[];
+  returns: OrderReturn[];
+};
+
 export const previewOrder = async (
   payload: OrderPreviewPayload
 ): Promise<OrderPreviewResponse> => {
@@ -131,13 +202,13 @@ export const previewOrder = async (
   return response.data.data;
 };
 
-export const createOrder = async (payload: CreateOrderPayload) => {
-  const response = await http.post<ApiResponse<any>>('/orders', payload);
+export const createOrder = async (payload: CreateOrderPayload): Promise<RentalOrderDetail> => {
+  const response = await http.post<ApiResponse<RentalOrderDetail>>('/orders', payload);
   return response.data.data;
 };
 
-export const fetchOrder = async (orderId: string) => {
-  const response = await http.get<ApiResponse<any>>(`/orders/${orderId}`);
+export const fetchOrder = async (orderId: string): Promise<RentalOrderDetail> => {
+  const response = await http.get<ApiResponse<RentalOrderDetail>>(`/orders/${orderId}`);
   return response.data.data;
 };
 
@@ -170,87 +241,87 @@ export const listAdminOrders = async (params: {
 export const confirmOrderPayment = async (
   orderId: string,
   payload: OrderPaymentPayload
-) => {
-  const response = await http.post<ApiResponse<any>>(`/orders/${orderId}/pay`, payload);
+) : Promise<RentalOrderDetail> => {
+  const response = await http.post<ApiResponse<RentalOrderDetail>>(`/orders/${orderId}/pay`, payload);
   return response.data.data;
 };
 
 export const cancelOrder = async (
   orderId: string,
   payload: { userId: string; reason?: string }
-) => {
-  const response = await http.post<ApiResponse<any>>(`/orders/${orderId}/cancel`, payload);
+) : Promise<RentalOrderDetail> => {
+  const response = await http.post<ApiResponse<RentalOrderDetail>>(`/orders/${orderId}/cancel`, payload);
   return response.data.data;
 };
 
 export const shipOrder = async (
   orderId: string,
   payload: OrderShipmentPayload
-) => {
-  const response = await http.post<ApiResponse<any>>(`/orders/${orderId}/ship`, payload);
+) : Promise<RentalOrderDetail> => {
+  const response = await http.post<ApiResponse<RentalOrderDetail>>(`/orders/${orderId}/ship`, payload);
   return response.data.data;
 };
 
 export const confirmOrderReceive = async (
   orderId: string,
   payload: OrderActorPayload
-) => {
-  const response = await http.post<ApiResponse<any>>(`/orders/${orderId}/confirm-receive`, payload);
+) : Promise<RentalOrderDetail> => {
+  const response = await http.post<ApiResponse<RentalOrderDetail>>(`/orders/${orderId}/confirm-receive`, payload);
   return response.data.data;
 };
 
 export const applyOrderExtension = async (
   orderId: string,
   payload: OrderExtensionApplyPayload
-) => {
-  const response = await http.post<ApiResponse<any>>(`/orders/${orderId}/extend`, payload);
+) : Promise<RentalOrderDetail> => {
+  const response = await http.post<ApiResponse<RentalOrderDetail>>(`/orders/${orderId}/extend`, payload);
   return response.data.data;
 };
 
 export const decideOrderExtension = async (
   orderId: string,
   payload: OrderExtensionDecisionPayload
-) => {
-  const response = await http.post<ApiResponse<any>>(`/orders/${orderId}/extend/approve`, payload);
+) : Promise<RentalOrderDetail> => {
+  const response = await http.post<ApiResponse<RentalOrderDetail>>(`/orders/${orderId}/extend/approve`, payload);
   return response.data.data;
 };
 
 export const applyOrderReturn = async (
   orderId: string,
   payload: OrderReturnApplyPayload
-) => {
-  const response = await http.post<ApiResponse<any>>(`/orders/${orderId}/return`, payload);
+) : Promise<RentalOrderDetail> => {
+  const response = await http.post<ApiResponse<RentalOrderDetail>>(`/orders/${orderId}/return`, payload);
   return response.data.data;
 };
 
 export const decideOrderReturn = async (
   orderId: string,
   payload: OrderReturnDecisionPayload
-) => {
-  const response = await http.post<ApiResponse<any>>(`/orders/${orderId}/return/approve`, payload);
+) : Promise<RentalOrderDetail> => {
+  const response = await http.post<ApiResponse<RentalOrderDetail>>(`/orders/${orderId}/return/approve`, payload);
   return response.data.data;
 };
 
 export const applyOrderBuyout = async (
   orderId: string,
   payload: OrderBuyoutApplyPayload
-) => {
-  const response = await http.post<ApiResponse<any>>(`/orders/${orderId}/buyout`, payload);
+) : Promise<RentalOrderDetail> => {
+  const response = await http.post<ApiResponse<RentalOrderDetail>>(`/orders/${orderId}/buyout`, payload);
   return response.data.data;
 };
 
 export const decideOrderBuyout = async (
   orderId: string,
   payload: OrderBuyoutDecisionPayload
-) => {
-  const response = await http.post<ApiResponse<any>>(`/orders/${orderId}/buyout/confirm`, payload);
+) : Promise<RentalOrderDetail> => {
+  const response = await http.post<ApiResponse<RentalOrderDetail>>(`/orders/${orderId}/buyout/confirm`, payload);
   return response.data.data;
 };
 
 export const forceCloseOrder = async (
   orderId: string,
   payload: OrderForceClosePayload
-) => {
-  const response = await http.post<ApiResponse<any>>(`/admin/orders/${orderId}/force-close`, payload);
+) : Promise<RentalOrderDetail> => {
+  const response = await http.post<ApiResponse<RentalOrderDetail>>(`/admin/orders/${orderId}/force-close`, payload);
   return response.data.data;
 };

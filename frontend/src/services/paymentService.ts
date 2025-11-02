@@ -40,7 +40,7 @@ export type PaymentSettlementResponse = {
   refundedAmount: number;
   netAmount: number;
   lastPaidAt?: string | null;
-  count: number;
+  transactionCount: number;
 };
 
 type ApiResponse<T> = {

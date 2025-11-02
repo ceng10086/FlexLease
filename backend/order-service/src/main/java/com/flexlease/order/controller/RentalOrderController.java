@@ -3,6 +3,7 @@ package com.flexlease.order.controller;
 import com.flexlease.common.dto.ApiResponse;
 import com.flexlease.common.exception.BusinessException;
 import com.flexlease.common.exception.ErrorCode;
+import com.flexlease.common.idempotency.IdempotencyService;
 import com.flexlease.common.security.FlexleasePrincipal;
 import com.flexlease.common.security.SecurityUtils;
 import com.flexlease.order.domain.OrderStatus;
@@ -27,6 +28,7 @@ import com.flexlease.order.dto.RentalOrderSummaryResponse;
 import com.flexlease.order.service.OrderContractService;
 import com.flexlease.order.service.RentalOrderService;
 import jakarta.validation.Valid;
+import java.time.Duration;
 import java.util.UUID;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -35,6 +37,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -43,13 +46,18 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/orders")
 public class RentalOrderController {
 
+    private static final Duration IDEMPOTENCY_TTL = Duration.ofMinutes(10);
+
     private final RentalOrderService rentalOrderService;
     private final OrderContractService orderContractService;
+    private final IdempotencyService idempotencyService;
 
     public RentalOrderController(RentalOrderService rentalOrderService,
-                                 OrderContractService orderContractService) {
+                                 OrderContractService orderContractService,
+                                 IdempotencyService idempotencyService) {
         this.rentalOrderService = rentalOrderService;
         this.orderContractService = orderContractService;
+        this.idempotencyService = idempotencyService;
     }
 
     @PostMapping("/preview")
@@ -58,8 +66,18 @@ public class RentalOrderController {
     }
 
     @PostMapping
-    public ApiResponse<RentalOrderResponse> createOrder(@Valid @RequestBody CreateOrderRequest request) {
-        return ApiResponse.success(rentalOrderService.createOrder(request));
+    public ApiResponse<RentalOrderResponse> createOrder(@Valid @RequestBody CreateOrderRequest request,
+                                                        @RequestHeader(value = "Idempotency-Key", required = false)
+                                                        String idempotencyKey) {
+        if (idempotencyKey == null || idempotencyKey.isBlank()) {
+            return ApiResponse.success(rentalOrderService.createOrder(request));
+        }
+        String normalizedKey = idempotencyKey.trim();
+        return idempotencyService.execute(
+                "order:create:" + normalizedKey,
+                IDEMPOTENCY_TTL,
+                () -> ApiResponse.success(rentalOrderService.createOrder(request))
+        );
     }
 
     @GetMapping

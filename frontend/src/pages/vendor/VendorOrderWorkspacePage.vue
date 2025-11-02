@@ -48,7 +48,7 @@
 
           <a-divider />
           <h4>明细</h4>
-          <a-table :data-source="detail.order.orderItems" :pagination="false" size="small" row-key="id">
+          <a-table :data-source="detail.order.items" :pagination="false" size="small" row-key="id">
             <a-table-column title="商品" data-index="productName" key="product" />
             <a-table-column title="SKU" data-index="skuCode" key="sku" />
             <a-table-column title="数量" data-index="quantity" key="quantity" />
@@ -78,6 +78,19 @@
               </a-form>
             </div>
           </div>
+
+          <a-divider />
+          <h5>操作记录</h5>
+          <a-empty v-if="!detail.order.events?.length" description="暂无记录" />
+          <a-timeline v-else>
+            <a-timeline-item v-for="event in detail.order.events" :key="event.id">
+              <div class="timeline-item">
+                <strong>{{ event.eventType }}</strong>
+                <span>{{ formatDate(event.createdAt) }}</span>
+                <p v-if="event.description">{{ event.description }}</p>
+              </div>
+            </a-timeline-item>
+          </a-timeline>
         </template>
         <template v-else>
           <a-empty description="未找到订单详情" />
@@ -97,7 +110,8 @@ import {
   shipOrder,
   decideOrderReturn,
   type OrderStatus,
-  type RentalOrderSummary
+  type RentalOrderSummary,
+  type RentalOrderDetail
 } from '../../services/orderService';
 
 const vendorStatuses: OrderStatus[] = [
@@ -125,7 +139,7 @@ const orders = ref<RentalOrderSummary[]>([]);
 const filters = reactive<{ status?: OrderStatus }>({});
 const pagination = reactive({ current: 1, pageSize: 10, total: 0 });
 
-const detail = reactive<{ open: boolean; loading: boolean; order: any }>(
+const detail = reactive<{ open: boolean; loading: boolean; order: RentalOrderDetail | null }>(
   {
     open: false,
     loading: false,
@@ -169,8 +183,8 @@ const openDetail = async (orderId: string) => {
   detail.loading = true;
   try {
     detail.order = await fetchOrder(orderId);
-    shipForm.carrier = detail.order?.shippingInfo?.carrier ?? '';
-    shipForm.trackingNumber = detail.order?.shippingInfo?.trackingNumber ?? '';
+    shipForm.carrier = detail.order?.shippingCarrier ?? '';
+    shipForm.trackingNumber = detail.order?.shippingTrackingNo ?? '';
   } catch (error) {
     console.error('加载订单详情失败', error);
     message.error('加载详情失败');
@@ -252,5 +266,11 @@ loadOrders();
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.timeline-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 </style>

@@ -82,11 +82,13 @@
           <a-descriptions-item label="租金">¥{{ formatCurrency(detailDrawer.order.rentAmount) }}</a-descriptions-item>
           <a-descriptions-item label="总金额">¥{{ formatCurrency(detailDrawer.order.totalAmount) }}</a-descriptions-item>
           <a-descriptions-item label="创建时间">{{ formatDate(detailDrawer.order.createdAt) }}</a-descriptions-item>
+          <a-descriptions-item label="承运方" v-if="detailDrawer.order.shippingCarrier">{{ detailDrawer.order.shippingCarrier }}</a-descriptions-item>
+          <a-descriptions-item label="运单号" v-if="detailDrawer.order.shippingTrackingNo">{{ detailDrawer.order.shippingTrackingNo }}</a-descriptions-item>
         </a-descriptions>
         <a-divider />
         <h4>租赁明细</h4>
         <a-table
-          :data-source="detailDrawer.order.orderItems"
+          :data-source="detailDrawer.order.items"
           row-key="id"
           :pagination="false"
           size="small"
@@ -118,6 +120,19 @@
             >强制关闭订单</a-button>
           </a-form>
         </div>
+
+        <a-divider />
+        <h4>操作记录</h4>
+        <a-empty v-if="!detailDrawer.order.events?.length" description="暂无记录" />
+        <a-timeline v-else>
+          <a-timeline-item v-for="event in detailDrawer.order.events" :key="event.id">
+            <div class="timeline-item">
+              <strong>{{ event.eventType }}</strong>
+              <span>{{ formatDate(event.createdAt) }}</span>
+              <p v-if="event.description">{{ event.description }}</p>
+            </div>
+          </a-timeline-item>
+        </a-timeline>
       </template>
       <template v-else>
         <a-empty description="未找到订单详情" />
@@ -134,7 +149,8 @@ import {
   fetchOrder,
   forceCloseOrder,
   type RentalOrderSummary,
-  type OrderStatus
+  type OrderStatus,
+  type RentalOrderDetail
 } from '../../services/orderService';
 
 const orderStatusOptions: OrderStatus[] = [
@@ -154,7 +170,7 @@ const loading = ref(false);
 const orders = ref<RentalOrderSummary[]>([]);
 const pagination = reactive({ current: 1, pageSize: 10, total: 0 });
 
-const detailDrawer = reactive<{ open: boolean; loading: boolean; order: any }>(
+const detailDrawer = reactive<{ open: boolean; loading: boolean; order: RentalOrderDetail | null }>(
   {
     open: false,
     loading: false,
@@ -258,5 +274,11 @@ loadOrders();
 
 .info-alert {
   margin-bottom: 16px;
+}
+
+.timeline-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 </style>

@@ -62,9 +62,14 @@
                 </a-form-item>
               </a-col>
             </a-row>
-            <a-button type="primary" block size="large" :disabled="!canCheckout" @click="goCheckout">
-              去结算
-            </a-button>
+            <a-space direction="vertical" style="width: 100%">
+              <a-button type="primary" block size="large" :disabled="!canCheckout" @click="goCheckout">
+                去结算
+              </a-button>
+              <a-button block :disabled="!canCheckout" :loading="addingToCart" @click="handleAddToCart">
+                加入购物车
+              </a-button>
+            </a-space>
           </a-form>
         </a-card>
       </a-col>
@@ -81,10 +86,13 @@ import { useRoute, useRouter } from 'vue-router';
 import { message } from 'ant-design-vue';
 import dayjs, { type Dayjs } from 'dayjs';
 import { fetchCatalogProduct, type CatalogProductDetail } from '../../services/catalogService';
+import { addCartItem } from '../../services/cartService';
+import { useAuthStore } from '../../stores/auth';
 
 const route = useRoute();
 const router = useRouter();
 const productId = route.params.productId as string;
+const auth = useAuthStore();
 
 const loading = ref(false);
 const product = ref<CatalogProductDetail | null>(null);
@@ -92,6 +100,7 @@ const selectedPlanId = ref<string | undefined>();
 const selectedSkuId = ref<string | undefined>();
 
 const form = reactive<{ quantity: number; leaseStart?: Dayjs; leaseEnd?: Dayjs }>({ quantity: 1 });
+const addingToCart = ref(false);
 
 const currentPlan = computed(() => product.value?.rentalPlans.find((plan) => plan.id === selectedPlanId.value));
 const currentSku = computed(() => currentPlan.value?.skus.find((sku) => sku.id === selectedSkuId.value));
@@ -130,6 +139,41 @@ const goCheckout = () => {
       leaseEnd: form.leaseEnd ? dayjs(form.leaseEnd).format('YYYY-MM-DD') : undefined
     }
   });
+};
+
+const handleAddToCart = async () => {
+  if (!auth.user?.id) {
+    message.error('请先登录');
+    router.replace({ name: 'login', query: { redirect: route.fullPath } });
+    return;
+  }
+  if (!canCheckout.value || !product.value || !currentPlan.value || !currentSku.value) {
+    message.warning('请先选择租赁方案和库存');
+    return;
+  }
+  addingToCart.value = true;
+  try {
+    await addCartItem({
+      userId: auth.user.id,
+      vendorId: product.value.vendorId,
+      productId: product.value.id,
+      skuId: currentSku.value.id,
+      planId: currentPlan.value.id,
+      productName: product.value.name,
+      skuCode: currentSku.value.skuCode,
+      planSnapshot: JSON.stringify({ termMonths: currentPlan.value.termMonths }),
+      quantity: form.quantity,
+      unitRentAmount: currentPlan.value.rentAmountMonthly,
+      unitDepositAmount: currentPlan.value.depositAmount,
+      buyoutPrice: currentPlan.value.buyoutPrice ?? null
+    });
+    message.success('已加入购物车');
+  } catch (error) {
+    console.error('加入购物车失败', error);
+    message.error('加入购物车失败，请稍后重试');
+  } finally {
+    addingToCart.value = false;
+  }
 };
 
 const goBack = () => {

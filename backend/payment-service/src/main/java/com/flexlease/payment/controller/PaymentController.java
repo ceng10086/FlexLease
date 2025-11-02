@@ -3,6 +3,7 @@ package com.flexlease.payment.controller;
 import com.flexlease.common.dto.ApiResponse;
 import com.flexlease.common.exception.BusinessException;
 import com.flexlease.common.exception.ErrorCode;
+import com.flexlease.common.idempotency.IdempotencyService;
 import com.flexlease.common.security.FlexleasePrincipal;
 import com.flexlease.common.security.SecurityUtils;
 import com.flexlease.payment.dto.PaymentCallbackRequest;
@@ -14,6 +15,7 @@ import com.flexlease.payment.dto.PaymentTransactionResponse;
 import com.flexlease.payment.dto.RefundTransactionResponse;
 import com.flexlease.payment.service.PaymentTransactionService;
 import jakarta.validation.Valid;
+import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -22,6 +24,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -30,15 +33,22 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/payments")
 public class PaymentController {
 
-    private final PaymentTransactionService paymentTransactionService;
+    private static final Duration IDEMPOTENCY_TTL = Duration.ofMinutes(10);
 
-    public PaymentController(PaymentTransactionService paymentTransactionService) {
+    private final PaymentTransactionService paymentTransactionService;
+    private final IdempotencyService idempotencyService;
+
+    public PaymentController(PaymentTransactionService paymentTransactionService,
+                             IdempotencyService idempotencyService) {
         this.paymentTransactionService = paymentTransactionService;
+        this.idempotencyService = idempotencyService;
     }
 
     @PostMapping("/{orderId}/init")
     public ApiResponse<PaymentTransactionResponse> initPayment(@PathVariable UUID orderId,
-                                                               @Valid @RequestBody PaymentInitRequest request) {
+                                                               @Valid @RequestBody PaymentInitRequest request,
+                                                               @RequestHeader(value = "Idempotency-Key", required = false)
+                                                               String idempotencyKey) {
         FlexleasePrincipal principal = SecurityUtils.requirePrincipal();
         if (!principal.hasRole("ADMIN") && !principal.hasRole("INTERNAL")) {
             if (!principal.hasRole("USER")) {
@@ -48,7 +58,15 @@ public class PaymentController {
                 throw new BusinessException(ErrorCode.FORBIDDEN, "禁止使用他人账号创建支付");
             }
         }
-        return ApiResponse.success(paymentTransactionService.initPayment(orderId, request));
+        if (idempotencyKey == null || idempotencyKey.isBlank()) {
+            return ApiResponse.success(paymentTransactionService.initPayment(orderId, request));
+        }
+        String normalizedKey = idempotencyKey.trim();
+        return idempotencyService.execute(
+                "payment:init:" + normalizedKey,
+                IDEMPOTENCY_TTL,
+                () -> ApiResponse.success(paymentTransactionService.initPayment(orderId, request))
+        );
     }
 
     @GetMapping("/{transactionId}")

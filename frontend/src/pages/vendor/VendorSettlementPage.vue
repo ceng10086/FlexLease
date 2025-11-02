@@ -41,7 +41,9 @@
         <a-table-column title="最后付款时间" key="lastPaidAt">
           <template #default="{ record }">{{ record.lastPaidAt ? formatDate(record.lastPaidAt) : '-' }}</template>
         </a-table-column>
-        <a-table-column title="笔数" data-index="count" key="count" />
+        <a-table-column title="笔数" key="transactionCount">
+          <template #default="{ record }">{{ record.transactionCount }}</template>
+        </a-table-column>
       </a-table>
     </a-card>
   </div>
