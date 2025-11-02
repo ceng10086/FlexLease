@@ -3,12 +3,15 @@ package com.flexlease.order.client;
 import com.flexlease.common.dto.ApiResponse;
 import com.flexlease.common.exception.ErrorCode;
 import com.flexlease.common.notification.NotificationSendRequest;
+import com.flexlease.common.security.JwtAuthProperties;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClientException;
@@ -24,18 +27,27 @@ public class NotificationClient {
 
     private final RestTemplate restTemplate;
     private final String baseUrl;
+    private final String internalToken;
 
-    public NotificationClient(RestTemplate restTemplate, NotificationServiceProperties properties) {
+    public NotificationClient(RestTemplate restTemplate,
+                              NotificationServiceProperties properties,
+                              JwtAuthProperties jwtAuthProperties) {
         this.restTemplate = restTemplate;
         this.baseUrl = properties.getBaseUrl();
+        this.internalToken = jwtAuthProperties.getInternalAccessToken();
     }
 
     public void send(NotificationSendRequest request) {
         try {
+            HttpHeaders headers = new HttpHeaders();
+            if (internalToken != null && !internalToken.isBlank()) {
+                headers.set("X-Internal-Token", internalToken);
+            }
+            headers.setContentType(MediaType.APPLICATION_JSON);
             ResponseEntity<ApiResponse<Map<String, Object>>> response = restTemplate.exchange(
                     baseUrl + "/notifications/send",
                     HttpMethod.POST,
-                    new HttpEntity<>(request),
+                    new HttpEntity<>(request, headers),
                     RESPONSE_TYPE
             );
             ApiResponse<Map<String, Object>> body = response.getBody();

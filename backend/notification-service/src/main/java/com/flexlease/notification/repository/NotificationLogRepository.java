@@ -11,4 +11,8 @@ public interface NotificationLogRepository extends JpaRepository<NotificationLog
     List<NotificationLog> findTop50ByStatusOrderByCreatedAtDesc(NotificationStatus status);
 
     List<NotificationLog> findTop50ByOrderByCreatedAtDesc();
+
+    List<NotificationLog> findTop50ByRecipientOrderByCreatedAtDesc(String recipient);
+
+    List<NotificationLog> findTop50ByRecipientAndStatusOrderByCreatedAtDesc(String recipient, NotificationStatus status);
 }

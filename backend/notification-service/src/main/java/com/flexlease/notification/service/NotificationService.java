@@ -6,6 +6,8 @@ import com.flexlease.common.exception.BusinessException;
 import com.flexlease.common.exception.ErrorCode;
 import com.flexlease.common.notification.NotificationChannel;
 import com.flexlease.common.notification.NotificationSendRequest;
+import com.flexlease.common.security.FlexleasePrincipal;
+import com.flexlease.common.security.SecurityUtils;
 import com.flexlease.notification.domain.NotificationLog;
 import com.flexlease.notification.domain.NotificationStatus;
 import com.flexlease.notification.domain.NotificationTemplate;
@@ -83,10 +85,32 @@ public class NotificationService {
     }
 
     @Transactional(Transactional.TxType.SUPPORTS)
-    public List<NotificationLogResponse> listLogs(NotificationStatus status) {
-        List<NotificationLog> logs = status == null
-                ? logRepository.findTop50ByOrderByCreatedAtDesc()
-                : logRepository.findTop50ByStatusOrderByCreatedAtDesc(status);
+    public List<NotificationLogResponse> listLogs(NotificationStatus status, String recipient) {
+        FlexleasePrincipal principal = SecurityUtils.requirePrincipal();
+        boolean hasGlobalAccess = principal.hasRole("ADMIN") || principal.hasRole("INTERNAL");
+        String normalizedRecipient = recipient != null && !recipient.isBlank() ? recipient : null;
+
+        if (normalizedRecipient == null && !hasGlobalAccess) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "仅管理员可查看全部通知记录");
+        }
+
+        if (!hasGlobalAccess) {
+            if (principal.userId() == null) {
+                throw new BusinessException(ErrorCode.UNAUTHORIZED, "当前身份缺少用户标识");
+            }
+            normalizedRecipient = principal.userId().toString();
+        }
+
+        List<NotificationLog> logs;
+        if (normalizedRecipient != null) {
+            logs = status == null
+                    ? logRepository.findTop50ByRecipientOrderByCreatedAtDesc(normalizedRecipient)
+                    : logRepository.findTop50ByRecipientAndStatusOrderByCreatedAtDesc(normalizedRecipient, status);
+        } else {
+            logs = status == null
+                    ? logRepository.findTop50ByOrderByCreatedAtDesc()
+                    : logRepository.findTop50ByStatusOrderByCreatedAtDesc(status);
+        }
         return logs.stream().map(this::toResponse).toList();
     }
 

@@ -3,6 +3,8 @@ package com.flexlease.order.controller;
 import com.flexlease.common.dto.ApiResponse;
 import com.flexlease.common.exception.BusinessException;
 import com.flexlease.common.exception.ErrorCode;
+import com.flexlease.common.security.FlexleasePrincipal;
+import com.flexlease.common.security.SecurityUtils;
 import com.flexlease.order.domain.OrderStatus;
 import com.flexlease.order.dto.CreateOrderRequest;
 import com.flexlease.order.dto.OrderActorRequest;
@@ -66,15 +68,45 @@ public class RentalOrderController {
                                                                              @RequestParam(required = false) OrderStatus status,
                                                                              @RequestParam(defaultValue = "1") int page,
                                                                              @RequestParam(defaultValue = "10") int size) {
+        FlexleasePrincipal principal = SecurityUtils.requirePrincipal();
+        UUID effectiveUserId = null;
+        UUID effectiveVendorId = null;
+
+        if (principal.hasRole("ADMIN") || principal.hasRole("INTERNAL")) {
+            if (userId != null && vendorId != null) {
+                throw new BusinessException(ErrorCode.VALIDATION_ERROR, "userId 与 vendorId 不能同时提供");
+            }
+            effectiveUserId = userId;
+            effectiveVendorId = vendorId;
+        } else if (principal.hasRole("VENDOR")) {
+            UUID currentVendorId = principal.userId();
+            if (currentVendorId == null) {
+                throw new BusinessException(ErrorCode.UNAUTHORIZED, "当前身份缺少用户标识");
+            }
+            if (vendorId != null && !vendorId.equals(currentVendorId)) {
+                throw new BusinessException(ErrorCode.FORBIDDEN, "禁止查看其他厂商的订单");
+            }
+            if (userId != null) {
+                throw new BusinessException(ErrorCode.FORBIDDEN, "厂商查询时无需指定 userId");
+            }
+            effectiveVendorId = currentVendorId;
+        } else {
+            UUID currentUserId = SecurityUtils.requireUserId();
+            if (vendorId != null) {
+                throw new BusinessException(ErrorCode.FORBIDDEN, "仅厂商可按 vendorId 查询订单");
+            }
+            if (userId != null && !userId.equals(currentUserId)) {
+                throw new BusinessException(ErrorCode.FORBIDDEN, "无权查看其他用户的订单");
+            }
+            effectiveUserId = currentUserId;
+        }
+
         Pageable pageable = PageRequest.of(Math.max(page - 1, 0), Math.max(1, Math.min(size, 100)), Sort.by(Sort.Direction.DESC, "createdAt"));
-        if (userId != null && vendorId != null) {
-            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "userId 与 vendorId 不能同时提供");
+        if (effectiveUserId != null) {
+            return ApiResponse.success(rentalOrderService.listOrdersForUser(effectiveUserId, status, pageable));
         }
-        if (userId != null) {
-            return ApiResponse.success(rentalOrderService.listOrdersForUser(userId, status, pageable));
-        }
-        if (vendorId != null) {
-            return ApiResponse.success(rentalOrderService.listOrdersForVendor(vendorId, status, pageable));
+        if (effectiveVendorId != null) {
+            return ApiResponse.success(rentalOrderService.listOrdersForVendor(effectiveVendorId, status, pageable));
         }
         throw new BusinessException(ErrorCode.VALIDATION_ERROR, "请提供 userId 或 vendorId");
     }

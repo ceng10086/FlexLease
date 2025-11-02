@@ -179,11 +179,13 @@ public class RentalOrderService {
     public RentalOrderResponse getOrder(UUID orderId) {
         RentalOrder order = rentalOrderRepository.findByIdWithDetails(orderId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "订单不存在"));
+        ensureOrderReadable(order);
         return assembler.toOrderResponse(order);
     }
 
     @Transactional(Transactional.TxType.SUPPORTS)
     public PagedResponse<RentalOrderSummaryResponse> listOrdersForUser(UUID userId, OrderStatus status, Pageable pageable) {
+        ensureUserListPermission(userId);
         Page<RentalOrder> page = status == null
                 ? rentalOrderRepository.findByUserId(userId, pageable)
                 : rentalOrderRepository.findByUserIdAndStatus(userId, status, pageable);
@@ -192,6 +194,7 @@ public class RentalOrderService {
 
     @Transactional(Transactional.TxType.SUPPORTS)
     public PagedResponse<RentalOrderSummaryResponse> listOrdersForVendor(UUID vendorId, OrderStatus status, Pageable pageable) {
+        ensureVendorListPermission(vendorId);
         Page<RentalOrder> page = status == null
                 ? rentalOrderRepository.findByVendorId(vendorId, pageable)
                 : rentalOrderRepository.findByVendorIdAndStatus(vendorId, status, pageable);
@@ -200,6 +203,7 @@ public class RentalOrderService {
 
     @Transactional(Transactional.TxType.SUPPORTS)
     public PagedResponse<RentalOrderSummaryResponse> listOrdersForAdmin(UUID userId, UUID vendorId, OrderStatus status, Pageable pageable) {
+        ensureAdminAccess();
         if (userId != null && vendorId != null) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "userId 与 vendorId 不能同时提供");
         }
@@ -506,6 +510,57 @@ public class RentalOrderService {
     private RentalOrder getOrderForUpdate(UUID orderId) {
         return rentalOrderRepository.findByIdWithDetails(orderId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "订单不存在"));
+    }
+
+    private void ensureOrderReadable(RentalOrder order) {
+        FlexleasePrincipal principal = SecurityUtils.requirePrincipal();
+        if (principal.hasRole("ADMIN") || principal.hasRole("INTERNAL")) {
+            return;
+        }
+        UUID principalUserId = principal.userId();
+        if (principal.hasRole("VENDOR")) {
+            if (principalUserId == null || !principalUserId.equals(order.getVendorId())) {
+                throw new BusinessException(ErrorCode.FORBIDDEN, "无权查看该订单");
+            }
+            return;
+        }
+        if (principal.hasRole("USER")) {
+            if (principalUserId == null || !principalUserId.equals(order.getUserId())) {
+                throw new BusinessException(ErrorCode.FORBIDDEN, "无权查看该订单");
+            }
+            return;
+        }
+        throw new BusinessException(ErrorCode.FORBIDDEN, "缺少访问订单详情的权限");
+    }
+
+    private void ensureUserListPermission(UUID userId) {
+        FlexleasePrincipal principal = SecurityUtils.requirePrincipal();
+        if (principal.hasRole("ADMIN") || principal.hasRole("INTERNAL")) {
+            return;
+        }
+        if (principal.userId() == null || !principal.userId().equals(userId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "无权访问该用户的订单");
+        }
+    }
+
+    private void ensureVendorListPermission(UUID vendorId) {
+        FlexleasePrincipal principal = SecurityUtils.requirePrincipal();
+        if (principal.hasRole("ADMIN") || principal.hasRole("INTERNAL")) {
+            return;
+        }
+        if (!principal.hasRole("VENDOR")) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "仅厂商可访问厂商订单");
+        }
+        if (principal.userId() == null || !principal.userId().equals(vendorId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "无权访问该厂商的订单");
+        }
+    }
+
+    private void ensureAdminAccess() {
+        FlexleasePrincipal principal = SecurityUtils.requirePrincipal();
+        if (!principal.hasRole("ADMIN") && !principal.hasRole("INTERNAL")) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "仅管理员可执行该操作");
+        }
     }
 
     private void ensureUser(RentalOrder order, UUID userId) {

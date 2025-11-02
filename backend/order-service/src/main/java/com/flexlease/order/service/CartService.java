@@ -2,6 +2,8 @@ package com.flexlease.order.service;
 
 import com.flexlease.common.exception.BusinessException;
 import com.flexlease.common.exception.ErrorCode;
+import com.flexlease.common.security.FlexleasePrincipal;
+import com.flexlease.common.security.SecurityUtils;
 import com.flexlease.order.domain.CartItem;
 import com.flexlease.order.dto.AddCartItemRequest;
 import com.flexlease.order.dto.CartItemResponse;
@@ -27,12 +29,14 @@ public class CartService {
 
     @Transactional(Transactional.TxType.SUPPORTS)
     public List<CartItemResponse> listCartItems(UUID userId) {
+        requireUserAccess(userId);
         return cartItemRepository.findByUserIdOrderByCreatedAtAsc(userId).stream()
                 .map(this::toResponse)
                 .toList();
     }
 
     public CartItemResponse addItem(AddCartItemRequest request) {
+        requireUserAccess(request.userId());
         CartItem item = cartItemRepository.findByUserIdAndSkuId(request.userId(), request.skuId())
                 .map(existing -> {
                     existing.increaseQuantity(request.quantity());
@@ -60,6 +64,7 @@ public class CartService {
     }
 
     public CartItemResponse updateItem(UUID itemId, UpdateCartItemRequest request) {
+        requireUserAccess(request.userId());
         CartItem item = cartItemRepository.findByIdAndUserId(itemId, request.userId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "购物车条目不存在"));
         item.updateQuantity(request.quantity());
@@ -67,17 +72,20 @@ public class CartService {
     }
 
     public void removeItem(UUID userId, UUID itemId) {
+        requireUserAccess(userId);
         CartItem item = cartItemRepository.findByIdAndUserId(itemId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "购物车条目不存在"));
         cartItemRepository.delete(item);
     }
 
     public void clearCart(UUID userId) {
+        requireUserAccess(userId);
         cartItemRepository.deleteByUserId(userId);
     }
 
     @Transactional(Transactional.TxType.SUPPORTS)
     public List<CartItem> loadCartItems(UUID userId, List<UUID> itemIds) {
+        requireUserAccess(userId);
         if (itemIds == null || itemIds.isEmpty()) {
             return Collections.emptyList();
         }
@@ -104,10 +112,22 @@ public class CartService {
     }
 
     public void removeItems(UUID userId, List<UUID> itemIds) {
+        requireUserAccess(userId);
         if (itemIds == null || itemIds.isEmpty()) {
             return;
         }
         cartItemRepository.deleteByUserIdAndIdIn(userId, itemIds);
+    }
+
+    private void requireUserAccess(UUID userId) {
+        FlexleasePrincipal principal = SecurityUtils.getCurrentPrincipal()
+                .orElseThrow(() -> new BusinessException(ErrorCode.UNAUTHORIZED, "未认证"));
+        if (principal.hasRole("ADMIN") || principal.hasRole("INTERNAL")) {
+            return;
+        }
+        if (principal.userId() == null || !principal.userId().equals(userId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "无权访问该购物车");
+        }
     }
 
     private CartItemResponse toResponse(CartItem item) {

@@ -294,7 +294,10 @@ class RentalOrderServiceIntegrationTest {
         ).isInstanceOf(BusinessException.class)
                 .hasMessageContaining("支付尚未完成");
 
-        RentalOrderResponse queried = rentalOrderService.getOrder(created.id());
+        RentalOrderResponse queried;
+        try (SecurityContextHandle ignored = withPrincipal(userId, "user-%s".formatted(userId), "USER")) {
+            queried = rentalOrderService.getOrder(created.id());
+        }
         assertThat(queried.status()).isEqualTo(OrderStatus.PENDING_PAYMENT);
     }
 
@@ -306,33 +309,41 @@ class RentalOrderServiceIntegrationTest {
         UUID skuId = UUID.randomUUID();
         UUID planId = UUID.randomUUID();
 
-        CartItemResponse cartItem = cartService.addItem(new AddCartItemRequest(
-                userId,
-                vendorId,
-                productId,
-                skuId,
-                planId,
-                "共享咖啡机",
-                "COFFEE-01",
-                null,
-                1,
-                new BigDecimal("99.00"),
-                new BigDecimal("200.00"),
-                null
-        ));
+        CartItemResponse cartItem;
+        try (SecurityContextHandle ignored = withPrincipal(userId, "user-%s".formatted(userId), "USER")) {
+            cartItem = cartService.addItem(new AddCartItemRequest(
+                    userId,
+                    vendorId,
+                    productId,
+                    skuId,
+                    planId,
+                    "共享咖啡机",
+                    "COFFEE-01",
+                    null,
+                    1,
+                    new BigDecimal("99.00"),
+                    new BigDecimal("200.00"),
+                    null
+            ));
+        }
 
-        RentalOrderResponse created = rentalOrderService.createOrder(new CreateOrderRequest(
-                userId,
-                vendorId,
-                "STANDARD",
-                null,
-                null,
-                List.of(),
-                List.of(cartItem.id())
-        ));
+        RentalOrderResponse created;
+        try (SecurityContextHandle ignored = withPrincipal(userId, "user-%s".formatted(userId), "USER")) {
+            created = rentalOrderService.createOrder(new CreateOrderRequest(
+                    userId,
+                    vendorId,
+                    "STANDARD",
+                    null,
+                    null,
+                    List.of(),
+                    List.of(cartItem.id())
+            ));
+        }
 
         assertThat(created.status()).isEqualTo(OrderStatus.PENDING_PAYMENT);
-        assertThat(cartService.listCartItems(userId)).isEmpty();
+        try (SecurityContextHandle ignored = withPrincipal(userId, "user-%s".formatted(userId), "USER")) {
+            assertThat(cartService.listCartItems(userId)).isEmpty();
+        }
     }
 
     @Test
@@ -371,7 +382,24 @@ class RentalOrderServiceIntegrationTest {
         org.mockito.Mockito.verify(inventoryReservationClient, org.mockito.Mockito.atLeastOnce())
                 .release(org.mockito.ArgumentMatchers.eq(created.id()), org.mockito.ArgumentMatchers.anyList());
 
-        RentalOrderResponse refreshed = rentalOrderService.getOrder(created.id());
-        assertThat(refreshed.status()).isEqualTo(OrderStatus.CANCELLED);
+                RentalOrderResponse refreshed;
+                try (SecurityContextHandle ignored = withPrincipal(UUID.randomUUID(), "admin", "ADMIN")) {
+                        refreshed = rentalOrderService.getOrder(created.id());
+                }
+                assertThat(refreshed.status()).isEqualTo(OrderStatus.CANCELLED);
     }
+
+        private SecurityContextHandle withPrincipal(UUID userId, String username, String... roles) {
+                Set<String> roleSet = roles.length == 0 ? Set.of() : Set.copyOf(List.of(roles));
+                FlexleasePrincipal principal = new FlexleasePrincipal(userId, username, roleSet);
+                SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(principal, null));
+                return new SecurityContextHandle();
+        }
+
+        private static final class SecurityContextHandle implements AutoCloseable {
+                @Override
+                public void close() {
+                        SecurityContextHolder.clearContext();
+                }
+        }
 }
