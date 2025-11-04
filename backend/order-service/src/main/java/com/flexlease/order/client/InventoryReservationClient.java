@@ -5,8 +5,10 @@ import com.flexlease.common.exception.BusinessException;
 import com.flexlease.common.exception.ErrorCode;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
@@ -17,16 +19,21 @@ import org.springframework.web.client.RestTemplate;
 @Component
 public class InventoryReservationClient {
 
+    private static final String INTERNAL_TOKEN_HEADER = "X-Internal-Token";
     private static final ParameterizedTypeReference<ApiResponse<Void>> RESPONSE_TYPE =
             new ParameterizedTypeReference<>() {
             };
 
     private final RestTemplate restTemplate;
     private final String baseUrl;
+    private final String internalToken;
 
-    public InventoryReservationClient(RestTemplate restTemplate, ProductServiceProperties properties) {
+    public InventoryReservationClient(RestTemplate restTemplate, 
+                                     ProductServiceProperties properties,
+                                     @Value("${security.jwt.internal-access-token}") String internalToken) {
         this.restTemplate = restTemplate;
         this.baseUrl = properties.getBaseUrl();
+        this.internalToken = internalToken;
     }
 
     public void reserve(UUID referenceId, List<InventoryCommand> commands) {
@@ -56,10 +63,13 @@ public class InventoryReservationClient {
                         .toList()
         );
         try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.set(INTERNAL_TOKEN_HEADER, internalToken);
+            
             ResponseEntity<ApiResponse<Void>> response = restTemplate.exchange(
                     baseUrl + "/internal/inventory/reservations",
                     HttpMethod.POST,
-                    new HttpEntity<>(payload),
+                    new HttpEntity<>(payload, headers),
                     RESPONSE_TYPE
             );
             ApiResponse<Void> body = response.getBody();
