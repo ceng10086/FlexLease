@@ -4,7 +4,6 @@ import com.flexlease.auth.domain.UserAccount;
 import com.flexlease.auth.domain.UserStatus;
 import com.flexlease.common.exception.BusinessException;
 import com.flexlease.common.exception.ErrorCode;
-import java.util.Objects;
 import java.util.Set;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -38,14 +37,14 @@ public class AuthService {
         return userAccountService.register(username, password, UserStatus.PENDING_REVIEW, Set.of(RoleService.ROLE_VENDOR));
     }
 
-    public String authenticate(String username, String password) {
+    public TokenService.TokenBundle authenticate(String username, String password) {
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(username, password)
         );
         Object principal = authentication.getPrincipal();
         if (principal instanceof UserPrincipal userPrincipal) {
             userAccountService.updateLastLogin(userPrincipal.getUserId());
-            return tokenService.generateToken(userPrincipal);
+            return tokenService.generateTokens(userPrincipal);
         }
         if (principal instanceof UserDetails userDetails) {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR, "未知的认证主体: " + userDetails.getUsername());
@@ -58,7 +57,7 @@ public class AuthService {
         userAccountService.resetPassword(username, oldPassword, newPassword);
     }
 
-    public String refreshToken(String refreshToken) {
-        return tokenService.refreshToken(refreshToken);
+    public TokenService.TokenBundle refreshToken(String refreshToken) {
+        return tokenService.refreshTokens(refreshToken);
     }
 }

@@ -33,6 +33,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/auth")
 public class AuthController {
 
+    private static final String TOKEN_TYPE_ACCESS = "ACCESS";
+
     private final AuthService authService;
     private final TokenService tokenService;
     private final JwtTokenProvider tokenProvider;
@@ -62,8 +64,13 @@ public class AuthController {
 
     @PostMapping("/token")
     public ApiResponse<TokenResponse> token(@Valid @RequestBody LoginRequest request) {
-        String accessToken = authService.authenticate(request.username(), request.password());
-        return ApiResponse.success(new TokenResponse(accessToken, securityProperties.getAccessTokenTtlSeconds()));
+        var tokens = authService.authenticate(request.username(), request.password());
+        return ApiResponse.success(new TokenResponse(
+            tokens.accessToken(),
+            tokens.accessTokenTtlSeconds(),
+            tokens.refreshToken(),
+            tokens.refreshTokenTtlSeconds()
+        ));
     }
 
     @PostMapping("/logout")
@@ -79,8 +86,13 @@ public class AuthController {
 
     @PostMapping("/token/refresh")
     public ApiResponse<TokenResponse> refreshToken(@Valid @RequestBody TokenRefreshRequest request) {
-        String accessToken = authService.refreshToken(request.refreshToken());
-        return ApiResponse.success(new TokenResponse(accessToken, securityProperties.getAccessTokenTtlSeconds()));
+        var tokens = authService.refreshToken(request.refreshToken());
+        return ApiResponse.success(new TokenResponse(
+            tokens.accessToken(),
+            tokens.accessTokenTtlSeconds(),
+            tokens.refreshToken(),
+            tokens.refreshTokenTtlSeconds()
+        ));
     }
 
     @GetMapping("/me")
@@ -96,6 +108,11 @@ public class AuthController {
         if (claims.isEmpty()) {
             return ResponseEntity.status(401)
                     .body(ApiResponse.failure(ErrorCode.UNAUTHORIZED.code(), "令牌无效"));
+        }
+        String tokenType = claims.get().get("tokenType", String.class);
+        if (tokenType != null && !tokenType.equalsIgnoreCase(TOKEN_TYPE_ACCESS)) {
+            return ResponseEntity.status(401)
+                .body(ApiResponse.failure(ErrorCode.UNAUTHORIZED.code(), "仅支持访问令牌"));
         }
         Set<String> roles = tokenService.extractRoles(claims.get());
         java.util.UUID userId = java.util.UUID.fromString(claims.get().getSubject());

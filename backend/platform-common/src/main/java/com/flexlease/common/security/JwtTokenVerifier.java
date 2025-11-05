@@ -29,6 +29,10 @@ public class JwtTokenVerifier {
                     .build()
                     .parseClaimsJws(token)
                     .getBody();
+            String tokenType = claims.get("tokenType", String.class);
+            if (tokenType != null && !"ACCESS".equalsIgnoreCase(tokenType)) {
+                return Optional.empty();
+            }
             UUID userId = UUID.fromString(claims.getSubject());
             String username = claims.get("username", String.class);
             UUID vendorId = null;

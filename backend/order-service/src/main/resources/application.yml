@@ -41,9 +41,10 @@ flexlease:
     base-url: http://notification-service/api/v1
   product-service:
     base-url: http://product-service/api/v1
-  maintenance:
-    pending-payment-expire-minutes: 30
-    scan-interval-ms: 60000
+  order:
+    maintenance:
+      pending-payment-expire-minutes: 30
+      scan-interval-ms: 60000
   messaging:
     enabled: true
 server:

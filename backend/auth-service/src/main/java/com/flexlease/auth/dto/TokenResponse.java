@@ -1,4 +1,7 @@
 package com.flexlease.auth.dto;
 
-public record TokenResponse(String accessToken, long expiresInSeconds) {
+public record TokenResponse(String accessToken,
+							long expiresInSeconds,
+							String refreshToken,
+							long refreshExpiresInSeconds) {
 }

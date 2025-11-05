@@ -33,17 +33,17 @@
 | ---- | --- | ---- | ------ | ------------ |
 | POST | `/auth/register/customer` | C 端注册 | `{ "username", "password" }` | `id`, `username`, `roles` |
 | POST | `/auth/register/vendor` | 厂商管理员注册 | `{ "username", "password" }` | `id`, `username`, `roles` |
-| POST | `/auth/token` | 获取访问令牌 | `{ "username", "password" }` | `accessToken`, `expiresInSeconds` |
+| POST | `/auth/token` | 获取访问令牌 | `{ "username", "password" }` | `accessToken`, `expiresInSeconds`, `refreshToken`, `refreshExpiresInSeconds` |
 | GET | `/auth/me` | 获取当前登录用户信息 | `Authorization: Bearer <token>` | `id`, `vendorId?`, `username`, `roles`, `lastLoginAt` |
 
-> 说明：注册接口当前仅返回账号摘要，厂商入驻详情在用户服务中维护；`/auth/token` 使用 JSON 请求体而非表单。`/auth/me` 会在厂商审核通过并映射 vendorId 后返回 `vendorId` 字段，前端可据此加载厂商工作台。
+> 说明：注册接口当前仅返回账号摘要，厂商入驻详情在用户服务中维护；`/auth/token` 使用 JSON 请求体而非表单，并同时返回访问令牌与刷新令牌。`/auth/me` 会在厂商审核通过并映射 vendorId 后返回 `vendorId` 字段，前端可据此加载厂商工作台。
 
 ### 2.2 账号管理（已实现）
 | 方法 | URL | 描述 | 请求体要点 | 备注 |
 | ---- | --- | ---- | ---------- | ---- |
 | POST | `/auth/logout` | 客户端主动注销 | - | 无状态实现，前端清理 token 即可 |
 | POST | `/auth/password/reset` | 重置密码 | `{ "username", "oldPassword", "newPassword" }` | 校验旧密码后写入新密文 |
-| POST | `/auth/token/refresh` | 刷新令牌 | `{ "refreshToken" }` | 当前使用访问令牌作为刷新凭证，返回新的短期 `accessToken` |
+| POST | `/auth/token/refresh` | 刷新令牌 | `{ "refreshToken" }` | 返回新的 `accessToken`、`refreshToken` 及各自剩余有效期 |
 
 ### 2.3 内部接口
 > 内部接口供微服务之间调用，需在请求头中携带 `X-Internal-Token`，默认值可在配置中覆盖。

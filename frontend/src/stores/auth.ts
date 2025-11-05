@@ -7,15 +7,18 @@ import {
   registerCustomer,
   registerVendor,
   fetchCurrentUser,
+  refreshAuthToken,
   type LoginPayload,
   type RegisterPayload,
   type AuthSession
 } from '../services/authService';
 
 const TOKEN_KEY = 'flexlease_token';
+const REFRESH_TOKEN_KEY = 'flexlease_refresh_token';
 
 export const useAuthStore = defineStore('auth', () => {
   const token = ref<string>(localStorage.getItem(TOKEN_KEY) ?? '');
+  const refreshToken = ref<string>(localStorage.getItem(REFRESH_TOKEN_KEY) ?? '');
   const user = ref<AuthSession['user'] | null>(null);
   const initializing = ref(true);
   const loading = ref(false);
@@ -26,15 +29,35 @@ export const useAuthStore = defineStore('auth', () => {
   const roles = computed(() => new Set(user.value?.roles ?? []));
   const vendorId = computed(() => user.value?.vendorId ?? null);
 
+  const applySession = (session: AuthSession) => {
+    token.value = session.accessToken;
+    refreshToken.value = session.refreshToken;
+    localStorage.setItem(TOKEN_KEY, session.accessToken);
+    localStorage.setItem(REFRESH_TOKEN_KEY, session.refreshToken);
+  };
+
   const clearSession = () => {
     token.value = '';
+    refreshToken.value = '';
     user.value = null;
     error.value = null;
     localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(REFRESH_TOKEN_KEY);
   };
 
   configureHttpAuth({
     getToken: () => (token.value ? token.value : null),
+    getRefreshToken: () => (refreshToken.value ? refreshToken.value : null),
+    refreshTokens: async (currentRefreshToken) => {
+      try {
+        const session = await refreshAuthToken(currentRefreshToken);
+        applySession(session);
+        return session.accessToken;
+      } catch (err) {
+        clearSession();
+        throw err;
+      }
+    },
     onUnauthorized: () => {
       const shouldNotify = token.value && bootstrapCompleted.value;
       if (shouldNotify) {
@@ -66,8 +89,7 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = null;
     try {
       const session = await loginApi(payload);
-      token.value = session.accessToken;
-      localStorage.setItem(TOKEN_KEY, session.accessToken);
+      applySession(session);
       user.value = await fetchCurrentUser();
       message.success('登录成功');
     } catch (err) {
@@ -106,10 +128,20 @@ export const useAuthStore = defineStore('auth', () => {
     message.success('已退出登录');
   };
 
+  const refreshSession = async () => {
+    if (!refreshToken.value) {
+      throw new Error('当前没有可用的刷新令牌');
+    }
+    const session = await refreshAuthToken(refreshToken.value);
+    applySession(session);
+    return session.accessToken;
+  };
+
   const hasRole = (role: string) => roles.value.has(role);
 
   return {
     token,
+    refreshToken,
     user,
     initializing,
     bootstrapCompleted,
@@ -123,6 +155,7 @@ export const useAuthStore = defineStore('auth', () => {
     login,
     register,
     logout,
-    clearSession
+    clearSession,
+    refreshSession
   };
 });

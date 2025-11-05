@@ -64,6 +64,8 @@ class AuthServiceApplicationTests {
         JsonNode tokenNode = objectMapper.readTree(loginResult.getResponse().getContentAsString());
         String token = tokenNode.at("/data/accessToken").asText();
         assertThat(token).isNotBlank();
+        String refreshToken = tokenNode.at("/data/refreshToken").asText();
+        assertThat(refreshToken).isNotBlank();
 
         mockMvc.perform(get("/api/v1/auth/me")
                         .header("Authorization", "Bearer " + token))
@@ -88,13 +90,23 @@ class AuthServiceApplicationTests {
         String userId = registerNode.at("/data/id").asText();
         assertThat(userId).isNotBlank();
 
-        mockMvc.perform(post("/api/v1/auth/token")
+        MvcResult firstLogin = mockMvc.perform(post("/api/v1/auth/token")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(java.util.Map.of(
                                 "username", username,
                                 "password", password
                         ))))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode firstLoginNode = objectMapper.readTree(firstLogin.getResponse().getContentAsString());
+        String firstAccessToken = firstLoginNode.at("/data/accessToken").asText();
+        assertThat(firstAccessToken).isNotBlank();
+        assertThat(firstLoginNode.at("/data/refreshToken").asText()).isNotBlank();
+
+        mockMvc.perform(get("/api/v1/auth/me")
+                        .header("Authorization", "Bearer " + firstAccessToken))
+                .andExpect(status().isOk());
 
         mockMvc.perform(patch("/api/v1/internal/users/{id}/status", userId)
                         .header("X-Internal-Token", "flexlease-internal-secret")
@@ -137,6 +149,8 @@ class AuthServiceApplicationTests {
         JsonNode loginNode = objectMapper.readTree(loginResult.getResponse().getContentAsString());
         String oldToken = loginNode.at("/data/accessToken").asText();
         assertThat(oldToken).isNotBlank();
+        String oldRefreshToken = loginNode.at("/data/refreshToken").asText();
+        assertThat(oldRefreshToken).isNotBlank();
 
         mockMvc.perform(post("/api/v1/auth/password/reset")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -159,11 +173,13 @@ class AuthServiceApplicationTests {
         JsonNode newLoginNode = objectMapper.readTree(newLoginResult.getResponse().getContentAsString());
         String freshToken = newLoginNode.at("/data/accessToken").asText();
         assertThat(freshToken).isNotBlank();
+        String refreshToken = newLoginNode.at("/data/refreshToken").asText();
+        assertThat(refreshToken).isNotBlank();
 
         MvcResult refreshResult = mockMvc.perform(post("/api/v1/auth/token/refresh")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(java.util.Map.of(
-                                "refreshToken", freshToken
+                                "refreshToken", refreshToken
                         ))))
                 .andExpect(status().isOk())
                 .andReturn();
@@ -171,6 +187,7 @@ class AuthServiceApplicationTests {
         JsonNode refreshNode = objectMapper.readTree(refreshResult.getResponse().getContentAsString());
         String refreshedToken = refreshNode.at("/data/accessToken").asText();
         assertThat(refreshedToken).isNotBlank();
+        assertThat(refreshNode.at("/data/refreshToken").asText()).isNotBlank();
 
         mockMvc.perform(post("/api/v1/auth/logout"))
                 .andExpect(status().isOk());

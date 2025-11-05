@@ -3,11 +3,15 @@ import type { InternalAxiosRequestConfig, AxiosResponse } from 'axios';
 
 type AuthHandlers = {
   getToken: () => string | null;
+  getRefreshToken?: () => string | null;
+  refreshTokens?: (refreshToken: string) => Promise<string | null>;
   onUnauthorized: () => void;
 };
 
 let authHandlers: AuthHandlers = {
   getToken: () => null,
+  getRefreshToken: () => null,
+  refreshTokens: async () => null,
   onUnauthorized: () => undefined
 };
 
@@ -18,6 +22,8 @@ export const configureHttpAuth = (handlers: AuthHandlers) => {
 const http = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL ?? '/api/v1'
 });
+
+let refreshPromise: Promise<string | null> | null = null;
 
 http.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token = authHandlers.getToken();
@@ -33,10 +39,52 @@ http.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 
 http.interceptors.response.use(
   (response: AxiosResponse) => response,
-  (error: AxiosError) => {
-    if (error.response?.status === 401) {
+  async (error: AxiosError) => {
+    const { response } = error;
+    const originalRequest = error.config as (InternalAxiosRequestConfig & {
+      _retry?: boolean;
+      _skipAuthRefresh?: boolean;
+    }) | undefined;
+
+    if (response?.status === 401 && originalRequest && !originalRequest._skipAuthRefresh) {
+      if (originalRequest._retry) {
+        authHandlers.onUnauthorized();
+        return Promise.reject(error);
+      }
+
+      const currentRefreshToken = authHandlers.getRefreshToken?.() ?? null;
+      const refreshTokens = authHandlers.refreshTokens;
+
+      if (!currentRefreshToken || !refreshTokens) {
+        authHandlers.onUnauthorized();
+        return Promise.reject(error);
+      }
+
+      if (!refreshPromise) {
+        refreshPromise = refreshTokens(currentRefreshToken).finally(() => {
+          refreshPromise = null;
+        });
+      }
+
+      try {
+        const newAccessToken = await refreshPromise;
+        if (newAccessToken) {
+          originalRequest._retry = true;
+          const headers = originalRequest.headers instanceof AxiosHeaders
+            ? originalRequest.headers
+            : new AxiosHeaders(originalRequest.headers);
+          headers.set('Authorization', `Bearer ${newAccessToken}`);
+          originalRequest.headers = headers;
+          return http(originalRequest);
+        }
+      } catch (refreshError) {
+        authHandlers.onUnauthorized();
+        return Promise.reject(refreshError);
+      }
+
       authHandlers.onUnauthorized();
     }
+
     return Promise.reject(error);
   }
 );

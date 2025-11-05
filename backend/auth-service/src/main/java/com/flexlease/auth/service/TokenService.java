@@ -1,6 +1,7 @@
 package com.flexlease.auth.service;
 
 import com.flexlease.auth.config.JwtTokenProvider;
+import com.flexlease.auth.config.SecurityProperties;
 import com.flexlease.common.exception.BusinessException;
 import com.flexlease.common.exception.ErrorCode;
 import io.jsonwebtoken.Claims;
@@ -10,7 +11,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.stereotype.Service;
@@ -18,28 +18,48 @@ import org.springframework.stereotype.Service;
 @Service
 public class TokenService {
 
+    private static final String TOKEN_TYPE_ACCESS = "ACCESS";
+    private static final String TOKEN_TYPE_REFRESH = "REFRESH";
+
     private final JwtTokenProvider tokenProvider;
     private final UserDetailsService userDetailsService;
+    private final SecurityProperties securityProperties;
 
-    public TokenService(JwtTokenProvider tokenProvider, UserDetailsService userDetailsService) {
+    public TokenService(JwtTokenProvider tokenProvider,
+                        UserDetailsService userDetailsService,
+                        SecurityProperties securityProperties) {
         this.tokenProvider = tokenProvider;
         this.userDetailsService = userDetailsService;
+        this.securityProperties = securityProperties;
     }
 
-    public String generateToken(UserPrincipal principal) {
-        String rolesCsv = principal.getAuthorities().stream()
-            .map(grantedAuthority -> {
-                String authority = grantedAuthority.getAuthority();
-                return authority != null && authority.startsWith("ROLE_")
-                    ? authority.substring(5)
-                    : authority;
-            })
-            .filter(authority -> authority != null && !authority.isBlank())
-            .collect(Collectors.joining(","));
-        return tokenProvider.generateToken(principal.getUserId(), principal.getVendorId(), principal.getUsername(), rolesCsv);
+    public TokenBundle generateTokens(UserPrincipal principal) {
+        String rolesCsv = toRolesCsv(principal);
+        String accessToken = tokenProvider.generateAccessToken(
+                principal.getUserId(),
+                principal.getVendorId(),
+                principal.getUsername(),
+                rolesCsv
+        );
+        String refreshToken = tokenProvider.generateRefreshToken(
+                principal.getUserId(),
+                principal.getVendorId(),
+                principal.getUsername(),
+                rolesCsv
+        );
+        return new TokenBundle(
+                accessToken,
+                securityProperties.getAccessTokenTtlSeconds(),
+                refreshToken,
+                securityProperties.getRefreshTokenTtlSeconds()
+        );
     }
 
     public Optional<UsernamePasswordAuthenticationToken> buildAuthentication(Claims claims, String token) {
+        String tokenType = claims.get("tokenType", String.class);
+        if (tokenType != null && !TOKEN_TYPE_ACCESS.equalsIgnoreCase(tokenType)) {
+            return Optional.empty();
+        }
         String username = claims.get("username", String.class);
         if (username == null) {
             return Optional.empty();
@@ -61,9 +81,13 @@ public class TokenService {
                 .collect(Collectors.toSet());
     }
 
-    public String refreshToken(String refreshToken) {
+    public TokenBundle refreshTokens(String refreshToken) {
         Claims claims = tokenProvider.parseClaims(refreshToken)
                 .orElseThrow(() -> new BusinessException(ErrorCode.UNAUTHORIZED, "刷新令牌无效或已过期"));
+        String tokenType = claims.get("tokenType", String.class);
+        if (tokenType == null || !TOKEN_TYPE_REFRESH.equalsIgnoreCase(tokenType)) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "刷新令牌类型无效");
+        }
         String username = claims.get("username", String.class);
         if (username == null || username.isBlank()) {
             throw new BusinessException(ErrorCode.UNAUTHORIZED, "刷新令牌缺少用户名信息");
@@ -72,6 +96,24 @@ public class TokenService {
         if (!(userDetails instanceof UserPrincipal userPrincipal)) {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR, "无法刷新令牌，用户信息异常");
         }
-        return generateToken(userPrincipal);
+        return generateTokens(userPrincipal);
+    }
+
+    private String toRolesCsv(UserPrincipal principal) {
+        return principal.getAuthorities().stream()
+                .map(grantedAuthority -> {
+                    String authority = grantedAuthority.getAuthority();
+                    return authority != null && authority.startsWith("ROLE_")
+                            ? authority.substring(5)
+                            : authority;
+                })
+                .filter(authority -> authority != null && !authority.isBlank())
+                .collect(Collectors.joining(","));
+    }
+
+    public record TokenBundle(String accessToken,
+                              long accessTokenTtlSeconds,
+                              String refreshToken,
+                              long refreshTokenTtlSeconds) {
     }
 }

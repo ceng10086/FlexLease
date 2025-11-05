@@ -21,6 +21,8 @@ export type RegisterPayload = {
 export type AuthSession = {
   accessToken: string;
   expiresInSeconds?: number;
+  refreshToken: string;
+  refreshExpiresInSeconds?: number;
   user?: AuthUser;
 };
 
@@ -35,6 +37,22 @@ export const login = async (payload: LoginPayload): Promise<AuthSession> => {
   const session = response.data?.data;
   if (!session?.accessToken) {
     throw new Error('登录失败，请检查账号或稍后再试');
+  }
+  if (!session.refreshToken) {
+    throw new Error('登录返回缺少刷新令牌');
+  }
+  return session;
+};
+
+export const refreshAuthToken = async (token: string): Promise<AuthSession> => {
+  const response = await http.post<ApiResponse<AuthSession>>(
+    '/auth/token/refresh',
+    { refreshToken: token },
+    { _skipAuthRefresh: true } as any
+  );
+  const session = response.data?.data;
+  if (!session?.accessToken || !session.refreshToken) {
+    throw new Error('刷新登录状态失败');
   }
   return session;
 };

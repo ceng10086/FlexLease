@@ -7,6 +7,7 @@ public class SecurityProperties {
 
         private String secret = "flexlease-default-secret-please-change";
         private long accessTokenTtlSeconds = 3600;
+        private long refreshTokenTtlSeconds = 86400;
         private String issuer = "flexlease-auth-service";
         private String internalAccessToken = "flexlease-internal-secret";
 
@@ -27,6 +28,16 @@ public class SecurityProperties {
         public void setAccessTokenTtlSeconds(long accessTokenTtlSeconds) {
                 if (accessTokenTtlSeconds > 0) {
                         this.accessTokenTtlSeconds = accessTokenTtlSeconds;
+                }
+        }
+
+        public long getRefreshTokenTtlSeconds() {
+                return refreshTokenTtlSeconds;
+        }
+
+        public void setRefreshTokenTtlSeconds(long refreshTokenTtlSeconds) {
+                if (refreshTokenTtlSeconds > 0) {
+                        this.refreshTokenTtlSeconds = refreshTokenTtlSeconds;
                 }
         }
 
