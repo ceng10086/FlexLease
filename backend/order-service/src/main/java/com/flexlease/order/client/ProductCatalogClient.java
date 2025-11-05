@@ -4,10 +4,12 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.flexlease.common.dto.ApiResponse;
 import com.flexlease.common.exception.BusinessException;
 import com.flexlease.common.exception.ErrorCode;
+import com.flexlease.common.security.JwtAuthProperties;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
@@ -24,18 +26,24 @@ public class ProductCatalogClient {
 
     private final RestTemplate restTemplate;
     private final String baseUrl;
+    private final String internalToken;
 
-    public ProductCatalogClient(RestTemplate restTemplate, ProductServiceProperties properties) {
+    public ProductCatalogClient(RestTemplate restTemplate, ProductServiceProperties properties, JwtAuthProperties jwtAuthProperties) {
         this.restTemplate = restTemplate;
         this.baseUrl = properties.getBaseUrl();
+        this.internalToken = jwtAuthProperties.getInternalAccessToken();
     }
 
     public CatalogProductView getProduct(UUID productId) {
         try {
+            HttpHeaders headers = new HttpHeaders();
+            if (internalToken != null && !internalToken.isBlank()) {
+                headers.set("X-Internal-Token", internalToken);
+            }
             ResponseEntity<ApiResponse<CatalogProductView>> response = restTemplate.exchange(
                     baseUrl + "/catalog/products/{productId}",
                     HttpMethod.GET,
-                    HttpEntity.EMPTY,
+                    new HttpEntity<>(headers),
                     RESPONSE_TYPE,
                     productId
             );

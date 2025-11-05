@@ -3,13 +3,16 @@ package com.flexlease.order.client;
 import com.flexlease.common.dto.ApiResponse;
 import com.flexlease.common.exception.BusinessException;
 import com.flexlease.common.exception.ErrorCode;
+import com.flexlease.common.security.JwtAuthProperties;
 import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
@@ -23,24 +26,27 @@ public class PaymentClient {
             new ParameterizedTypeReference<>() {
             };
 
-        private static final ParameterizedTypeReference<ApiResponse<RefundTransactionRecord>> REFUND_RESPONSE_TYPE =
+    private static final ParameterizedTypeReference<ApiResponse<RefundTransactionRecord>> REFUND_RESPONSE_TYPE =
             new ParameterizedTypeReference<>() {
             };
 
     private final RestTemplate restTemplate;
     private final String baseUrl;
+    private final String internalToken;
 
-    public PaymentClient(RestTemplate restTemplate, PaymentServiceProperties properties) {
+    public PaymentClient(RestTemplate restTemplate, PaymentServiceProperties properties, JwtAuthProperties jwtAuthProperties) {
         this.restTemplate = restTemplate;
         this.baseUrl = properties.getBaseUrl();
+        this.internalToken = jwtAuthProperties.getInternalAccessToken();
     }
 
     public PaymentTransactionView loadTransaction(UUID transactionId) {
         try {
+            HttpHeaders headers = buildInternalHeaders();
             ResponseEntity<ApiResponse<PaymentTransactionView>> response = restTemplate.exchange(
                     baseUrl + "/payments/{transactionId}",
                     HttpMethod.GET,
-                    null,
+                    new HttpEntity<>(headers),
                     PAYMENT_RESPONSE_TYPE,
                     transactionId
             );
@@ -66,10 +72,12 @@ public class PaymentClient {
             payload.put("reason", reason);
         }
         try {
+            HttpHeaders headers = buildInternalHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
             ResponseEntity<ApiResponse<RefundTransactionRecord>> response = restTemplate.exchange(
-                    baseUrl + "/payments/{transactionId}/refund",
+                    baseUrl + "/internal/payments/{transactionId}/refund",
                     HttpMethod.POST,
-                    new HttpEntity<>(payload),
+                    new HttpEntity<>(payload, headers),
                     REFUND_RESPONSE_TYPE,
                     transactionId
             );
@@ -89,5 +97,13 @@ public class PaymentClient {
     }
 
     public record RefundTransactionRecord(UUID id, BigDecimal amount) {
+    }
+
+    private HttpHeaders buildInternalHeaders() {
+        HttpHeaders headers = new HttpHeaders();
+        if (internalToken != null && !internalToken.isBlank()) {
+            headers.set("X-Internal-Token", internalToken);
+        }
+        return headers;
     }
 }

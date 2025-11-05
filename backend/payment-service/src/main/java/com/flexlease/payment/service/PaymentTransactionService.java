@@ -137,7 +137,7 @@ public class PaymentTransactionService {
 
     public RefundTransactionResponse createRefund(UUID transactionId, PaymentRefundRequest request) {
         SecurityUtils.getCurrentPrincipal().ifPresent(principal -> {
-            if (!principal.hasRole("ADMIN")) {
+            if (!principal.hasRole("ADMIN") && !principal.hasRole("INTERNAL")) {
                 throw new BusinessException(ErrorCode.FORBIDDEN, "当前身份无权发起退款");
             }
         });
