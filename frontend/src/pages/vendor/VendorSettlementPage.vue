@@ -50,7 +50,7 @@
 </template>
 
 <script lang="ts" setup>
-import { reactive, ref } from 'vue';
+import { computed, reactive, ref } from 'vue';
 import { message } from 'ant-design-vue';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useAuthStore } from '../../stores/auth';
@@ -59,6 +59,7 @@ import { listSettlements, type PaymentSettlementResponse } from '../../services/
 const auth = useAuthStore();
 const loading = ref(false);
 const records = ref<PaymentSettlementResponse[]>([]);
+const currentVendorId = computed(() => auth.vendorId ?? auth.user?.id ?? null);
 
 const filters = reactive<{ from?: Dayjs; to?: Dayjs }>({});
 
@@ -66,14 +67,14 @@ const formatCurrency = (value: number) => value.toFixed(2);
 const formatDate = (value: string) => new Date(value).toLocaleString();
 
 const loadSettlements = async () => {
-  if (!auth.user?.id) {
+  if (!currentVendorId.value) {
     message.error('未获取到厂商账号');
     return;
   }
   loading.value = true;
   try {
     records.value = await listSettlements({
-      vendorId: auth.user.id,
+      vendorId: currentVendorId.value,
       from: filters.from ? dayjs(filters.from).startOf('day').toISOString() : undefined,
       to: filters.to ? dayjs(filters.to).endOf('day').toISOString() : undefined
     });

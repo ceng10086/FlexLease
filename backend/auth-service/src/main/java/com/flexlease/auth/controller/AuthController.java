@@ -98,8 +98,15 @@ public class AuthController {
                     .body(ApiResponse.failure(ErrorCode.UNAUTHORIZED.code(), "令牌无效"));
         }
         Set<String> roles = tokenService.extractRoles(claims.get());
+        java.util.UUID userId = java.util.UUID.fromString(claims.get().getSubject());
+        String vendorIdRaw = claims.get().get("vendorId", String.class);
+        java.util.UUID vendorId = null;
+        if (vendorIdRaw != null && !vendorIdRaw.isBlank()) {
+            vendorId = java.util.UUID.fromString(vendorIdRaw);
+        }
         UserSummary summary = new UserSummary(
-                java.util.UUID.fromString(claims.get().getSubject()),
+                userId,
+                vendorId,
                 userDetails.getUsername(),
                 roles,
                 null
@@ -108,6 +115,6 @@ public class AuthController {
     }
 
     private UserSummary toSummary(UserAccount account, Set<String> roles) {
-        return new UserSummary(account.getId(), account.getUsername(), roles, account.getLastLoginAt());
+        return new UserSummary(account.getId(), account.getVendorId(), account.getUsername(), roles, account.getLastLoginAt());
     }
 }

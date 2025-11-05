@@ -52,6 +52,6 @@ public class CustomUserDetailsService implements UserDetailsService {
             .map(Role::getCode)
             .map(code -> new SimpleGrantedAuthority("ROLE_" + code))
             .collect(Collectors.toSet());
-        return new UserPrincipal(account.getId(), account.getUsername(), account.getPasswordHash(), true, authorities);
+        return new UserPrincipal(account.getId(), account.getVendorId(), account.getUsername(), account.getPasswordHash(), true, authorities);
     }
 }

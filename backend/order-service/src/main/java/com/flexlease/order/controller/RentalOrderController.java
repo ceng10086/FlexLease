@@ -97,9 +97,9 @@ public class RentalOrderController {
             effectiveUserId = userId;
             effectiveVendorId = vendorId;
         } else if (principal.hasRole("VENDOR")) {
-            UUID currentVendorId = principal.userId();
+            UUID currentVendorId = principal.vendorId();
             if (currentVendorId == null) {
-                throw new BusinessException(ErrorCode.UNAUTHORIZED, "当前身份缺少用户标识");
+                throw new BusinessException(ErrorCode.UNAUTHORIZED, "当前身份缺少厂商标识");
             }
             if (vendorId != null && !vendorId.equals(currentVendorId)) {
                 throw new BusinessException(ErrorCode.FORBIDDEN, "禁止查看其他厂商的订单");

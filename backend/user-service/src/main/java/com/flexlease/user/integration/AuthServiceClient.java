@@ -52,4 +52,19 @@ public class AuthServiceClient {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR, "更新账号状态失败，请稍后重试");
         }
     }
+
+    public void assignVendor(UUID userId, UUID vendorId) {
+        try {
+            restClient.patch()
+                    .uri("/api/v1/internal/users/{id}/vendor", userId)
+                    .header("X-Internal-Token", properties.getInternalToken())
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(Map.of("vendorId", vendorId))
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (RestClientException ex) {
+            log.error("Failed to associate account {} with vendor {}", userId, vendorId, ex);
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "同步厂商账号映射失败，请稍后重试");
+        }
+    }
 }

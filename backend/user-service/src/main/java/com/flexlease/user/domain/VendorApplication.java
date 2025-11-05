@@ -200,4 +200,27 @@ public class VendorApplication {
         this.reviewRemark = remark;
         this.reviewedAt = OffsetDateTime.now();
     }
+
+    public void resubmit(String companyName,
+                         String unifiedSocialCode,
+                         String contactName,
+                         String contactPhone,
+                         String contactEmail,
+                         String province,
+                         String city,
+                         String address) {
+        this.companyName = companyName;
+        this.unifiedSocialCode = unifiedSocialCode;
+        this.contactName = contactName;
+        this.contactPhone = contactPhone;
+        this.contactEmail = contactEmail;
+        this.province = province;
+        this.city = city;
+        this.address = address;
+        this.status = VendorApplicationStatus.SUBMITTED;
+        this.submittedAt = OffsetDateTime.now();
+        this.reviewedAt = null;
+        this.reviewedBy = null;
+        this.reviewRemark = null;
+    }
 }

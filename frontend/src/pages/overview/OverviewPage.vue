@@ -135,6 +135,7 @@ const state = reactive({
 const isVendor = computed(() => auth.hasRole('VENDOR'));
 const isAdmin = computed(() => auth.hasRole('ADMIN'));
 const isCustomer = computed(() => auth.hasRole('USER'));
+const currentVendorId = computed(() => auth.vendorId ?? auth.user?.id ?? null);
 
 const statusEntries = computed(() => {
   if (!state.metrics?.ordersByStatus) {
@@ -197,12 +198,12 @@ const loadMetrics = async () => {
 };
 
 const loadVendorMetrics = async () => {
-  if (!isVendor.value || !auth.user?.id) {
+  if (!isVendor.value || !currentVendorId.value) {
     return;
   }
   state.loadingVendorMetrics = true;
   try {
-    state.vendorMetrics = await fetchVendorMetrics(auth.user.id);
+    state.vendorMetrics = await fetchVendorMetrics(currentVendorId.value);
   } catch (error) {
     console.error('Failed to load vendor metrics', error);
   } finally {

@@ -83,4 +83,14 @@ public class UserAccountService {
         account.updateStatus(status);
         return account;
     }
+
+    @Transactional
+    public void associateVendor(UUID userId, UUID vendorId) {
+        if (vendorId == null) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "厂商标识不能为空");
+        }
+        UserAccount account = userAccountRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "账号不存在"));
+        account.updateVendorId(vendorId);
+    }
 }

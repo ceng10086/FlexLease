@@ -3,6 +3,7 @@ package com.flexlease.auth.controller;
 import com.flexlease.auth.config.SecurityProperties;
 import com.flexlease.auth.domain.UserStatus;
 import com.flexlease.auth.dto.UpdateUserStatusRequest;
+import com.flexlease.auth.dto.UpdateUserVendorRequest;
 import com.flexlease.auth.service.UserAccountService;
 import com.flexlease.common.dto.ApiResponse;
 import com.flexlease.common.exception.BusinessException;
@@ -10,7 +11,6 @@ import com.flexlease.common.exception.ErrorCode;
 import jakarta.validation.Valid;
 import java.util.Locale;
 import java.util.UUID;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -38,6 +38,15 @@ public class InternalUserController {
         validateInternalToken(internalToken);
         UserStatus status = parseStatus(request.status());
         userAccountService.updateStatus(userId, status);
+        return ResponseEntity.ok(ApiResponse.success());
+    }
+
+    @PatchMapping("/{id}/vendor")
+    public ResponseEntity<ApiResponse<Void>> updateVendor(@PathVariable("id") UUID userId,
+                                                          @RequestHeader(value = "X-Internal-Token", required = false) String internalToken,
+                                                          @Valid @RequestBody UpdateUserVendorRequest request) {
+        validateInternalToken(internalToken);
+        userAccountService.associateVendor(userId, request.vendorId());
         return ResponseEntity.ok(ApiResponse.success());
     }
 

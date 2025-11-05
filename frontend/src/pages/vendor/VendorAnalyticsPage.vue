@@ -67,6 +67,7 @@ import { fetchVendorMetrics, type VendorMetrics } from '../../services/analytics
 const auth = useAuthStore();
 const loading = ref(false);
 const metrics = ref<VendorMetrics | null>(null);
+const currentVendorId = computed(() => auth.vendorId ?? auth.user?.id ?? null);
 
 const formatCurrency = (value: number) =>
   value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -90,13 +91,13 @@ const completionPercent = computed(() => {
 });
 
 const loadMetrics = async () => {
-  if (!auth.user?.id) {
+  if (!currentVendorId.value) {
     message.error('未获取到厂商账号');
     return;
   }
   loading.value = true;
   try {
-    metrics.value = await fetchVendorMetrics(auth.user.id);
+    metrics.value = await fetchVendorMetrics(currentVendorId.value);
   } catch (error) {
     console.error('加载厂商指标失败', error);
     message.error('加载指标失败，请稍后重试');

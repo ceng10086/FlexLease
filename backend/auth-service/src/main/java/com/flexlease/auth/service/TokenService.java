@@ -36,7 +36,7 @@ public class TokenService {
             })
             .filter(authority -> authority != null && !authority.isBlank())
             .collect(Collectors.joining(","));
-        return tokenProvider.generateToken(principal.getUserId(), principal.getUsername(), rolesCsv);
+        return tokenProvider.generateToken(principal.getUserId(), principal.getVendorId(), principal.getUsername(), rolesCsv);
     }
 
     public Optional<UsernamePasswordAuthenticationToken> buildAuthentication(Claims claims, String token) {

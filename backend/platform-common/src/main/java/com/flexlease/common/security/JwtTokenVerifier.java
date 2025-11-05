@@ -31,8 +31,13 @@ public class JwtTokenVerifier {
                     .getBody();
             UUID userId = UUID.fromString(claims.getSubject());
             String username = claims.get("username", String.class);
+            UUID vendorId = null;
+            Object vendorClaim = claims.get("vendorId");
+            if (vendorClaim instanceof String vendorString && !vendorString.isBlank()) {
+                vendorId = UUID.fromString(vendorString);
+            }
             Set<String> roles = parseRoles(claims.get("roles", String.class));
-            return Optional.of(new FlexleasePrincipal(userId, username, roles));
+            return Optional.of(new FlexleasePrincipal(userId, vendorId, username, roles));
         } catch (Exception ex) {
             return Optional.empty();
         }

@@ -2,6 +2,7 @@ import http from './http';
 
 export type AuthUser = {
   id: string;
+  vendorId?: string | null;
   username: string;
   roles: string[];
   lastLoginAt?: string | null;

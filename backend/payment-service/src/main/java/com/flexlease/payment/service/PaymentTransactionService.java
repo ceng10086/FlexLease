@@ -214,18 +214,22 @@ public class PaymentTransactionService {
         if (principal.hasRole("ADMIN") || principal.hasRole("INTERNAL")) {
             return;
         }
-        UUID principalId = principal.userId();
-        if (principalId == null) {
-            throw new BusinessException(ErrorCode.UNAUTHORIZED, "当前身份缺少用户标识");
-        }
         if (principal.hasRole("USER")) {
-            if (transaction.getUserId() == null || !transaction.getUserId().equals(principalId)) {
+            UUID principalUserId = principal.userId();
+            if (principalUserId == null) {
+                throw new BusinessException(ErrorCode.UNAUTHORIZED, "当前身份缺少用户标识");
+            }
+            if (transaction.getUserId() == null || !transaction.getUserId().equals(principalUserId)) {
                 throw new BusinessException(ErrorCode.FORBIDDEN, "无权查看该支付流水");
             }
             return;
         }
         if (principal.hasRole("VENDOR")) {
-            if (transaction.getVendorId() == null || !transaction.getVendorId().equals(principalId)) {
+            UUID currentVendorId = principal.vendorId();
+            if (currentVendorId == null) {
+                throw new BusinessException(ErrorCode.UNAUTHORIZED, "当前身份缺少厂商标识");
+            }
+            if (transaction.getVendorId() == null || !transaction.getVendorId().equals(currentVendorId)) {
                 throw new BusinessException(ErrorCode.FORBIDDEN, "无权查看该支付流水");
             }
             return;

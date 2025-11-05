@@ -38,7 +38,7 @@ public class AnalyticsController {
                 if (!principal.hasRole("VENDOR")) {
                     throw new BusinessException(ErrorCode.FORBIDDEN, "仅厂商可查看自身数据");
                 }
-                if (principal.userId() == null || !principal.userId().equals(vendorUuid)) {
+                if (principal.vendorId() == null || !principal.vendorId().equals(vendorUuid)) {
                     throw new BusinessException(ErrorCode.FORBIDDEN, "禁止查看其他厂商数据");
                 }
             }

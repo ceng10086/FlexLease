@@ -10,13 +10,15 @@ import org.springframework.security.core.userdetails.UserDetails;
 public class UserPrincipal implements UserDetails {
 
     private final UUID userId;
+    private final UUID vendorId;
     private final String username;
     private final String passwordHash;
     private final boolean enabled;
     private final Set<SimpleGrantedAuthority> authorities;
 
-    public UserPrincipal(UUID userId, String username, String passwordHash, boolean enabled, Set<SimpleGrantedAuthority> authorities) {
+    public UserPrincipal(UUID userId, UUID vendorId, String username, String passwordHash, boolean enabled, Set<SimpleGrantedAuthority> authorities) {
         this.userId = userId;
+        this.vendorId = vendorId;
         this.username = username;
         this.passwordHash = passwordHash;
         this.enabled = enabled;
@@ -25,6 +27,10 @@ public class UserPrincipal implements UserDetails {
 
     public UUID getUserId() {
         return userId;
+    }
+
+    public UUID getVendorId() {
+        return vendorId;
     }
 
     @Override

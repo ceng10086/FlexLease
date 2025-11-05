@@ -4,7 +4,7 @@ import java.util.Collections;
 import java.util.Set;
 import java.util.UUID;
 
-public record FlexleasePrincipal(UUID userId, String username, Set<String> roles) {
+public record FlexleasePrincipal(UUID userId, UUID vendorId, String username, Set<String> roles) {
 
     public Set<String> roles() {
         return roles == null ? Collections.emptySet() : Collections.unmodifiableSet(roles);

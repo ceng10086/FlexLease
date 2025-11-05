@@ -30,25 +30,9 @@ public class VendorApplicationService {
 
     @Transactional
     public VendorApplicationResponse submit(UUID ownerUserId, VendorApplicationRequest request) {
-        vendorApplicationRepository.findByOwnerUserId(ownerUserId).ifPresent(existing -> {
-            throw new BusinessException(ErrorCode.DUPLICATE_RESOURCE, "已提交厂商申请，请勿重复提交");
-        });
-        if (vendorApplicationRepository.existsByUnifiedSocialCode(request.unifiedSocialCode())) {
-            throw new BusinessException(ErrorCode.DUPLICATE_RESOURCE, "统一社会信用代码已存在");
-        }
-        VendorApplication application = VendorApplication.submit(
-                ownerUserId,
-                request.companyName(),
-                request.unifiedSocialCode(),
-                request.contactName(),
-                request.contactPhone(),
-                request.contactEmail(),
-                request.province(),
-                request.city(),
-                request.address()
-        );
-        VendorApplication saved = vendorApplicationRepository.save(application);
-        return toResponse(saved);
+        return vendorApplicationRepository.findByOwnerUserId(ownerUserId)
+                .map(existing -> handleExistingApplication(existing, request))
+                .orElseGet(() -> createNewApplication(ownerUserId, request));
     }
 
     @Transactional(readOnly = true)
@@ -82,7 +66,8 @@ public class VendorApplicationService {
         }
         application.approve(reviewerId, remark);
         authServiceClient.activateAccount(application.getOwnerUserId());
-        vendorService.ensureVendorForApplication(application);
+        var vendor = vendorService.ensureVendorForApplication(application);
+        authServiceClient.assignVendor(application.getOwnerUserId(), vendor.id());
         return toResponse(application);
     }
 
@@ -115,5 +100,49 @@ public class VendorApplicationService {
                 application.getReviewedAt(),
                 application.getReviewRemark()
         );
+    }
+
+    private VendorApplicationResponse handleExistingApplication(VendorApplication existing, VendorApplicationRequest request) {
+        if (existing.getStatus() == VendorApplicationStatus.SUBMITTED) {
+            throw new BusinessException(ErrorCode.DUPLICATE_RESOURCE, "申请正在审核中，请勿重复提交");
+        }
+        if (existing.getStatus() == VendorApplicationStatus.APPROVED) {
+            throw new BusinessException(ErrorCode.DUPLICATE_RESOURCE, "申请已通过，无需重复提交");
+        }
+        boolean codeChanged = request.unifiedSocialCode() != null
+                && !request.unifiedSocialCode().equalsIgnoreCase(existing.getUnifiedSocialCode());
+        if (codeChanged && vendorApplicationRepository.existsByUnifiedSocialCode(request.unifiedSocialCode())) {
+            throw new BusinessException(ErrorCode.DUPLICATE_RESOURCE, "统一社会信用代码已存在");
+        }
+        existing.resubmit(
+                request.companyName(),
+                request.unifiedSocialCode(),
+                request.contactName(),
+                request.contactPhone(),
+                request.contactEmail(),
+                request.province(),
+                request.city(),
+                request.address()
+        );
+        return toResponse(existing);
+    }
+
+    private VendorApplicationResponse createNewApplication(UUID ownerUserId, VendorApplicationRequest request) {
+        if (vendorApplicationRepository.existsByUnifiedSocialCode(request.unifiedSocialCode())) {
+            throw new BusinessException(ErrorCode.DUPLICATE_RESOURCE, "统一社会信用代码已存在");
+        }
+        VendorApplication application = VendorApplication.submit(
+                ownerUserId,
+                request.companyName(),
+                request.unifiedSocialCode(),
+                request.contactName(),
+                request.contactPhone(),
+                request.contactEmail(),
+                request.province(),
+                request.city(),
+                request.address()
+        );
+        VendorApplication saved = vendorApplicationRepository.save(application);
+        return toResponse(saved);
     }
 }

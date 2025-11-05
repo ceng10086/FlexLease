@@ -131,8 +131,11 @@ class RentalOrderServiceIntegrationTest {
         assertThat(paid.status()).isEqualTo(OrderStatus.AWAITING_SHIPMENT);
         assertThat(paid.paymentTransactionId()).isEqualTo(transactionId);
 
-        RentalOrderResponse shipped = rentalOrderService.shipOrder(created.id(),
-                new OrderShipmentRequest(vendorId, "SF", "SF123456789"));
+        RentalOrderResponse shipped;
+        try (SecurityContextHandle ignored = withPrincipal(UUID.randomUUID(), vendorId, "vendor-%s".formatted(vendorId), "VENDOR")) {
+            shipped = rentalOrderService.shipOrder(created.id(),
+                    new OrderShipmentRequest(vendorId, "SF", "SF123456789"));
+        }
         assertThat(shipped.status()).isEqualTo(OrderStatus.IN_LEASE);
         assertThat(shipped.shippingCarrier()).isEqualTo("SF");
 
@@ -145,8 +148,11 @@ class RentalOrderServiceIntegrationTest {
         assertThat(extensionRequested.extensionCount()).isZero();
         assertThat(extensionRequested.extensions()).hasSize(1);
 
-        RentalOrderResponse extensionApproved = rentalOrderService.decideExtension(created.id(),
-                new OrderExtensionDecisionRequest(vendorId, true, "同意续租"));
+        RentalOrderResponse extensionApproved;
+        try (SecurityContextHandle ignored = withPrincipal(UUID.randomUUID(), vendorId, "vendor-%s".formatted(vendorId), "VENDOR")) {
+            extensionApproved = rentalOrderService.decideExtension(created.id(),
+                    new OrderExtensionDecisionRequest(vendorId, true, "同意续租"));
+        }
         assertThat(extensionApproved.extensionCount()).isEqualTo(1);
         assertThat(extensionApproved.extensions())
                 .isNotEmpty();
@@ -158,8 +164,11 @@ class RentalOrderServiceIntegrationTest {
                 new OrderReturnApplyRequest(userId, "不再需要", "SF", "SF987654321"));
         assertThat(returnRequested.status()).isEqualTo(OrderStatus.RETURN_REQUESTED);
 
-        RentalOrderResponse returnApproved = rentalOrderService.decideReturn(created.id(),
-                new OrderReturnDecisionRequest(vendorId, true, "已验收"));
+        RentalOrderResponse returnApproved;
+        try (SecurityContextHandle ignored = withPrincipal(UUID.randomUUID(), vendorId, "vendor-%s".formatted(vendorId), "VENDOR")) {
+            returnApproved = rentalOrderService.decideReturn(created.id(),
+                    new OrderReturnDecisionRequest(vendorId, true, "已验收"));
+        }
         assertThat(returnApproved.status()).isEqualTo(OrderStatus.COMPLETED);
         assertThat(returnApproved.returns())
                 .isNotEmpty();
@@ -231,7 +240,7 @@ class RentalOrderServiceIntegrationTest {
         rentalOrderService.confirmPayment(created.id(), new OrderPaymentRequest(userId, transactionId.toString(), created.totalAmount()));
 
                 UUID adminId = UUID.randomUUID();
-                FlexleasePrincipal principal = new FlexleasePrincipal(adminId, "admin-user", Set.of("ADMIN"));
+                FlexleasePrincipal principal = new FlexleasePrincipal(adminId, null, "admin-user", Set.of("ADMIN"));
                 SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(principal, null));
                 try {
                         RentalOrderResponse forced = rentalOrderService.forceClose(created.id(), "库存异常");
@@ -390,8 +399,12 @@ class RentalOrderServiceIntegrationTest {
     }
 
         private SecurityContextHandle withPrincipal(UUID userId, String username, String... roles) {
+                return withPrincipal(userId, null, username, roles);
+        }
+
+        private SecurityContextHandle withPrincipal(UUID userId, UUID vendorId, String username, String... roles) {
                 Set<String> roleSet = roles.length == 0 ? Set.of() : Set.copyOf(List.of(roles));
-                FlexleasePrincipal principal = new FlexleasePrincipal(userId, username, roleSet);
+                FlexleasePrincipal principal = new FlexleasePrincipal(userId, vendorId, username, roleSet);
                 SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(principal, null));
                 return new SecurityContextHandle();
         }

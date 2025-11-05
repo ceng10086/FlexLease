@@ -32,6 +32,9 @@ public class UserAccount {
     @Column(name = "last_login_at")
     private OffsetDateTime lastLoginAt;
 
+    @Column(name = "vendor_id")
+    private UUID vendorId;
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
@@ -93,6 +96,10 @@ public class UserAccount {
         return updatedAt;
     }
 
+    public UUID getVendorId() {
+        return vendorId;
+    }
+
     public void updateLastLoginAt(OffsetDateTime lastLoginAt) {
         this.lastLoginAt = lastLoginAt;
     }
@@ -103,5 +110,9 @@ public class UserAccount {
 
     public void updateStatus(UserStatus status) {
         this.status = status;
+    }
+
+    public void updateVendorId(UUID vendorId) {
+        this.vendorId = vendorId;
     }
 }

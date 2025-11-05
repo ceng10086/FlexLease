@@ -47,7 +47,6 @@ import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -519,7 +518,8 @@ public class RentalOrderService {
         }
         UUID principalUserId = principal.userId();
         if (principal.hasRole("VENDOR")) {
-            if (principalUserId == null || !principalUserId.equals(order.getVendorId())) {
+            UUID currentVendorId = principal.vendorId();
+            if (currentVendorId == null || !currentVendorId.equals(order.getVendorId())) {
                 throw new BusinessException(ErrorCode.FORBIDDEN, "无权查看该订单");
             }
             return;
@@ -551,7 +551,11 @@ public class RentalOrderService {
         if (!principal.hasRole("VENDOR")) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "仅厂商可访问厂商订单");
         }
-        if (principal.userId() == null || !principal.userId().equals(vendorId)) {
+        UUID currentVendorId = principal.vendorId();
+        if (currentVendorId == null) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "当前身份缺少厂商标识");
+        }
+        if (!currentVendorId.equals(vendorId)) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "无权访问该厂商的订单");
         }
     }
@@ -579,17 +583,25 @@ public class RentalOrderService {
     }
 
     private void ensureVendor(RentalOrder order, UUID vendorId) {
-        Optional<FlexleasePrincipal> principal = SecurityUtils.getCurrentPrincipal();
-        principal.ifPresent(p -> {
-            if (!p.hasRole("VENDOR") && !p.hasRole("ADMIN")) {
-                throw new BusinessException(ErrorCode.FORBIDDEN, "当前身份不允许执行此操作");
-            }
-        });
-        if (principal.isPresent() || vendorId != null) {
-            UUID expectedVendorId = vendorId != null ? vendorId : order.getVendorId();
-            if (!order.getVendorId().equals(expectedVendorId)) {
+        FlexleasePrincipal principal = SecurityUtils.requirePrincipal();
+        if (principal.hasRole("ADMIN") || principal.hasRole("INTERNAL")) {
+            if (vendorId != null && !vendorId.equals(order.getVendorId())) {
                 throw new BusinessException(ErrorCode.FORBIDDEN, "厂商信息不匹配");
             }
+            return;
+        }
+        if (!principal.hasRole("VENDOR")) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "当前身份不允许执行此操作");
+        }
+        UUID currentVendorId = principal.vendorId();
+        if (currentVendorId == null) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "当前身份缺少厂商标识");
+        }
+        if (vendorId != null && !vendorId.equals(currentVendorId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "厂商信息不匹配");
+        }
+        if (!order.getVendorId().equals(currentVendorId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "无权操作该订单");
         }
     }
 

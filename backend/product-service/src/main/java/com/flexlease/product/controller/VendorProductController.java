@@ -167,10 +167,10 @@ public class VendorProductController {
         if (!principal.hasRole("VENDOR")) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "当前账号无权访问厂商资源");
         }
-        if (principal.userId() == null) {
-            throw new BusinessException(ErrorCode.UNAUTHORIZED, "当前身份缺少用户标识");
+        if (principal.vendorId() == null) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "当前身份缺少厂商标识");
         }
-        if (!principal.userId().equals(vendorId)) {
+        if (!principal.vendorId().equals(vendorId)) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "禁止访问其他厂商资源");
         }
         return vendorId;

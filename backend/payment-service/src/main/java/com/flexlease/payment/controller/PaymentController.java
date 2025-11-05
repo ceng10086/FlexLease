@@ -119,13 +119,13 @@ public class PaymentController {
         if (principal.hasRole("ADMIN")) {
             // admin can query any vendor, including null for all
         } else if (principal.hasRole("VENDOR")) {
-            if (principal.userId() == null) {
-                throw new BusinessException(ErrorCode.UNAUTHORIZED, "当前身份缺少用户标识");
+            if (principal.vendorId() == null) {
+                throw new BusinessException(ErrorCode.UNAUTHORIZED, "当前身份缺少厂商标识");
             }
-            if (vendorId != null && !principal.userId().equals(vendorId)) {
+            if (vendorId != null && !principal.vendorId().equals(vendorId)) {
                 throw new BusinessException(ErrorCode.FORBIDDEN, "禁止查询其他厂商结算");
             }
-            effectiveVendorId = principal.userId();
+            effectiveVendorId = principal.vendorId();
         } else {
             throw new BusinessException(ErrorCode.FORBIDDEN, "缺少访问结算数据的权限");
         }

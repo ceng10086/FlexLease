@@ -128,10 +128,11 @@ const vendorStatuses: OrderStatus[] = [
 
 const auth = useAuthStore();
 const vendorId = () => {
-  if (!auth.user?.id) {
+  const id = auth.vendorId ?? auth.user?.id;
+  if (!id) {
     throw new Error('未获取到厂商账号');
   }
-  return auth.user.id;
+  return id;
 };
 
 const loading = ref(false);

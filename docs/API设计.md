@@ -34,9 +34,9 @@
 | POST | `/auth/register/customer` | C 端注册 | `{ "username", "password" }` | `id`, `username`, `roles` |
 | POST | `/auth/register/vendor` | 厂商管理员注册 | `{ "username", "password" }` | `id`, `username`, `roles` |
 | POST | `/auth/token` | 获取访问令牌 | `{ "username", "password" }` | `accessToken`, `expiresInSeconds` |
-| GET | `/auth/me` | 获取当前登录用户信息 | `Authorization: Bearer <token>` | `id`, `username`, `roles`, `lastLoginAt` |
+| GET | `/auth/me` | 获取当前登录用户信息 | `Authorization: Bearer <token>` | `id`, `vendorId?`, `username`, `roles`, `lastLoginAt` |
 
-> 说明：注册接口当前仅返回账号摘要，厂商入驻详情在用户服务中维护；`/auth/token` 使用 JSON 请求体而非表单。
+> 说明：注册接口当前仅返回账号摘要，厂商入驻详情在用户服务中维护；`/auth/token` 使用 JSON 请求体而非表单。`/auth/me` 会在厂商审核通过并映射 vendorId 后返回 `vendorId` 字段，前端可据此加载厂商工作台。
 
 ### 2.2 账号管理（已实现）
 | 方法 | URL | 描述 | 请求体要点 | 备注 |
@@ -51,15 +51,16 @@
 | 方法 | URL | 描述 | 备注 |
 | ---- | --- | ---- | ---- |
 | PATCH | `/internal/users/{userId}/status` | 更新指定账号状态 | 典型用例：厂商入驻审核通过后将账号从 `PENDING_REVIEW` 调整为 `ENABLED`；支持 `ENABLED`/`DISABLED`，请求体 `{ "status": "ENABLED" }` |
+| PATCH | `/internal/users/{userId}/vendor` | 绑定认证账号与厂商 ID | 审核通过后由用户服务调用，确保 JWT 与 `/auth/me` 返回 `vendorId`，请求体 `{ "vendorId": "UUID" }` |
 
 ## 3. 用户 & 厂商管理（user-service）
 ### 3.1 厂商入驻
 | 方法 | URL | 角色 | 描述 | 备注 |
 | ---- | --- | ---- | ---- | ---- |
-| POST | `/vendors/applications` | 厂商 | 提交入驻资料 | 需厂商账号登录 |
+| POST | `/vendors/applications` | 厂商 | 提交入驻资料 | 需厂商账号登录；已被驳回的申请可在原记录上重新提交 |
 | GET | `/vendors/applications/{id}` | 管理员/申请人 | 查看申请详情 | - |
 | GET | `/vendors/applications` | 管理员 | 列表查询 | 支持 `status` 过滤 |
-| POST | `/vendors/applications/{id}/approve` | 管理员 | 审核通过 | 请求体 `{ remark? }`，调用认证服务激活账号 |
+| POST | `/vendors/applications/{id}/approve` | 管理员 | 审核通过 | 请求体 `{ remark? }`，调用认证服务激活账号并同步厂商 `vendorId` 至认证中心 |
 | POST | `/vendors/applications/{id}/reject` | 管理员 | 审核驳回 | 请求体 `{ remark? }` |
 
 ### 3.2 厂商资料（已实现）
@@ -153,6 +154,8 @@
 | POST | `/orders/{orderId}/return/approve` | VENDOR | 审核退租，更新状态（完成/退回租赁） | `{ vendorId, approve, remark? }` |
 | POST | `/orders/{orderId}/buyout` | USER | 申请买断，可调整买断金额 | `{ userId, buyoutAmount?, remark? }` |
 | POST | `/orders/{orderId}/buyout/confirm` | VENDOR | 处理买断请求（通过/驳回） | `{ vendorId, approve, remark? }` |
+
+> 厂商端订单操作需携带登录厂商的 `vendorId`，服务端会基于 JWT 内的厂商身份做二次校验，仅允许匹配租赁单的厂商执行操作；管理员/内部角色可跳过该限制以便干预。
 
 > 订单支付确认会回调支付服务核验流水，`paymentReference` 需提供支付服务返回的交易 UUID，金额必须与订单应付一致。
 

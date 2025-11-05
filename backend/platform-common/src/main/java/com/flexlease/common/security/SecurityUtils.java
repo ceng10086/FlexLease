@@ -28,6 +28,10 @@ public final class SecurityUtils {
         return getCurrentPrincipal().flatMap(principal -> Optional.ofNullable(principal.userId()));
     }
 
+    public static Optional<UUID> getCurrentVendorId() {
+        return getCurrentPrincipal().flatMap(principal -> Optional.ofNullable(principal.vendorId()));
+    }
+
     public static boolean hasRole(String role) {
         return getCurrentPrincipal().map(principal -> principal.hasRole(role)).orElse(false);
     }
@@ -44,6 +48,15 @@ public final class SecurityUtils {
             throw new BusinessException(ErrorCode.UNAUTHORIZED, "当前身份缺少用户标识");
         }
         return userId;
+    }
+
+    public static UUID requireVendorId() {
+        FlexleasePrincipal principal = requirePrincipal();
+        UUID vendorId = principal.vendorId();
+        if (vendorId == null) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "当前身份缺少厂商标识");
+        }
+        return vendorId;
     }
 
     public static void requireRole(String role) {

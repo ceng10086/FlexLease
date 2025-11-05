@@ -8,7 +8,7 @@ import io.jsonwebtoken.security.Keys;
 import java.security.Key;
 import java.time.Instant;
 import java.util.Date;
-import java.util.Map;
+import java.util.HashMap;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
@@ -24,18 +24,21 @@ public class JwtTokenProvider {
         this.key = Keys.hmacShaKeyFor(Decoders.BASE64.decode(ensureBase64(properties.getSecret())));
     }
 
-    public String generateToken(UUID userId, String username, String rolesCsv) {
+    public String generateToken(UUID userId, UUID vendorId, String username, String rolesCsv) {
         Instant now = Instant.now();
         Instant expiry = now.plusSeconds(properties.getAccessTokenTtlSeconds());
+        HashMap<String, Object> claims = new HashMap<>();
+        claims.put("username", username);
+        claims.put("roles", rolesCsv);
+        if (vendorId != null) {
+            claims.put("vendorId", vendorId.toString());
+        }
         return Jwts.builder()
                 .setIssuer(properties.getIssuer())
                 .setSubject(userId.toString())
                 .setIssuedAt(Date.from(now))
                 .setExpiration(Date.from(expiry))
-                .addClaims(Map.of(
-                        "username", username,
-                        "roles", rolesCsv
-                ))
+                .addClaims(claims)
                 .signWith(key, SignatureAlgorithm.HS256)
                 .compact();
     }

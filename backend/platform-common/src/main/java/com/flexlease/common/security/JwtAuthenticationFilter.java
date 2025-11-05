@@ -95,7 +95,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (!internalToken.equals(properties.getInternalAccessToken())) {
             return false;
         }
-        FlexleasePrincipal principal = new FlexleasePrincipal(null, "internal-service", Set.of("INTERNAL"));
+        FlexleasePrincipal principal = new FlexleasePrincipal(null, null, "internal-service", Set.of("INTERNAL"));
         UsernamePasswordAuthenticationToken authentication =
                 new UsernamePasswordAuthenticationToken(principal, null,
                         Set.of(new SimpleGrantedAuthority("ROLE_INTERNAL")));

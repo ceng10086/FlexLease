@@ -24,6 +24,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   const isAuthenticated = computed(() => Boolean(token.value));
   const roles = computed(() => new Set(user.value?.roles ?? []));
+  const vendorId = computed(() => user.value?.vendorId ?? null);
 
   const clearSession = () => {
     token.value = '';
@@ -117,6 +118,7 @@ export const useAuthStore = defineStore('auth', () => {
     isAuthenticated,
     roles,
     hasRole,
+    vendorId,
     bootstrap,
     login,
     register,
