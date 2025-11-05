@@ -10,6 +10,7 @@ import com.flexlease.order.client.PaymentClient;
 import com.flexlease.order.client.PaymentStatus;
 import com.flexlease.order.client.PaymentTransactionView;
 import com.flexlease.order.client.NotificationClient;
+import com.flexlease.order.client.ProductCatalogClient;
 import com.flexlease.order.domain.CartItem;
 import com.flexlease.order.domain.ExtensionRequestStatus;
 import com.flexlease.order.domain.OrderEvent;
@@ -69,6 +70,7 @@ public class RentalOrderService {
     private final CartService cartService;
     private final OrderAssembler assembler;
     private final OrderEventPublisher orderEventPublisher;
+    private final ProductCatalogClient productCatalogClient;
 
     public RentalOrderService(RentalOrderRepository rentalOrderRepository,
                               OrderExtensionRequestRepository extensionRequestRepository,
@@ -78,7 +80,8 @@ public class RentalOrderService {
                               InventoryReservationClient inventoryReservationClient,
                               CartService cartService,
                               OrderAssembler assembler,
-                              OrderEventPublisher orderEventPublisher) {
+                              OrderEventPublisher orderEventPublisher,
+                              ProductCatalogClient productCatalogClient) {
         this.rentalOrderRepository = rentalOrderRepository;
         this.extensionRequestRepository = extensionRequestRepository;
         this.returnRequestRepository = returnRequestRepository;
@@ -88,6 +91,7 @@ public class RentalOrderService {
         this.cartService = cartService;
         this.assembler = assembler;
         this.orderEventPublisher = orderEventPublisher;
+        this.productCatalogClient = productCatalogClient;
     }
 
     @Transactional(Transactional.TxType.SUPPORTS)
@@ -133,6 +137,10 @@ public class RentalOrderService {
 
         if (orderItems.isEmpty()) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "订单缺少商品明细");
+        }
+
+        if (!directItems.isEmpty()) {
+            validateDirectOrderItems(request.vendorId(), orderItems);
         }
 
         Totals totals = calculateTotals(orderItems);
@@ -801,5 +809,43 @@ public class RentalOrderService {
     }
 
     private record Totals(BigDecimal depositAmount, BigDecimal rentAmount, BigDecimal buyoutAmount, BigDecimal totalAmount) {
+    }
+
+    private void validateDirectOrderItems(UUID expectedVendorId, List<OrderItemRequest> items) {
+        Map<UUID, ProductCatalogClient.CatalogProductView> products = new HashMap<>();
+        for (OrderItemRequest item : items) {
+            ProductCatalogClient.CatalogProductView product = products.computeIfAbsent(
+                    item.productId(),
+                    productCatalogClient::getProduct
+            );
+
+            if (!expectedVendorId.equals(product.vendorId())) {
+                throw new BusinessException(ErrorCode.VALIDATION_ERROR, "订单明细所属厂商与请求不一致");
+            }
+
+            ProductCatalogClient.CatalogProductView.RentalPlanView matchedPlan = null;
+            if (item.planId() != null) {
+                matchedPlan = product.rentalPlans() == null ? null : product.rentalPlans().stream()
+                        .filter(plan -> item.planId().equals(plan.id()))
+                        .findFirst()
+                        .orElseThrow(() -> new BusinessException(ErrorCode.VALIDATION_ERROR, "租赁方案不存在: " + item.planId()));
+            }
+
+            if (item.skuId() != null) {
+                boolean skuBelongsToProduct;
+                if (matchedPlan != null) {
+                    skuBelongsToProduct = matchedPlan.skus() != null
+                            && matchedPlan.skus().stream().anyMatch(sku -> item.skuId().equals(sku.id()));
+                } else {
+                    skuBelongsToProduct = product.rentalPlans() != null
+                            && product.rentalPlans().stream()
+                            .filter(plan -> plan.skus() != null)
+                            .anyMatch(plan -> plan.skus().stream().anyMatch(sku -> item.skuId().equals(sku.id())));
+                }
+                if (!skuBelongsToProduct) {
+                    throw new BusinessException(ErrorCode.VALIDATION_ERROR, "SKU 不属于指定商品");
+                }
+            }
+        }
     }
 }

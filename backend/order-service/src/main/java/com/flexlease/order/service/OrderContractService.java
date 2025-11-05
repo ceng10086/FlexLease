@@ -71,6 +71,13 @@ public class OrderContractService {
             return;
         }
         if (principal.hasRole("VENDOR")) {
+            UUID currentVendorId = principal.vendorId();
+            if (currentVendorId == null) {
+                throw new BusinessException(ErrorCode.UNAUTHORIZED, "当前身份缺少厂商标识");
+            }
+            if (!currentVendorId.equals(order.getVendorId())) {
+                throw new BusinessException(ErrorCode.FORBIDDEN, "无权访问该订单合同");
+            }
             return;
         }
         throw new BusinessException(ErrorCode.FORBIDDEN, "无权访问该订单合同");

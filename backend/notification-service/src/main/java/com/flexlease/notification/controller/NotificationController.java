@@ -51,16 +51,29 @@ public class NotificationController {
         }
         FlexleasePrincipal principal = SecurityUtils.requirePrincipal();
         String normalizedRecipient = recipient != null && !recipient.isBlank() ? recipient : null;
-        if (!principal.hasRole("ADMIN") && !principal.hasRole("INTERNAL")) {
-            if (principal.userId() == null) {
-                throw new BusinessException(ErrorCode.UNAUTHORIZED, "当前身份缺少用户标识");
-            }
-            if (normalizedRecipient != null && !normalizedRecipient.equals(principal.userId().toString())) {
-                throw new BusinessException(ErrorCode.FORBIDDEN, "禁止查看其他用户的通知");
-            }
-            normalizedRecipient = principal.userId().toString();
+        if (principal.hasRole("ADMIN") || principal.hasRole("INTERNAL")) {
+            return ApiResponse.success(notificationService.listLogs(statusEnum, normalizedRecipient));
         }
-        return ApiResponse.success(notificationService.listLogs(statusEnum, normalizedRecipient));
+
+        if (principal.hasRole("VENDOR")) {
+            if (principal.vendorId() == null) {
+                throw new BusinessException(ErrorCode.UNAUTHORIZED, "当前身份缺少厂商标识");
+            }
+            String vendorRecipient = principal.vendorId().toString();
+            if (normalizedRecipient != null && !normalizedRecipient.equals(vendorRecipient)) {
+                throw new BusinessException(ErrorCode.FORBIDDEN, "禁止查看其他厂商的通知");
+            }
+            return ApiResponse.success(notificationService.listLogs(statusEnum, vendorRecipient));
+        }
+
+        if (principal.userId() == null) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "当前身份缺少用户标识");
+        }
+        String userRecipient = principal.userId().toString();
+        if (normalizedRecipient != null && !normalizedRecipient.equals(userRecipient)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "禁止查看其他用户的通知");
+        }
+        return ApiResponse.success(notificationService.listLogs(statusEnum, userRecipient));
     }
 
     @GetMapping("/templates")

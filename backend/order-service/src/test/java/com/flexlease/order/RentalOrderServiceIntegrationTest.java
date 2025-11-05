@@ -1,45 +1,53 @@
 package com.flexlease.order;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.flexlease.common.exception.BusinessException;
+import com.flexlease.common.exception.ErrorCode;
 import com.flexlease.common.security.FlexleasePrincipal;
+import com.flexlease.order.client.InventoryReservationClient;
+import com.flexlease.order.client.NotificationClient;
+import com.flexlease.order.client.PaymentClient;
+import com.flexlease.order.client.PaymentStatus;
+import com.flexlease.order.client.PaymentTransactionView;
+import com.flexlease.order.client.ProductCatalogClient;
+import com.flexlease.order.client.ProductCatalogClient.CatalogProductView;
+import com.flexlease.order.client.ProductCatalogClient.CatalogProductView.RentalPlanView;
+import com.flexlease.order.client.ProductCatalogClient.CatalogProductView.SkuView;
 import com.flexlease.order.domain.OrderStatus;
 import com.flexlease.order.dto.AddCartItemRequest;
 import com.flexlease.order.dto.CartItemResponse;
 import com.flexlease.order.dto.CreateOrderRequest;
 import com.flexlease.order.dto.OrderActorRequest;
-import com.flexlease.common.exception.BusinessException;
 import com.flexlease.order.dto.OrderBuyoutApplyRequest;
 import com.flexlease.order.dto.OrderExtensionApplyRequest;
 import com.flexlease.order.dto.OrderExtensionDecisionRequest;
 import com.flexlease.order.dto.OrderItemRequest;
 import com.flexlease.order.dto.OrderPaymentRequest;
 import com.flexlease.order.dto.OrderPreviewRequest;
+import com.flexlease.order.dto.OrderPreviewResponse;
 import com.flexlease.order.dto.OrderReturnApplyRequest;
 import com.flexlease.order.dto.OrderReturnDecisionRequest;
 import com.flexlease.order.dto.OrderShipmentRequest;
-import com.flexlease.order.dto.OrderPreviewResponse;
 import com.flexlease.order.dto.RentalOrderResponse;
+import com.flexlease.order.service.CartService;
+import com.flexlease.order.service.OrderContractService;
 import com.flexlease.order.service.OrderMaintenanceScheduler;
 import com.flexlease.order.service.RentalOrderService;
-import com.flexlease.order.service.CartService;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.TestPropertySource;
-import com.flexlease.order.client.InventoryReservationClient;
-import com.flexlease.order.client.NotificationClient;
-import com.flexlease.order.client.PaymentClient;
-import com.flexlease.order.client.PaymentStatus;
-import com.flexlease.order.client.PaymentTransactionView;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.test.context.TestPropertySource;
 
 @SpringBootTest
 @TestPropertySource(properties = "flexlease.order.maintenance.pending-payment-expire-minutes=0")
@@ -52,6 +60,9 @@ class RentalOrderServiceIntegrationTest {
     @Autowired
     private RentalOrderService rentalOrderService;
 
+        @Autowired
+        private OrderContractService orderContractService;
+
     @MockBean
     private PaymentClient paymentClient;
 
@@ -60,6 +71,9 @@ class RentalOrderServiceIntegrationTest {
 
     @MockBean
     private InventoryReservationClient inventoryReservationClient;
+
+        @MockBean
+        private ProductCatalogClient productCatalogClient;
 
     @Autowired
     private CartService cartService;
@@ -87,6 +101,8 @@ class RentalOrderServiceIntegrationTest {
                 new BigDecimal("500.00"),
                 new BigDecimal("2599.00")
         );
+
+        stubProductCatalog(productId, vendorId, planId, skuId);
 
         OrderPreviewResponse preview = rentalOrderService.previewOrder(new OrderPreviewRequest(
                 userId,
@@ -214,6 +230,8 @@ class RentalOrderServiceIntegrationTest {
                 null
         );
 
+        stubProductCatalog(productId, vendorId, planId, skuId);
+
         RentalOrderResponse created = rentalOrderService.createOrder(new CreateOrderRequest(
                 userId,
                 vendorId,
@@ -273,6 +291,8 @@ class RentalOrderServiceIntegrationTest {
                 null
         );
 
+        stubProductCatalog(productId, vendorId, planId, skuId);
+
         RentalOrderResponse created = rentalOrderService.createOrder(new CreateOrderRequest(
                 userId,
                 vendorId,
@@ -317,6 +337,8 @@ class RentalOrderServiceIntegrationTest {
         UUID productId = UUID.randomUUID();
         UUID skuId = UUID.randomUUID();
         UUID planId = UUID.randomUUID();
+
+        stubProductCatalog(productId, vendorId, planId, skuId);
 
         CartItemResponse cartItem;
         try (SecurityContextHandle ignored = withPrincipal(userId, "user-%s".formatted(userId), "USER")) {
@@ -376,6 +398,8 @@ class RentalOrderServiceIntegrationTest {
                 null
         );
 
+        stubProductCatalog(productId, vendorId, planId, skuId);
+
         RentalOrderResponse created = rentalOrderService.createOrder(new CreateOrderRequest(
                 userId,
                 vendorId,
@@ -396,6 +420,95 @@ class RentalOrderServiceIntegrationTest {
                         refreshed = rentalOrderService.getOrder(created.id());
                 }
                 assertThat(refreshed.status()).isEqualTo(OrderStatus.CANCELLED);
+    }
+
+    @Test
+    void shouldRejectDirectOrderWhenVendorMismatch() {
+        UUID userId = UUID.randomUUID();
+        UUID requestedVendorId = UUID.randomUUID();
+        UUID actualVendorId = UUID.randomUUID();
+        UUID productId = UUID.randomUUID();
+        UUID skuId = UUID.randomUUID();
+        UUID planId = UUID.randomUUID();
+
+        stubProductCatalog(productId, actualVendorId, planId, skuId);
+
+        OrderItemRequest itemRequest = new OrderItemRequest(
+                productId,
+                skuId,
+                planId,
+                "跨厂商商品",
+                "SKU-001",
+                null,
+                1,
+                new BigDecimal("120.00"),
+                new BigDecimal("220.00"),
+                null
+        );
+
+        assertThatThrownBy(() -> rentalOrderService.createOrder(new CreateOrderRequest(
+                userId,
+                requestedVendorId,
+                "STANDARD",
+                null,
+                null,
+                List.of(itemRequest),
+                List.of()
+        )))
+                .isInstanceOf(BusinessException.class)
+                .extracting("errorCode")
+                .isEqualTo(ErrorCode.VALIDATION_ERROR);
+    }
+
+    @Test
+    void vendorCannotAccessOtherVendorContract() {
+        UUID userId = UUID.randomUUID();
+        UUID vendorId = UUID.randomUUID();
+        UUID otherVendorId = UUID.randomUUID();
+        UUID productId = UUID.randomUUID();
+        UUID skuId = UUID.randomUUID();
+        UUID planId = UUID.randomUUID();
+
+        stubProductCatalog(productId, vendorId, planId, skuId);
+
+        RentalOrderResponse order = rentalOrderService.createOrder(new CreateOrderRequest(
+                userId,
+                vendorId,
+                "STANDARD",
+                null,
+                null,
+                List.of(new OrderItemRequest(
+                        productId,
+                        skuId,
+                        planId,
+                        "合同测试商品",
+                        "SKU-C",
+                        null,
+                        1,
+                        new BigDecimal("88.00"),
+                        new BigDecimal("188.00"),
+                        null
+                )),
+                List.of()
+        ));
+
+        try (SecurityContextHandle ignored = withPrincipal(UUID.randomUUID(), otherVendorId, "other-vendor", "VENDOR")) {
+            assertThatThrownBy(() -> orderContractService.getContract(order.id()))
+                    .isInstanceOf(BusinessException.class)
+                    .hasMessageContaining("无权访问");
+        }
+
+        try (SecurityContextHandle ignored = withPrincipal(UUID.randomUUID(), vendorId, "current-vendor", "VENDOR")) {
+            assertThat(orderContractService.getContract(order.id()).orderId()).isEqualTo(order.id());
+        }
+    }
+
+    private void stubProductCatalog(UUID productId, UUID vendorId, UUID planId, UUID skuId) {
+        UUID planIdentifier = planId != null ? planId : UUID.randomUUID();
+        SkuView skuView = new SkuView(skuId);
+        RentalPlanView planView = new RentalPlanView(planIdentifier, List.of(skuView));
+        CatalogProductView catalogProductView = new CatalogProductView(productId, vendorId, List.of(planView));
+        Mockito.when(productCatalogClient.getProduct(productId)).thenReturn(catalogProductView);
     }
 
         private SecurityContextHandle withPrincipal(UUID userId, String username, String... roles) {

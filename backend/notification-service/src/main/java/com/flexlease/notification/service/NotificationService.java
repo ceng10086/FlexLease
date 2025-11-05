@@ -90,15 +90,28 @@ public class NotificationService {
         boolean hasGlobalAccess = principal.hasRole("ADMIN") || principal.hasRole("INTERNAL");
         String normalizedRecipient = recipient != null && !recipient.isBlank() ? recipient : null;
 
-        if (normalizedRecipient == null && !hasGlobalAccess) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "仅管理员可查看全部通知记录");
-        }
-
         if (!hasGlobalAccess) {
-            if (principal.userId() == null) {
-                throw new BusinessException(ErrorCode.UNAUTHORIZED, "当前身份缺少用户标识");
+            if (principal.hasRole("VENDOR")) {
+                if (principal.vendorId() == null) {
+                    throw new BusinessException(ErrorCode.UNAUTHORIZED, "当前身份缺少厂商标识");
+                }
+                String vendorRecipient = principal.vendorId().toString();
+                if (normalizedRecipient == null) {
+                    normalizedRecipient = vendorRecipient;
+                } else if (!normalizedRecipient.equals(vendorRecipient)) {
+                    throw new BusinessException(ErrorCode.FORBIDDEN, "禁止查看其他厂商的通知");
+                }
+            } else {
+                if (principal.userId() == null) {
+                    throw new BusinessException(ErrorCode.UNAUTHORIZED, "当前身份缺少用户标识");
+                }
+                String userRecipient = principal.userId().toString();
+                if (normalizedRecipient == null) {
+                    normalizedRecipient = userRecipient;
+                } else if (!normalizedRecipient.equals(userRecipient)) {
+                    throw new BusinessException(ErrorCode.FORBIDDEN, "禁止查看其他用户的通知");
+                }
             }
-            normalizedRecipient = principal.userId().toString();
         }
 
         List<NotificationLog> logs;
