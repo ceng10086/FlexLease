@@ -78,9 +78,9 @@
           <a-descriptions-item label="状态">{{ detailDrawer.order.status }}</a-descriptions-item>
           <a-descriptions-item label="用户">{{ detailDrawer.order.userId }}</a-descriptions-item>
           <a-descriptions-item label="厂商">{{ detailDrawer.order.vendorId }}</a-descriptions-item>
-          <a-descriptions-item label="押金">¥{{ formatCurrency(detailDrawer.order.depositAmount) }}</a-descriptions-item>
-          <a-descriptions-item label="租金">¥{{ formatCurrency(detailDrawer.order.rentAmount) }}</a-descriptions-item>
-          <a-descriptions-item label="总金额">¥{{ formatCurrency(detailDrawer.order.totalAmount) }}</a-descriptions-item>
+          <a-descriptions-item label="押金">¥{{ formatCurrency(resolveOrderDeposit(detailDrawer.order)) }}</a-descriptions-item>
+          <a-descriptions-item label="租金">¥{{ formatCurrency(resolveOrderRent(detailDrawer.order)) }}</a-descriptions-item>
+          <a-descriptions-item label="总金额">¥{{ formatCurrency(resolveOrderTotal(detailDrawer.order)) }}</a-descriptions-item>
           <a-descriptions-item label="创建时间">{{ formatDate(detailDrawer.order.createdAt) }}</a-descriptions-item>
           <a-descriptions-item label="承运方" v-if="detailDrawer.order.shippingCarrier">{{ detailDrawer.order.shippingCarrier }}</a-descriptions-item>
           <a-descriptions-item label="运单号" v-if="detailDrawer.order.shippingTrackingNo">{{ detailDrawer.order.shippingTrackingNo }}</a-descriptions-item>
@@ -97,10 +97,10 @@
           <a-table-column title="SKU" data-index="skuCode" key="sku" />
           <a-table-column title="数量" data-index="quantity" key="quantity" />
           <a-table-column title="月租金" key="rent">
-            <template #default="{ record }">¥{{ formatCurrency(record.unitRentAmount) }}</template>
+            <template #default="{ record }">¥{{ formatCurrency(resolveItemRent(record)) }}</template>
           </a-table-column>
           <a-table-column title="押金" key="deposit">
-            <template #default="{ record }">¥{{ formatCurrency(record.unitDepositAmount) }}</template>
+            <template #default="{ record }">¥{{ formatCurrency(resolveItemDeposit(record)) }}</template>
           </a-table-column>
         </a-table>
 
@@ -152,6 +152,7 @@ import {
   type OrderStatus,
   type RentalOrderDetail
 } from '../../services/orderService';
+import { parsePlanSnapshot, resolveDeposit, resolveRent } from '../../utils/planSnapshot';
 
 const orderStatusOptions: OrderStatus[] = [
   'PENDING_PAYMENT',
@@ -180,6 +181,8 @@ const detailDrawer = reactive<{ open: boolean; loading: boolean; order: RentalOr
 
 const forceCloseForm = reactive({ reason: '', loading: false });
 
+type RentalOrderItem = RentalOrderDetail['items'][number];
+
 
 const formatCurrency = (value: number) => value.toFixed(2);
 const formatDate = (value: string) => new Date(value).toLocaleString();
@@ -190,6 +193,37 @@ const canForceClose = computed(() => {
   }
   return !['COMPLETED', 'CANCELLED', 'BUYOUT_COMPLETED'].includes(detailDrawer.order.status);
 });
+
+const resolveItemDeposit = (item: RentalOrderItem): number => {
+  const snapshot = parsePlanSnapshot(item.planSnapshot);
+  return resolveDeposit(item.unitDepositAmount, snapshot) ?? 0;
+};
+
+const resolveItemRent = (item: RentalOrderItem): number => {
+  const snapshot = parsePlanSnapshot(item.planSnapshot);
+  return resolveRent(item.unitRentAmount, snapshot) ?? 0;
+};
+
+const resolveOrderDeposit = (detail: RentalOrderDetail): number => {
+  if (detail.depositAmount != null) {
+    return detail.depositAmount;
+  }
+  return detail.items.reduce((sum, item) => sum + resolveItemDeposit(item) * item.quantity, 0);
+};
+
+const resolveOrderRent = (detail: RentalOrderDetail): number => {
+  if (detail.rentAmount != null) {
+    return detail.rentAmount;
+  }
+  return detail.items.reduce((sum, item) => sum + resolveItemRent(item) * item.quantity, 0);
+};
+
+const resolveOrderTotal = (detail: RentalOrderDetail): number => {
+  if (detail.totalAmount != null) {
+    return detail.totalAmount;
+  }
+  return resolveOrderDeposit(detail) + resolveOrderRent(detail);
+};
 
 const loadOrders = async () => {
   loading.value = true;

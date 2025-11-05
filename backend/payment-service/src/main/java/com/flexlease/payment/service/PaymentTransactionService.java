@@ -25,6 +25,7 @@ import com.flexlease.payment.repository.PaymentTransactionRepository;
 import jakarta.transaction.Transactional;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -188,9 +189,9 @@ public class PaymentTransactionService {
             accumulator.add(transaction);
         }
         return grouped.entrySet().stream()
-            .sorted(Map.Entry.comparingByKey())
-                .map(entry -> entry.getValue().toResponse(entry.getKey()))
-                .toList();
+            .sorted(Map.Entry.comparingByKey(Comparator.comparing(UUID::toString)))
+            .map(entry -> entry.getValue().toResponse(entry.getKey()))
+            .toList();
     }
 
     private PaymentTransaction getTransactionForUpdate(UUID transactionId) {

@@ -210,6 +210,60 @@ class RentalOrderServiceIntegrationTest {
     }
 
     @Test
+    void shouldIgnoreClientManipulatedPricing() {
+        UUID userId = UUID.randomUUID();
+        UUID vendorId = UUID.randomUUID();
+        UUID productId = UUID.randomUUID();
+        UUID skuId = UUID.randomUUID();
+        UUID planId = UUID.randomUUID();
+
+        stubProductCatalog(productId, vendorId, planId, skuId);
+
+        OrderItemRequest manipulatedItem = new OrderItemRequest(
+                productId,
+                skuId,
+                planId,
+                "测试商品",
+                "SKU-X",
+                null,
+                1,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO
+        );
+
+        OrderPreviewResponse preview = rentalOrderService.previewOrder(new OrderPreviewRequest(
+                userId,
+                vendorId,
+                "STANDARD",
+                null,
+                null,
+                List.of(manipulatedItem)
+        ));
+
+        assertThat(preview.depositAmount()).isEqualByComparingTo("500.00");
+        assertThat(preview.rentAmount()).isEqualByComparingTo("299.00");
+        assertThat(preview.totalAmount()).isEqualByComparingTo("799.00");
+
+        RentalOrderResponse created = rentalOrderService.createOrder(new CreateOrderRequest(
+                userId,
+                vendorId,
+                "STANDARD",
+                null,
+                null,
+                List.of(manipulatedItem),
+                List.of()
+        ));
+
+        assertThat(created.depositAmount()).isEqualByComparingTo("500.00");
+        assertThat(created.rentAmount()).isEqualByComparingTo("299.00");
+        assertThat(created.totalAmount()).isEqualByComparingTo("799.00");
+        assertThat(created.items()).hasSize(1);
+        assertThat(created.items().getFirst().unitDepositAmount()).isEqualByComparingTo("500.00");
+        assertThat(created.items().getFirst().unitRentAmount()).isEqualByComparingTo("299.00");
+    }
+
+    @Test
     void adminForceCloseCancelsOrder() {
         UUID userId = UUID.randomUUID();
         UUID vendorId = UUID.randomUUID();
@@ -505,9 +559,17 @@ class RentalOrderServiceIntegrationTest {
 
     private void stubProductCatalog(UUID productId, UUID vendorId, UUID planId, UUID skuId) {
         UUID planIdentifier = planId != null ? planId : UUID.randomUUID();
-        SkuView skuView = new SkuView(skuId);
-        RentalPlanView planView = new RentalPlanView(planIdentifier, List.of(skuView));
-        CatalogProductView catalogProductView = new CatalogProductView(productId, vendorId, List.of(planView));
+        SkuView skuView = new SkuView(skuId, "SKU-" + skuId.toString().substring(0, 6));
+        RentalPlanView planView = new RentalPlanView(
+                planIdentifier,
+                "STANDARD",
+                12,
+                new BigDecimal("500.00"),
+                new BigDecimal("299.00"),
+                new BigDecimal("2599.00"),
+                List.of(skuView)
+        );
+        CatalogProductView catalogProductView = new CatalogProductView(productId, vendorId, null, List.of(planView));
         Mockito.when(productCatalogClient.getProduct(productId)).thenReturn(catalogProductView);
     }
 

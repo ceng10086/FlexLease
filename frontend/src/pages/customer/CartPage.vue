@@ -34,10 +34,10 @@
           </template>
         </a-table-column>
         <a-table-column title="月租金" key="rent">
-          <template #default="{ record }">¥{{ formatCurrency(record.unitRentAmount) }}</template>
+          <template #default="{ record }">¥{{ formatCurrency(resolveUnitRent(record)) }}</template>
         </a-table-column>
         <a-table-column title="押金" key="deposit">
-          <template #default="{ record }">¥{{ formatCurrency(record.unitDepositAmount) }}</template>
+          <template #default="{ record }">¥{{ formatCurrency(resolveUnitDeposit(record)) }}</template>
         </a-table-column>
         <a-table-column title="操作" key="actions">
           <template #default="{ record }">
@@ -82,6 +82,7 @@ import {
   type CartItem
 } from '../../services/cartService';
 import { createOrder } from '../../services/orderService';
+import { parsePlanSnapshot, resolveDeposit, resolveRent } from '../../utils/planSnapshot';
 
 const router = useRouter();
 const auth = useAuthStore();
@@ -107,11 +108,21 @@ watch(selectedRowKeys, (keys) => {
 
 const selectedItems = computed(() => items.value.filter((item) => selectedRowKeys.value.includes(item.id)));
 
+const resolveUnitDeposit = (item: CartItem): number => {
+  const snapshot = parsePlanSnapshot(item.planSnapshot);
+  return resolveDeposit(item.unitDepositAmount, snapshot) ?? 0;
+};
+
+const resolveUnitRent = (item: CartItem): number => {
+  const snapshot = parsePlanSnapshot(item.planSnapshot);
+  return resolveRent(item.unitRentAmount, snapshot) ?? 0;
+};
+
 const totalDeposit = computed(() =>
-  selectedItems.value.reduce((acc, item) => acc + item.unitDepositAmount * item.quantity, 0)
+  selectedItems.value.reduce((acc, item) => acc + resolveUnitDeposit(item) * item.quantity, 0)
 );
 const totalRent = computed(() =>
-  selectedItems.value.reduce((acc, item) => acc + item.unitRentAmount * item.quantity, 0)
+  selectedItems.value.reduce((acc, item) => acc + resolveUnitRent(item) * item.quantity, 0)
 );
 
 const formatCurrency = (value: number) => value.toFixed(2);

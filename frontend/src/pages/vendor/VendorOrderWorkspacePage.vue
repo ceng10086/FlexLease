@@ -40,9 +40,9 @@
             <a-descriptions-item label="订单号">{{ detail.order.orderNo }}</a-descriptions-item>
             <a-descriptions-item label="状态">{{ detail.order.status }}</a-descriptions-item>
             <a-descriptions-item label="用户">{{ detail.order.userId }}</a-descriptions-item>
-            <a-descriptions-item label="总金额">¥{{ formatCurrency(detail.order.totalAmount) }}</a-descriptions-item>
-            <a-descriptions-item label="押金">¥{{ formatCurrency(detail.order.depositAmount) }}</a-descriptions-item>
-            <a-descriptions-item label="租金">¥{{ formatCurrency(detail.order.rentAmount) }}</a-descriptions-item>
+            <a-descriptions-item label="总金额">¥{{ formatCurrency(resolveOrderTotal(detail.order)) }}</a-descriptions-item>
+            <a-descriptions-item label="押金">¥{{ formatCurrency(resolveOrderDeposit(detail.order)) }}</a-descriptions-item>
+            <a-descriptions-item label="租金">¥{{ formatCurrency(resolveOrderRent(detail.order)) }}</a-descriptions-item>
             <a-descriptions-item label="创建时间">{{ formatDate(detail.order.createdAt) }}</a-descriptions-item>
           </a-descriptions>
 
@@ -52,7 +52,7 @@
             <a-table-column title="商品" data-index="productName" key="product" />
             <a-table-column title="SKU" data-index="skuCode" key="sku" />
             <a-table-column title="数量" data-index="quantity" key="quantity" />
-            <a-table-column title="月租金" key="rent"><template #default="{ record }">¥{{ formatCurrency(record.unitRentAmount) }}</template></a-table-column>
+            <a-table-column title="月租金" key="rent"><template #default="{ record }">¥{{ formatCurrency(resolveItemRent(record)) }}</template></a-table-column>
           </a-table>
 
           <a-divider />
@@ -113,6 +113,7 @@ import {
   type RentalOrderSummary,
   type RentalOrderDetail
 } from '../../services/orderService';
+import { parsePlanSnapshot, resolveDeposit, resolveRent } from '../../utils/planSnapshot';
 
 const vendorStatuses: OrderStatus[] = [
   'PENDING_PAYMENT',
@@ -153,6 +154,38 @@ const returnForm = reactive({ remark: '', loading: false });
 
 const formatCurrency = (value: number) => value.toFixed(2);
 const formatDate = (value: string) => new Date(value).toLocaleString();
+
+type RentalOrderItem = RentalOrderDetail['items'][number];
+
+const resolveItemRent = (item: RentalOrderItem): number => {
+  const snapshot = parsePlanSnapshot(item.planSnapshot);
+  return resolveRent(item.unitRentAmount, snapshot) ?? 0;
+};
+const resolveItemDeposit = (item: RentalOrderItem): number => {
+  const snapshot = parsePlanSnapshot(item.planSnapshot);
+  return resolveDeposit(item.unitDepositAmount, snapshot) ?? 0;
+};
+
+const resolveOrderDeposit = (detail: RentalOrderDetail): number => {
+  if (detail.depositAmount != null) {
+    return detail.depositAmount;
+  }
+  return detail.items.reduce((sum, item) => sum + resolveItemDeposit(item) * item.quantity, 0);
+};
+
+const resolveOrderRent = (detail: RentalOrderDetail): number => {
+  if (detail.rentAmount != null) {
+    return detail.rentAmount;
+  }
+  return detail.items.reduce((sum, item) => sum + resolveItemRent(item) * item.quantity, 0);
+};
+
+const resolveOrderTotal = (detail: RentalOrderDetail): number => {
+  if (detail.totalAmount != null) {
+    return detail.totalAmount;
+  }
+  return resolveOrderDeposit(detail) + resolveOrderRent(detail);
+};
 
 const loadOrders = async () => {
   loading.value = true;

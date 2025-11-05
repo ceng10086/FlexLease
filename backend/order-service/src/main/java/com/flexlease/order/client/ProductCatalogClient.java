@@ -63,20 +63,26 @@ public class ProductCatalogClient {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record CatalogProductView(
+        public record CatalogProductView(
             UUID id,
             UUID vendorId,
+            String name,
             List<RentalPlanView> rentalPlans
-    ) {
+        ) {
         @JsonIgnoreProperties(ignoreUnknown = true)
         public record RentalPlanView(
                 UUID id,
-                List<SkuView> skus
+            String planType,
+            Integer termMonths,
+            java.math.BigDecimal depositAmount,
+            java.math.BigDecimal rentAmountMonthly,
+            java.math.BigDecimal buyoutPrice,
+            List<SkuView> skus
         ) {
         }
 
         @JsonIgnoreProperties(ignoreUnknown = true)
-        public record SkuView(UUID id) {
+        public record SkuView(UUID id, String skuCode) {
         }
     }
 }

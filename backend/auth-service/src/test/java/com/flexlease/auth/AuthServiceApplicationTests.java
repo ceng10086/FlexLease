@@ -88,18 +88,13 @@ class AuthServiceApplicationTests {
         String userId = registerNode.at("/data/id").asText();
         assertThat(userId).isNotBlank();
 
-        MvcResult pendingLoginResult = mockMvc.perform(post("/api/v1/auth/token")
+        mockMvc.perform(post("/api/v1/auth/token")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(java.util.Map.of(
                                 "username", username,
                                 "password", password
                         ))))
-                .andExpect(status().isOk())
-                .andReturn();
-
-        JsonNode pendingTokenNode = objectMapper.readTree(pendingLoginResult.getResponse().getContentAsString());
-        String pendingToken = pendingTokenNode.at("/data/accessToken").asText();
-        assertThat(pendingToken).isNotBlank();
+                .andExpect(status().isUnauthorized());
 
         mockMvc.perform(patch("/api/v1/internal/users/{id}/status", userId)
                         .header("X-Internal-Token", "flexlease-internal-secret")

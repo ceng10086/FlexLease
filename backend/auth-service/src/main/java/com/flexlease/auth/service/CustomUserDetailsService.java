@@ -7,11 +7,10 @@ import com.flexlease.auth.domain.UserStatus;
 import com.flexlease.auth.repository.UserAccountRepository;
 import com.flexlease.auth.repository.RoleRepository;
 import com.flexlease.auth.repository.UserRoleRepository;
-import com.flexlease.common.exception.BusinessException;
-import com.flexlease.common.exception.ErrorCode;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -39,8 +38,8 @@ public class CustomUserDetailsService implements UserDetailsService {
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         UserAccount account = userAccountRepository.findByUsernameIgnoreCase(username)
                 .orElseThrow(() -> new UsernameNotFoundException("用户不存在"));
-        if (account.getStatus() == UserStatus.DISABLED) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "账号已被禁用");
+        if (account.getStatus() != UserStatus.ENABLED) {
+            throw new DisabledException("账号尚未启用");
         }
         Set<java.util.UUID> roleIds = userRoleRepository.findByIdUserId(account.getId())
             .stream()

@@ -65,6 +65,7 @@ import dayjs, { type Dayjs } from 'dayjs';
 import { useAuthStore } from '../../stores/auth';
 import { fetchCatalogProduct, type CatalogProductDetail } from '../../services/catalogService';
 import { previewOrder, createOrder, type OrderPreviewResponse } from '../../services/orderService';
+import { serializePlanSnapshot } from '../../utils/planSnapshot';
 
 const route = useRoute();
 const router = useRouter();
@@ -123,7 +124,14 @@ const buildOrderItems = () => {
       planId: currentPlan.value.id,
       productName: product.value.name,
       skuCode: currentSku.value.skuCode,
-      planSnapshot: JSON.stringify({ termMonths: currentPlan.value.termMonths }),
+      planSnapshot: serializePlanSnapshot({
+        planId: currentPlan.value.id,
+        planType: currentPlan.value.planType,
+        termMonths: currentPlan.value.termMonths,
+        depositAmount: currentPlan.value.depositAmount,
+        rentAmountMonthly: currentPlan.value.rentAmountMonthly,
+        buyoutPrice: currentPlan.value.buyoutPrice ?? null
+      }),
       quantity: form.quantity,
       unitRentAmount: currentPlan.value.rentAmountMonthly,
       unitDepositAmount: currentPlan.value.depositAmount,

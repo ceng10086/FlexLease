@@ -1,15 +1,20 @@
 package com.flexlease.order.service;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flexlease.common.exception.BusinessException;
 import com.flexlease.common.exception.ErrorCode;
 import com.flexlease.common.notification.NotificationChannel;
 import com.flexlease.common.notification.NotificationSendRequest;
+import com.flexlease.common.security.FlexleasePrincipal;
+import com.flexlease.common.security.SecurityUtils;
 import com.flexlease.order.client.InventoryReservationClient;
 import com.flexlease.order.client.InventoryReservationClient.InventoryCommand;
+import com.flexlease.order.client.NotificationClient;
 import com.flexlease.order.client.PaymentClient;
 import com.flexlease.order.client.PaymentStatus;
 import com.flexlease.order.client.PaymentTransactionView;
-import com.flexlease.order.client.NotificationClient;
 import com.flexlease.order.client.ProductCatalogClient;
 import com.flexlease.order.domain.CartItem;
 import com.flexlease.order.domain.ExtensionRequestStatus;
@@ -38,8 +43,6 @@ import com.flexlease.order.dto.OrderShipmentRequest;
 import com.flexlease.order.dto.PagedResponse;
 import com.flexlease.order.dto.RentalOrderResponse;
 import com.flexlease.order.dto.RentalOrderSummaryResponse;
-import com.flexlease.common.security.FlexleasePrincipal;
-import com.flexlease.common.security.SecurityUtils;
 import com.flexlease.order.repository.OrderExtensionRequestRepository;
 import com.flexlease.order.repository.OrderReturnRequestRepository;
 import com.flexlease.order.repository.RentalOrderRepository;
@@ -48,6 +51,7 @@ import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,6 +75,7 @@ public class RentalOrderService {
     private final OrderAssembler assembler;
     private final OrderEventPublisher orderEventPublisher;
     private final ProductCatalogClient productCatalogClient;
+    private final ObjectMapper objectMapper;
 
     public RentalOrderService(RentalOrderRepository rentalOrderRepository,
                               OrderExtensionRequestRepository extensionRequestRepository,
@@ -81,7 +86,8 @@ public class RentalOrderService {
                               CartService cartService,
                               OrderAssembler assembler,
                               OrderEventPublisher orderEventPublisher,
-                              ProductCatalogClient productCatalogClient) {
+                              ProductCatalogClient productCatalogClient,
+                              ObjectMapper objectMapper) {
         this.rentalOrderRepository = rentalOrderRepository;
         this.extensionRequestRepository = extensionRequestRepository;
         this.returnRequestRepository = returnRequestRepository;
@@ -92,6 +98,7 @@ public class RentalOrderService {
         this.assembler = assembler;
         this.orderEventPublisher = orderEventPublisher;
         this.productCatalogClient = productCatalogClient;
+        this.objectMapper = objectMapper;
     }
 
     @Transactional(Transactional.TxType.SUPPORTS)
@@ -101,7 +108,9 @@ public class RentalOrderService {
                 throw new BusinessException(ErrorCode.FORBIDDEN, "请求用户与当前登录用户不一致");
             }
         });
-        Totals totals = calculateTotals(request.items());
+        List<OrderItemRequest> items = request.items() == null ? List.of() : request.items();
+        List<ResolvedOrderItem> resolvedItems = resolveOrderItems(request.vendorId(), items);
+        Totals totals = calculateTotals(resolvedItems);
         return new OrderPreviewResponse(totals.depositAmount, totals.rentAmount, totals.totalAmount);
     }
 
@@ -139,11 +148,8 @@ public class RentalOrderService {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "订单缺少商品明细");
         }
 
-        if (!directItems.isEmpty()) {
-            validateDirectOrderItems(request.vendorId(), orderItems);
-        }
-
-        Totals totals = calculateTotals(orderItems);
+        List<ResolvedOrderItem> resolvedItems = resolveOrderItems(request.vendorId(), orderItems);
+        Totals totals = calculateTotals(resolvedItems);
 
         RentalOrder order = RentalOrder.create(
                 request.userId(),
@@ -157,9 +163,9 @@ public class RentalOrderService {
                 request.leaseEndAt()
         );
 
-        orderItems.forEach(itemRequest -> order.addItem(toOrderItem(itemRequest)));
+        resolvedItems.forEach(item -> order.addItem(toOrderItem(item)));
 
-        List<InventoryCommand> reservationCommands = toInventoryCommands(orderItems);
+        List<InventoryCommand> reservationCommands = toInventoryCommands(resolvedItems);
         if (!reservationCommands.isEmpty()) {
             inventoryReservationClient.reserve(order.getId(), reservationCommands);
         }
@@ -651,11 +657,11 @@ public class RentalOrderService {
         return "支付成功: 交易号 " + reference + ", 金额 " + transaction.amount();
     }
 
-    private Totals calculateTotals(List<OrderItemRequest> items) {
+    private Totals calculateTotals(List<ResolvedOrderItem> items) {
         BigDecimal deposit = BigDecimal.ZERO;
         BigDecimal rent = BigDecimal.ZERO;
         BigDecimal buyout = BigDecimal.ZERO;
-        for (OrderItemRequest item : items) {
+        for (ResolvedOrderItem item : items) {
             BigDecimal quantity = BigDecimal.valueOf(item.quantity());
             deposit = deposit.add(item.unitDepositAmount().multiply(quantity));
             rent = rent.add(item.unitRentAmount().multiply(quantity));
@@ -724,22 +730,22 @@ public class RentalOrderService {
         );
     }
 
-    private RentalOrderItem toOrderItem(OrderItemRequest itemRequest) {
+    private RentalOrderItem toOrderItem(ResolvedOrderItem item) {
         return RentalOrderItem.create(
-                itemRequest.productId(),
-                itemRequest.skuId(),
-                itemRequest.planId(),
-                itemRequest.productName(),
-                itemRequest.skuCode(),
-                itemRequest.planSnapshot(),
-                itemRequest.quantity(),
-                itemRequest.unitRentAmount(),
-                itemRequest.unitDepositAmount(),
-                itemRequest.buyoutPrice()
+                item.productId(),
+                item.skuId(),
+                item.planId(),
+                item.productName(),
+                item.skuCode(),
+                item.planSnapshot(),
+                item.quantity(),
+                item.unitRentAmount(),
+                item.unitDepositAmount(),
+                item.buyoutPrice()
         );
     }
 
-    private List<InventoryCommand> toInventoryCommands(List<OrderItemRequest> items) {
+    private List<InventoryCommand> toInventoryCommands(List<ResolvedOrderItem> items) {
         return items.stream()
                 .map(item -> {
                     if (item.skuId() == null) {
@@ -811,41 +817,203 @@ public class RentalOrderService {
     private record Totals(BigDecimal depositAmount, BigDecimal rentAmount, BigDecimal buyoutAmount, BigDecimal totalAmount) {
     }
 
-    private void validateDirectOrderItems(UUID expectedVendorId, List<OrderItemRequest> items) {
+    private List<ResolvedOrderItem> resolveOrderItems(UUID expectedVendorId, List<OrderItemRequest> items) {
+        if (items == null || items.isEmpty()) {
+            return List.of();
+        }
+        Map<UUID, ProductCatalogClient.CatalogProductView> products = loadProductsForItems(expectedVendorId, items);
+        return items.stream()
+                .map(item -> resolveOrderItem(item, expectedVendorId, products))
+                .toList();
+    }
+
+    private Map<UUID, ProductCatalogClient.CatalogProductView> loadProductsForItems(UUID expectedVendorId,
+                                                                                   List<OrderItemRequest> items) {
         Map<UUID, ProductCatalogClient.CatalogProductView> products = new HashMap<>();
         for (OrderItemRequest item : items) {
             ProductCatalogClient.CatalogProductView product = products.computeIfAbsent(
                     item.productId(),
                     productCatalogClient::getProduct
             );
-
             if (!expectedVendorId.equals(product.vendorId())) {
                 throw new BusinessException(ErrorCode.VALIDATION_ERROR, "订单明细所属厂商与请求不一致");
             }
-
-            ProductCatalogClient.CatalogProductView.RentalPlanView matchedPlan = null;
-            if (item.planId() != null) {
-                matchedPlan = product.rentalPlans() == null ? null : product.rentalPlans().stream()
-                        .filter(plan -> item.planId().equals(plan.id()))
-                        .findFirst()
-                        .orElseThrow(() -> new BusinessException(ErrorCode.VALIDATION_ERROR, "租赁方案不存在: " + item.planId()));
-            }
-
-            if (item.skuId() != null) {
-                boolean skuBelongsToProduct;
-                if (matchedPlan != null) {
-                    skuBelongsToProduct = matchedPlan.skus() != null
-                            && matchedPlan.skus().stream().anyMatch(sku -> item.skuId().equals(sku.id()));
-                } else {
-                    skuBelongsToProduct = product.rentalPlans() != null
-                            && product.rentalPlans().stream()
-                            .filter(plan -> plan.skus() != null)
-                            .anyMatch(plan -> plan.skus().stream().anyMatch(sku -> item.skuId().equals(sku.id())));
-                }
-                if (!skuBelongsToProduct) {
-                    throw new BusinessException(ErrorCode.VALIDATION_ERROR, "SKU 不属于指定商品");
-                }
-            }
         }
+        return products;
+    }
+
+    private ResolvedOrderItem resolveOrderItem(OrderItemRequest item,
+                                               UUID expectedVendorId,
+                                               Map<UUID, ProductCatalogClient.CatalogProductView> products) {
+        ProductCatalogClient.CatalogProductView product = products.get(item.productId());
+        if (product == null) {
+            product = productCatalogClient.getProduct(item.productId());
+            if (!expectedVendorId.equals(product.vendorId())) {
+                throw new BusinessException(ErrorCode.VALIDATION_ERROR, "订单明细所属厂商与请求不一致");
+            }
+            products.put(item.productId(), product);
+        }
+
+        ProductCatalogClient.CatalogProductView.RentalPlanView plan = selectPlan(item, product);
+        ProductCatalogClient.CatalogProductView.SkuView sku = selectSku(item, product, plan);
+
+        PlanSnapshotData snapshot = parsePlanSnapshot(item.planSnapshot()).orElse(null);
+        if (snapshot == null && item.planId() != null) {
+            snapshot = new PlanSnapshotData(item.planId(), null, null, null, null, null);
+        }
+        PlanSnapshotData mergedSnapshot = mergeSnapshotData(snapshot, plan);
+        if (mergedSnapshot.planId() == null && item.planId() != null) {
+            mergedSnapshot = new PlanSnapshotData(item.planId(),
+                    mergedSnapshot.planType(),
+                    mergedSnapshot.termMonths(),
+                    mergedSnapshot.depositAmount(),
+                    mergedSnapshot.rentAmountMonthly(),
+                    mergedSnapshot.buyoutPrice());
+        }
+
+        BigDecimal unitDeposit = mergedSnapshot.depositAmount();
+        BigDecimal unitRent = mergedSnapshot.rentAmountMonthly();
+        if (unitDeposit == null) {
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "无法确定押金金额，请刷新商品数据后重试");
+        }
+        if (unitRent == null) {
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "无法确定租金金额，请刷新商品数据后重试");
+        }
+
+        String productName = product.name() != null && !product.name().isBlank() ? product.name() : item.productName();
+        String skuCode = sku != null && sku.skuCode() != null && !sku.skuCode().isBlank()
+                ? sku.skuCode()
+                : item.skuCode();
+        UUID resolvedPlanId = plan != null ? plan.id() : mergedSnapshot.planId();
+        UUID resolvedSkuId = sku != null ? sku.id() : item.skuId();
+        String sanitizedSnapshot = writePlanSnapshot(mergedSnapshot, item.planSnapshot());
+
+        return new ResolvedOrderItem(
+                item.productId(),
+                resolvedSkuId,
+                resolvedPlanId,
+                productName,
+                skuCode,
+                sanitizedSnapshot,
+                item.quantity(),
+                unitRent,
+                unitDeposit,
+                mergedSnapshot.buyoutPrice()
+        );
+    }
+
+    private ProductCatalogClient.CatalogProductView.RentalPlanView selectPlan(OrderItemRequest item,
+                                                                              ProductCatalogClient.CatalogProductView product) {
+        List<ProductCatalogClient.CatalogProductView.RentalPlanView> plans = product.rentalPlans();
+        if (plans == null || plans.isEmpty()) {
+            return null;
+        }
+        if (item.planId() != null) {
+            return plans.stream()
+                    .filter(plan -> item.planId().equals(plan.id()))
+                    .findFirst()
+                    .orElseThrow(() -> new BusinessException(ErrorCode.VALIDATION_ERROR, "租赁方案不存在: " + item.planId()));
+        }
+        if (item.skuId() != null) {
+            return plans.stream()
+                    .filter(plan -> plan.skus() != null && plan.skus().stream().anyMatch(sku -> item.skuId().equals(sku.id())))
+                    .findFirst()
+                    .orElse(null);
+        }
+        return null;
+    }
+
+    private ProductCatalogClient.CatalogProductView.SkuView selectSku(OrderItemRequest item,
+                                                                      ProductCatalogClient.CatalogProductView product,
+                                                                      ProductCatalogClient.CatalogProductView.RentalPlanView plan) {
+        if (item.skuId() == null) {
+            return null;
+        }
+        if (plan != null && plan.skus() != null) {
+            return plan.skus().stream()
+                    .filter(sku -> item.skuId().equals(sku.id()))
+                    .findFirst()
+                    .orElseThrow(() -> new BusinessException(ErrorCode.VALIDATION_ERROR, "SKU 不属于指定租赁方案"));
+        }
+        List<ProductCatalogClient.CatalogProductView.RentalPlanView> plans = product.rentalPlans();
+        if (plans == null || plans.isEmpty()) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "SKU 不属于指定商品");
+        }
+        return plans.stream()
+                .filter(p -> p.skus() != null)
+                .flatMap(p -> p.skus().stream())
+                .filter(sku -> item.skuId().equals(sku.id()))
+                .findFirst()
+                .orElseThrow(() -> new BusinessException(ErrorCode.VALIDATION_ERROR, "SKU 不属于指定商品"));
+    }
+
+    private PlanSnapshotData mergeSnapshotData(PlanSnapshotData snapshot,
+                                               ProductCatalogClient.CatalogProductView.RentalPlanView plan) {
+        UUID planId = plan != null ? plan.id() : snapshot != null ? snapshot.planId() : null;
+        String planType = snapshot != null && snapshot.planType() != null
+                ? snapshot.planType()
+                : plan != null ? plan.planType() : null;
+        Integer termMonths = snapshot != null && snapshot.termMonths() != null
+                ? snapshot.termMonths()
+                : plan != null ? plan.termMonths() : null;
+        BigDecimal deposit = snapshot != null && snapshot.depositAmount() != null
+                ? snapshot.depositAmount()
+                : plan != null ? plan.depositAmount() : null;
+        BigDecimal rent = snapshot != null && snapshot.rentAmountMonthly() != null
+                ? snapshot.rentAmountMonthly()
+                : plan != null ? plan.rentAmountMonthly() : null;
+        BigDecimal buyout = snapshot != null && snapshot.buyoutPrice() != null
+                ? snapshot.buyoutPrice()
+                : plan != null ? plan.buyoutPrice() : null;
+        return new PlanSnapshotData(planId, planType, termMonths, deposit, rent, buyout);
+    }
+
+    private Optional<PlanSnapshotData> parsePlanSnapshot(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(objectMapper.readValue(raw, PlanSnapshotData.class));
+        } catch (JsonProcessingException ex) {
+            LOG.debug("Failed to parse plan snapshot: {}", ex.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    private String writePlanSnapshot(PlanSnapshotData snapshot, String fallback) {
+        if (snapshot == null) {
+            return fallback;
+        }
+        try {
+            return objectMapper.writeValueAsString(snapshot);
+        } catch (JsonProcessingException ex) {
+            LOG.warn("Failed to serialize plan snapshot: {}", ex.getMessage());
+            return fallback;
+        }
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    private record PlanSnapshotData(
+            UUID planId,
+            String planType,
+            Integer termMonths,
+            BigDecimal depositAmount,
+            BigDecimal rentAmountMonthly,
+            BigDecimal buyoutPrice
+    ) {
+    }
+
+    private record ResolvedOrderItem(
+            UUID productId,
+            UUID skuId,
+            UUID planId,
+            String productName,
+            String skuCode,
+            String planSnapshot,
+            int quantity,
+            BigDecimal unitRentAmount,
+            BigDecimal unitDepositAmount,
+            BigDecimal buyoutPrice
+    ) {
     }
 }

@@ -264,7 +264,7 @@ const orderItemsPlaceholder = `[
     "planId": "33333333-3333-3333-3333-333333333333",
     "productName": "办公桌",
     "skuCode": "DESK-001",
-    "planSnapshot": "{\\"termMonths\\":12}",
+      "planSnapshot": "{\"planId\":\"33333333-3333-3333-3333-333333333333\",\"planType\":\"MONTHLY\",\"termMonths\":12,\"depositAmount\":500,\"rentAmountMonthly\":299,\"buyoutPrice\":2599}",
     "quantity": 1,
     "unitRentAmount": 299,
     "unitDepositAmount": 500,
