@@ -25,6 +25,11 @@ export default defineConfig((configEnv: ConfigEnv) => {
       changeOrigin: true,
       secure: false
     },
+    '/api/v1/customers': {
+      target: 'http://localhost:9002',
+      changeOrigin: true,
+      secure: false
+    },
     '/api/v1/admin/products': {
       target: 'http://localhost:9003',
       changeOrigin: true,
