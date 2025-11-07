@@ -19,10 +19,9 @@ import io.jsonwebtoken.Claims;
 import jakarta.validation.Valid;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -101,13 +100,16 @@ public class AuthController {
 
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<UserSummary>> me(
-            @AuthenticationPrincipal UserDetails userDetails,
             @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorizationHeader) {
-        if (userDetails == null || authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
+        if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
             return ResponseEntity.status(401)
                     .body(ApiResponse.failure(ErrorCode.UNAUTHORIZED.code(), "未认证"));
         }
-        String token = authorizationHeader.substring(7);
+        String token = authorizationHeader.substring(7).trim();
+        if (token.isEmpty()) {
+            return ResponseEntity.status(401)
+                    .body(ApiResponse.failure(ErrorCode.UNAUTHORIZED.code(), "未认证"));
+        }
         Optional<Claims> claims = tokenProvider.parseClaims(token);
         if (claims.isEmpty()) {
             return ResponseEntity.status(401)
@@ -119,19 +121,22 @@ public class AuthController {
                 .body(ApiResponse.failure(ErrorCode.UNAUTHORIZED.code(), "仅支持访问令牌"));
         }
         Set<String> roles = tokenService.extractRoles(claims.get());
-        java.util.UUID userId = java.util.UUID.fromString(claims.get().getSubject());
+        UUID userId = UUID.fromString(claims.get().getSubject());
         String vendorIdRaw = claims.get().get("vendorId", String.class);
-        java.util.UUID vendorId = null;
+        UUID vendorId = null;
         if (vendorIdRaw != null && !vendorIdRaw.isBlank()) {
-            vendorId = java.util.UUID.fromString(vendorIdRaw);
+            vendorId = UUID.fromString(vendorIdRaw);
         }
-        var lastLoginAt = userAccountRepository.findById(userId)
-            .map(UserAccount::getLastLoginAt)
-            .orElse(null);
+        var account = userAccountRepository.findById(userId);
+        var lastLoginAt = account.map(UserAccount::getLastLoginAt).orElse(null);
+        String username = claims.get().get("username", String.class);
+        if ((username == null || username.isBlank()) && account.isPresent()) {
+            username = account.get().getUsername();
+        }
         UserSummary summary = new UserSummary(
             userId,
             vendorId,
-            userDetails.getUsername(),
+            username,
             roles,
             lastLoginAt
         );
