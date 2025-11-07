@@ -12,6 +12,7 @@ import com.flexlease.auth.dto.UserSummary;
 import com.flexlease.auth.service.AuthService;
 import com.flexlease.auth.service.RoleService;
 import com.flexlease.auth.service.TokenService;
+import com.flexlease.auth.repository.UserAccountRepository;
 import com.flexlease.common.dto.ApiResponse;
 import com.flexlease.common.exception.ErrorCode;
 import io.jsonwebtoken.Claims;
@@ -39,15 +40,18 @@ public class AuthController {
     private final TokenService tokenService;
     private final JwtTokenProvider tokenProvider;
     private final SecurityProperties securityProperties;
+    private final UserAccountRepository userAccountRepository;
 
     public AuthController(AuthService authService,
                           TokenService tokenService,
                           JwtTokenProvider tokenProvider,
-                          SecurityProperties securityProperties) {
+                          SecurityProperties securityProperties,
+                          UserAccountRepository userAccountRepository) {
         this.authService = authService;
         this.tokenService = tokenService;
         this.tokenProvider = tokenProvider;
         this.securityProperties = securityProperties;
+        this.userAccountRepository = userAccountRepository;
     }
 
     @PostMapping("/register/customer")
@@ -121,12 +125,15 @@ public class AuthController {
         if (vendorIdRaw != null && !vendorIdRaw.isBlank()) {
             vendorId = java.util.UUID.fromString(vendorIdRaw);
         }
+        var lastLoginAt = userAccountRepository.findById(userId)
+            .map(UserAccount::getLastLoginAt)
+            .orElse(null);
         UserSummary summary = new UserSummary(
-                userId,
-                vendorId,
-                userDetails.getUsername(),
-                roles,
-                null
+            userId,
+            vendorId,
+            userDetails.getUsername(),
+            roles,
+            lastLoginAt
         );
         return ResponseEntity.ok(ApiResponse.success(summary));
     }

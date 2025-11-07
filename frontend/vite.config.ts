@@ -46,11 +46,21 @@ export default defineConfig((configEnv: ConfigEnv) => {
       secure: false
     },
     '/api/v1/vendors': {
-      target: 'http://localhost:9003',
+      target: 'http://localhost:9002',
+      changeOrigin: true,
+      secure: false,
+      router: (req) => {
+        const url = req?.url ?? '';
+        const vendorProductPattern = /^\/api\/v1\/vendors\/[^/]+\/products/;
+        return vendorProductPattern.test(url) ? 'http://localhost:9003' : 'http://localhost:9002';
+      }
+    },
+    '/api/v1/orders': {
+      target: 'http://localhost:9004',
       changeOrigin: true,
       secure: false
     },
-    '/api/v1/orders': {
+    '/api/v1/admin/orders': {
       target: 'http://localhost:9004',
       changeOrigin: true,
       secure: false
