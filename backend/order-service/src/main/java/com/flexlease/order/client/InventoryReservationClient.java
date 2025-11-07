@@ -1,5 +1,7 @@
 package com.flexlease.order.client;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flexlease.common.dto.ApiResponse;
 import com.flexlease.common.exception.BusinessException;
 import com.flexlease.common.exception.ErrorCode;
@@ -27,13 +29,16 @@ public class InventoryReservationClient {
     private final RestTemplate restTemplate;
     private final String baseUrl;
     private final String internalToken;
+    private final ObjectMapper objectMapper;
 
-    public InventoryReservationClient(RestTemplate restTemplate, 
-                                     ProductServiceProperties properties,
-                                     @Value("${security.jwt.internal-access-token}") String internalToken) {
+    public InventoryReservationClient(RestTemplate restTemplate,
+                                      ProductServiceProperties properties,
+                                      @Value("${security.jwt.internal-access-token}") String internalToken,
+                                      ObjectMapper objectMapper) {
         this.restTemplate = restTemplate;
         this.baseUrl = properties.getBaseUrl();
         this.internalToken = internalToken;
+        this.objectMapper = objectMapper;
     }
 
     public void reserve(UUID referenceId, List<InventoryCommand> commands) {
@@ -77,10 +82,52 @@ public class InventoryReservationClient {
                 throw new BusinessException(ErrorCode.INTERNAL_ERROR, body.message());
             }
         } catch (HttpStatusCodeException ex) {
-            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "库存服务调用失败：" + ex.getResponseBodyAsString());
+            ApiResponse<?> errorBody = parseErrorResponse(ex.getResponseBodyAsString());
+            ErrorCode fallback = ex.getStatusCode().is4xxClientError()
+                    ? ErrorCode.VALIDATION_ERROR
+                    : ErrorCode.INTERNAL_ERROR;
+            ErrorCode mappedCode = resolveErrorCode(errorBody, fallback);
+            String message = resolveErrorMessage(ex, errorBody);
+            throw new BusinessException(mappedCode, message);
         } catch (RestClientException ex) {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR, "库存服务调用失败");
         }
+    }
+
+    private ApiResponse<?> parseErrorResponse(String rawBody) {
+        if (rawBody == null || rawBody.isBlank()) {
+            return null;
+        }
+        try {
+            return objectMapper.readValue(rawBody, new TypeReference<ApiResponse<Object>>() {
+            });
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private ErrorCode resolveErrorCode(ApiResponse<?> errorBody, ErrorCode fallback) {
+        if (errorBody == null) {
+            return fallback;
+        }
+        int code = errorBody.code();
+        for (ErrorCode candidate : ErrorCode.values()) {
+            if (candidate.code() == code) {
+                return candidate;
+            }
+        }
+        return fallback;
+    }
+
+    private String resolveErrorMessage(HttpStatusCodeException ex, ApiResponse<?> errorBody) {
+        if (errorBody != null && errorBody.message() != null && !errorBody.message().isBlank()) {
+            return errorBody.message();
+        }
+        String responseBody = ex.getResponseBodyAsString();
+        if (responseBody != null && !responseBody.isBlank()) {
+            return responseBody;
+        }
+        return ex.getStatusText();
     }
 
     public record InventoryCommand(UUID skuId, int quantity) {
