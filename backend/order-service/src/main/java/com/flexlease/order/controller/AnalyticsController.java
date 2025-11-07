@@ -26,6 +26,10 @@ public class AnalyticsController {
 
     @GetMapping("/dashboard")
     public ApiResponse<DashboardMetricsResponse> dashboard() {
+        FlexleasePrincipal principal = SecurityUtils.requirePrincipal();
+        if (!principal.hasRole("ADMIN") && !principal.hasRole("INTERNAL")) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "仅管理员可查看平台指标");
+        }
         return ApiResponse.success(orderAnalyticsService.getDashboardMetrics());
     }
 

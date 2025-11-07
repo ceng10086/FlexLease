@@ -34,6 +34,8 @@ server:
 flexlease:
   notification-service:
     base-url: http://notification-service/api/v1
+  order-service:
+    base-url: http://order-service/api/v1
 management:
   endpoints:
     web:

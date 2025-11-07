@@ -23,6 +23,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
+import com.flexlease.user.repository.VendorRepository;
 import static org.mockito.Mockito.verify;
 
 @ActiveProfiles("test")
@@ -44,6 +45,9 @@ class UserServiceApplicationTests {
 
     @MockBean
     private com.flexlease.user.integration.AuthServiceClient authServiceClient;
+
+    @Autowired
+    private VendorRepository vendorRepository;
 
     @Test
     void vendorApplicationLifecycle() throws Exception {
@@ -86,6 +90,56 @@ class UserServiceApplicationTests {
         assertThat(approveNode.at("/data/status").asText()).isEqualTo("APPROVED");
 
         verify(authServiceClient).activateAccount(ownerId);
+
+        UUID vendorId = vendorRepository.findAll().stream()
+                .findFirst()
+                .map(com.flexlease.user.domain.Vendor::getId)
+                .orElseThrow();
+
+        verify(authServiceClient).assignVendor(ownerId, vendorId);
+
+        mockMvc.perform(get("/api/v1/vendors/" + vendorId)
+                .header(HttpHeaders.AUTHORIZATION, vendorToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.id").value(vendorId.toString()));
+
+        var ownerUpdatePayload = java.util.Map.of(
+            "contactName", "李运营",
+            "contactPhone", "18800002222"
+        );
+
+        mockMvc.perform(put("/api/v1/vendors/" + vendorId)
+                .header(HttpHeaders.AUTHORIZATION, vendorToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(ownerUpdatePayload)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.contactName").value("李运营"));
+
+        String operatorToken = TestJwtTokens.bearerToken(UUID.randomUUID(), vendorId, "vendor-operator", "VENDOR");
+
+        mockMvc.perform(get("/api/v1/vendors/" + vendorId)
+                .header(HttpHeaders.AUTHORIZATION, operatorToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.id").value(vendorId.toString()));
+
+        var operatorUpdatePayload = java.util.Map.of(
+            "contactName", "运营同学",
+            "contactPhone", "17700003333"
+        );
+
+        mockMvc.perform(put("/api/v1/vendors/" + vendorId)
+                .header(HttpHeaders.AUTHORIZATION, operatorToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(operatorUpdatePayload)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.contactPhone").value("17700003333"));
+
+        String otherVendorToken = TestJwtTokens.bearerToken(UUID.randomUUID(), UUID.randomUUID(), "outsider", "VENDOR");
+
+        mockMvc.perform(get("/api/v1/vendors/" + vendorId)
+                .header(HttpHeaders.AUTHORIZATION, otherVendorToken))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value(com.flexlease.common.exception.ErrorCode.FORBIDDEN.code()));
 
         mockMvc.perform(get("/api/v1/vendors/applications/" + applicationId)
                 .header(HttpHeaders.AUTHORIZATION, adminToken))

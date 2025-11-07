@@ -243,18 +243,26 @@ public class RentalOrderService {
         UUID transactionId = parseTransactionId(request.paymentReference());
         PaymentTransactionView transaction = paymentClient.loadTransaction(transactionId);
         ensurePaymentMatches(order, transaction, request);
-        order.markPaid();
-        order.setPaymentTransactionId(transaction.id());
-        recordEvent(order,
-                OrderEventType.PAYMENT_CONFIRMED,
-                buildPaymentMessage(transaction),
-                request.userId(),
-                Map.of(
-                        "paymentReference", request.paymentReference(),
-                        "paidAmount", request.paidAmount()
-                ));
-        notifyUser(order, "订单支付成功", "订单 %s 支付成功，实付 ¥%s。".formatted(order.getOrderNo(), request.paidAmount()));
-        notifyVendor(order, "订单待发货", "订单 %s 已完成支付，请尽快安排发货。".formatted(order.getOrderNo()));
+        finalizePayment(order, transaction, request.userId(), request.paymentReference(), request.paidAmount());
+        return assembler.toOrderResponse(order);
+    }
+
+    public RentalOrderResponse handlePaymentSuccess(UUID orderId, UUID transactionId) {
+        if (transactionId == null) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "支付流水缺失");
+        }
+        RentalOrder order = getOrderForUpdate(orderId);
+        UUID currentTransaction = order.getPaymentTransactionId();
+        if (currentTransaction != null) {
+            if (currentTransaction.equals(transactionId)) {
+                LOG.debug("Order {} already linked to transaction {}, ignoring duplicate payment callback", order.getOrderNo(), transactionId);
+                return assembler.toOrderResponse(order);
+            }
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "订单已关联其他支付流水");
+        }
+        PaymentTransactionView transaction = paymentClient.loadTransaction(transactionId);
+        ensurePaymentMatches(order, transaction);
+        finalizePayment(order, transaction, transaction.userId(), transaction.transactionNo(), transaction.amount());
         return assembler.toOrderResponse(order);
     }
 
@@ -630,6 +638,16 @@ public class RentalOrderService {
     private void ensurePaymentMatches(RentalOrder order,
                                       PaymentTransactionView transaction,
                                       OrderPaymentRequest request) {
+        ensurePaymentMatches(order, transaction);
+        if (request.paidAmount() == null) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "请求缺少支付金额");
+        }
+        if (transaction.amount().compareTo(request.paidAmount()) != 0) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "支付金额与请求不一致");
+        }
+    }
+
+    private void ensurePaymentMatches(RentalOrder order, PaymentTransactionView transaction) {
         if (transaction.orderId() == null || !transaction.orderId().equals(order.getId())) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "支付流水与订单不匹配");
         }
@@ -642,12 +660,54 @@ public class RentalOrderService {
         if (transaction.status() != PaymentStatus.SUCCEEDED) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "支付尚未完成");
         }
-        if (transaction.amount() == null || transaction.amount().compareTo(request.paidAmount()) != 0) {
-            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "支付金额与请求不一致");
+        if (transaction.amount() == null) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "支付金额为空");
         }
         if (transaction.amount().compareTo(order.getTotalAmount()) != 0) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "支付金额与订单应付不一致");
         }
+    }
+
+    private boolean finalizePayment(RentalOrder order,
+                                     PaymentTransactionView transaction,
+                                     UUID actorId,
+                                     String paymentReference,
+                                     BigDecimal paidAmount) {
+        if (order.getPaymentTransactionId() != null) {
+            if (order.getPaymentTransactionId().equals(transaction.id())) {
+                LOG.debug("Order {} already finalized with transaction {}", order.getOrderNo(), transaction.id());
+                return false;
+            }
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "订单已关联其他支付流水");
+        }
+        try {
+            order.markPaid();
+        } catch (IllegalStateException ex) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "订单状态不支持支付确认");
+        }
+        order.setPaymentTransactionId(transaction.id());
+        Map<String, Object> attributes = new HashMap<>();
+        if (paymentReference != null && !paymentReference.isBlank()) {
+            attributes.put("paymentReference", paymentReference);
+        }
+        BigDecimal notificationAmount = paidAmount != null ? paidAmount : transaction.amount();
+        if (notificationAmount != null) {
+            attributes.put("paidAmount", notificationAmount);
+        }
+        recordEvent(order,
+                OrderEventType.PAYMENT_CONFIRMED,
+                buildPaymentMessage(transaction),
+                actorId,
+                attributes);
+        if (notificationAmount != null) {
+            notifyUser(order,
+                    "订单支付成功",
+                    "订单 %s 支付成功，实付 ¥%s。".formatted(order.getOrderNo(), notificationAmount));
+        } else {
+            notifyUser(order, "订单支付成功", "订单 %s 支付成功。".formatted(order.getOrderNo()));
+        }
+        notifyVendor(order, "订单待发货", "订单 %s 已完成支付，请尽快安排发货。".formatted(order.getOrderNo()));
+        return true;
     }
 
     private String buildPaymentMessage(PaymentTransactionView transaction) {

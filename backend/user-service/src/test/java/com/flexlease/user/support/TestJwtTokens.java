@@ -20,22 +20,32 @@ public final class TestJwtTokens {
     }
 
     public static String bearerToken(UUID userId, String username, String... roles) {
-        return "Bearer " + token(userId, username, roles);
+        return bearerToken(userId, null, username, roles);
+    }
+
+    public static String bearerToken(UUID userId, UUID vendorId, String username, String... roles) {
+        return "Bearer " + token(userId, vendorId, username, roles);
     }
 
     public static String token(UUID userId, String username, String... roles) {
+        return token(userId, null, username, roles);
+    }
+
+    public static String token(UUID userId, UUID vendorId, String username, String... roles) {
         Key key = Keys.hmacShaKeyFor(Decoders.BASE64.decode(ensureBase64(SECRET)));
         String rolesCsv = roles == null || roles.length == 0 ? "" : String.join(",", roles);
         String subject = userId == null ? UUID.randomUUID().toString() : userId.toString();
-        return Jwts.builder()
+        var builder = Jwts.builder()
                 .setSubject(subject)
                 .claim("username", username)
                 .claim("roles", rolesCsv)
                 .setIssuer(ISSUER)
                 .setIssuedAt(Date.from(Instant.now()))
-                .setExpiration(Date.from(Instant.now().plus(1, ChronoUnit.HOURS)))
-                .signWith(key)
-                .compact();
+                .setExpiration(Date.from(Instant.now().plus(1, ChronoUnit.HOURS)));
+        if (vendorId != null) {
+            builder.claim("vendorId", vendorId.toString());
+        }
+        return builder.signWith(key).compact();
     }
 
     private static String ensureBase64(String secret) {

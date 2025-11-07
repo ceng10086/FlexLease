@@ -54,9 +54,7 @@ public class VendorController {
         if (!principal.hasRole("VENDOR")) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "仅厂商可查看自身信息");
         }
-        if (principal.userId() == null || !principal.userId().equals(response.ownerUserId())) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "无权查看该厂商信息");
-        }
+        ensureVendorAccess(principal, response, "无权查看该厂商信息");
         return ApiResponse.success(response);
     }
 
@@ -71,9 +69,7 @@ public class VendorController {
             throw new BusinessException(ErrorCode.FORBIDDEN, "仅厂商可更新资料");
         }
         VendorResponse response = vendorService.get(vendorId);
-        if (principal.userId() == null || !principal.userId().equals(response.ownerUserId())) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "无权更新该厂商资料");
-        }
+        ensureVendorAccess(principal, response, "无权更新该厂商资料");
         return ApiResponse.success(vendorService.update(vendorId, request));
     }
 
@@ -95,5 +91,20 @@ public class VendorController {
         } catch (IllegalArgumentException ex) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "非法状态值: " + status);
         }
+    }
+
+    private void ensureVendorAccess(FlexleasePrincipal principal, VendorResponse vendor, String forbiddenMessage) {
+        UUID principalVendorId = principal.vendorId();
+        if (principalVendorId != null) {
+            if (principalVendorId.equals(vendor.id())) {
+                return;
+            }
+            throw new BusinessException(ErrorCode.FORBIDDEN, forbiddenMessage);
+        }
+        UUID principalUserId = principal.userId();
+        if (principalUserId != null && principalUserId.equals(vendor.ownerUserId())) {
+            return;
+        }
+        throw new BusinessException(ErrorCode.FORBIDDEN, forbiddenMessage);
     }
 }

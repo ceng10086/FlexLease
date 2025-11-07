@@ -2,9 +2,14 @@ package com.flexlease.payment;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 
 import com.flexlease.common.exception.BusinessException;
 import com.flexlease.payment.client.NotificationClient;
+import com.flexlease.payment.client.OrderServiceClient;
 import com.flexlease.payment.domain.PaymentChannel;
 import com.flexlease.payment.domain.PaymentScene;
 import com.flexlease.payment.domain.PaymentStatus;
@@ -27,6 +32,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.mockito.Mockito;
 
 @SpringBootTest
 class PaymentTransactionServiceIntegrationTest {
@@ -36,6 +42,9 @@ class PaymentTransactionServiceIntegrationTest {
 
         @MockBean
         private NotificationClient notificationClient;
+
+        @MockBean
+        private OrderServiceClient orderServiceClient;
 
     @Test
     void shouldInitConfirmRefundAndSettlePayment() {
@@ -73,6 +82,7 @@ class PaymentTransactionServiceIntegrationTest {
         ));
         assertThat(confirmed.status()).isEqualTo(PaymentStatus.SUCCEEDED);
         assertThat(confirmed.paidAt()).isNotNull();
+        verify(orderServiceClient).notifyPaymentSucceeded(created.orderId(), created.id());
 
         RefundTransactionResponse refund = paymentTransactionService.createRefund(created.id(), new PaymentRefundRequest(
                 new BigDecimal("200.00"),
@@ -145,9 +155,46 @@ class PaymentTransactionServiceIntegrationTest {
         ));
 
         assertThat(failed.status()).isEqualTo(PaymentStatus.FAILED);
+        verify(orderServiceClient, never()).notifyPaymentSucceeded(any(), any());
 
         assertThatThrownBy(() -> paymentTransactionService.confirmPayment(created.id(), new PaymentConfirmRequest("MOCK-123", OffsetDateTime.now())))
                 .isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    void shouldIgnoreDuplicateSuccessCallback() {
+        UUID orderId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        UUID vendorId = UUID.randomUUID();
+
+        PaymentTransactionResponse created = paymentTransactionService.initPayment(orderId, new PaymentInitRequest(
+                userId,
+                vendorId,
+                PaymentScene.RENT,
+                PaymentChannel.MOCK,
+                new BigDecimal("650.00"),
+                "租金",
+                null
+        ));
+
+        PaymentCallbackRequest callbackRequest = new PaymentCallbackRequest(
+                PaymentStatus.SUCCEEDED,
+                "MOCK-CALLBACK-001",
+                OffsetDateTime.now(),
+                null
+        );
+
+        PaymentTransactionResponse first = paymentTransactionService.handleCallback(created.id(), callbackRequest);
+        assertThat(first.status()).isEqualTo(PaymentStatus.SUCCEEDED);
+        verify(orderServiceClient, times(1)).notifyPaymentSucceeded(created.orderId(), created.id());
+        verify(notificationClient, times(1)).send(any());
+
+        Mockito.clearInvocations(orderServiceClient, notificationClient);
+
+        PaymentTransactionResponse second = paymentTransactionService.handleCallback(created.id(), callbackRequest);
+        assertThat(second.status()).isEqualTo(PaymentStatus.SUCCEEDED);
+        verify(orderServiceClient, never()).notifyPaymentSucceeded(any(), any());
+        verify(notificationClient, never()).send(any());
     }
 
     @Test
@@ -170,6 +217,7 @@ class PaymentTransactionServiceIntegrationTest {
                 "MOCK-OK-01",
                 OffsetDateTime.now()
         ));
+        verify(orderServiceClient).notifyPaymentSucceeded(created.orderId(), created.id());
 
         paymentTransactionService.createRefund(created.id(), new PaymentRefundRequest(
                 new BigDecimal("300.00"),

@@ -15,6 +15,7 @@ import com.flexlease.order.client.ProductCatalogClient;
 import com.flexlease.order.client.ProductCatalogClient.CatalogProductView;
 import com.flexlease.order.client.ProductCatalogClient.CatalogProductView.RentalPlanView;
 import com.flexlease.order.client.ProductCatalogClient.CatalogProductView.SkuView;
+import com.flexlease.order.domain.OrderEventType;
 import com.flexlease.order.domain.OrderStatus;
 import com.flexlease.order.dto.AddCartItemRequest;
 import com.flexlease.order.dto.CartItemResponse;
@@ -36,6 +37,7 @@ import com.flexlease.order.service.OrderContractService;
 import com.flexlease.order.service.OrderMaintenanceScheduler;
 import com.flexlease.order.service.RentalOrderService;
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -429,6 +431,75 @@ class RentalOrderServiceIntegrationTest {
         try (SecurityContextHandle ignored = withPrincipal(userId, "user-%s".formatted(userId), "USER")) {
             assertThat(cartService.listCartItems(userId)).isEmpty();
         }
+    }
+
+    @Test
+    void shouldHandlePaymentSuccessNotificationsIdempotently() {
+        UUID userId = UUID.randomUUID();
+        UUID vendorId = UUID.randomUUID();
+        UUID productId = UUID.randomUUID();
+        UUID skuId = UUID.randomUUID();
+        UUID planId = UUID.randomUUID();
+
+        stubProductCatalog(productId, vendorId, planId, skuId);
+
+        RentalOrderResponse created;
+        try (SecurityContextHandle ignored = withPrincipal(userId, "order-user", "USER")) {
+            created = rentalOrderService.createOrder(new CreateOrderRequest(
+                    userId,
+                    vendorId,
+                    "STANDARD",
+                    null,
+                    null,
+                    List.of(new OrderItemRequest(
+                            productId,
+                            skuId,
+                            planId,
+                            "支付回调测试商品",
+                            "SKU-PAY",
+                            null,
+                            1,
+                            new BigDecimal("199.00"),
+                            new BigDecimal("499.00"),
+                            null
+                    )),
+                    List.of()
+            ));
+        }
+
+        UUID transactionId = UUID.randomUUID();
+        PaymentTransactionView transactionView = new PaymentTransactionView(
+                transactionId,
+                "TX-" + transactionId.toString().substring(0, 6),
+                created.id(),
+                userId,
+                vendorId,
+                PaymentStatus.SUCCEEDED,
+                created.totalAmount(),
+                OffsetDateTime.now(),
+                List.of()
+        );
+        Mockito.when(paymentClient.loadTransaction(transactionId)).thenReturn(transactionView);
+
+        RentalOrderResponse afterFirst = rentalOrderService.handlePaymentSuccess(created.id(), transactionId);
+        assertThat(afterFirst.status()).isEqualTo(OrderStatus.AWAITING_SHIPMENT);
+        assertThat(afterFirst.paymentTransactionId()).isEqualTo(transactionId);
+        long paymentEventCount = afterFirst.events().stream()
+                .filter(event -> event.eventType() == OrderEventType.PAYMENT_CONFIRMED)
+                .count();
+        assertThat(paymentEventCount).isEqualTo(1);
+
+        Mockito.clearInvocations(notificationClient, paymentClient);
+
+        RentalOrderResponse afterSecond = rentalOrderService.handlePaymentSuccess(created.id(), transactionId);
+        assertThat(afterSecond.status()).isEqualTo(OrderStatus.AWAITING_SHIPMENT);
+        assertThat(afterSecond.paymentTransactionId()).isEqualTo(transactionId);
+        long paymentEventsAfterDuplicate = afterSecond.events().stream()
+                .filter(event -> event.eventType() == OrderEventType.PAYMENT_CONFIRMED)
+                .count();
+        assertThat(paymentEventsAfterDuplicate).isEqualTo(1);
+        Mockito.verify(notificationClient, Mockito.never()).send(Mockito.any());
+        Mockito.verify(paymentClient, Mockito.never()).loadTransaction(transactionId);
     }
 
     @Test

@@ -13,6 +13,7 @@ import com.flexlease.payment.domain.PaymentTransaction;
 import com.flexlease.payment.domain.RefundStatus;
 import com.flexlease.payment.domain.RefundTransaction;
 import com.flexlease.payment.client.NotificationClient;
+import com.flexlease.payment.client.OrderServiceClient;
 import com.flexlease.payment.dto.PaymentCallbackRequest;
 import com.flexlease.payment.dto.PaymentConfirmRequest;
 import com.flexlease.payment.dto.PaymentInitRequest;
@@ -30,6 +31,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
@@ -38,16 +41,21 @@ import org.springframework.stereotype.Service;
 @Transactional
 public class PaymentTransactionService {
 
+    private static final Logger LOG = LoggerFactory.getLogger(PaymentTransactionService.class);
+
     private final PaymentTransactionRepository paymentTransactionRepository;
     private final PaymentAssembler assembler;
     private final NotificationClient notificationClient;
+    private final OrderServiceClient orderServiceClient;
 
     public PaymentTransactionService(PaymentTransactionRepository paymentTransactionRepository,
                                      PaymentAssembler assembler,
-                                     NotificationClient notificationClient) {
+                                     NotificationClient notificationClient,
+                                     OrderServiceClient orderServiceClient) {
         this.paymentTransactionRepository = paymentTransactionRepository;
         this.assembler = assembler;
         this.notificationClient = notificationClient;
+        this.orderServiceClient = orderServiceClient;
     }
 
     public PaymentTransactionResponse initPayment(UUID orderId, PaymentInitRequest request) {
@@ -102,11 +110,22 @@ public class PaymentTransactionService {
             }
         });
         PaymentTransaction transaction = getTransactionForUpdate(transactionId);
-        try {
-            transaction.markSucceeded(request.channelTransactionNo(), request.paidAt());
+        boolean transitioned = false;
+        if (transaction.getStatus() == PaymentStatus.PENDING) {
+            try {
+                transaction.markSucceeded(request.channelTransactionNo(), request.paidAt());
+                transitioned = true;
+            } catch (IllegalStateException ex) {
+                throw new BusinessException(ErrorCode.VALIDATION_ERROR, ex.getMessage());
+            }
+        } else if (transaction.getStatus() == PaymentStatus.SUCCEEDED) {
+            LOG.debug("Payment transaction {} already succeeded, skipping manual transition", transactionId);
+        } else {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "当前支付状态不支持确认");
+        }
+        if (transitioned) {
+            orderServiceClient.notifyPaymentSucceeded(transaction.getOrderId(), transaction.getId());
             notifyPaymentSucceeded(transaction);
-        } catch (IllegalStateException ex) {
-            throw new BusinessException(ErrorCode.VALIDATION_ERROR, ex.getMessage());
         }
         return assembler.toResponse(transaction);
     }
@@ -121,17 +140,40 @@ public class PaymentTransactionService {
             }
         });
         PaymentTransaction transaction = getTransactionForUpdate(transactionId);
-        try {
-            if (request.status() == PaymentStatus.SUCCEEDED) {
+        if (request.status() == PaymentStatus.SUCCEEDED) {
+            boolean transitioned = false;
+            if (transaction.getStatus() == PaymentStatus.PENDING) {
                 OffsetDateTime paidAt = request.paidAt() != null ? request.paidAt() : OffsetDateTime.now();
-                transaction.markSucceeded(request.channelTransactionNo(), paidAt);
-                notifyPaymentSucceeded(transaction);
-            } else {
-                transaction.markFailed(request.channelTransactionNo());
-                notifyPaymentFailed(transaction);
+                try {
+                    transaction.markSucceeded(request.channelTransactionNo(), paidAt);
+                    transitioned = true;
+                } catch (IllegalStateException ex) {
+                    throw new BusinessException(ErrorCode.VALIDATION_ERROR, ex.getMessage());
+                }
+            } else if (transaction.getStatus() == PaymentStatus.SUCCEEDED) {
+                LOG.debug("Duplicate success callback for transaction {}", transactionId);
+            } else if (transaction.getStatus() == PaymentStatus.FAILED) {
+                throw new BusinessException(ErrorCode.VALIDATION_ERROR, "支付流水已标记失败，无法回滚为成功");
             }
-        } catch (IllegalStateException ex) {
-            throw new BusinessException(ErrorCode.VALIDATION_ERROR, ex.getMessage());
+            if (transitioned) {
+                orderServiceClient.notifyPaymentSucceeded(transaction.getOrderId(), transaction.getId());
+                notifyPaymentSucceeded(transaction);
+            }
+        } else {
+            if (transaction.getStatus() == PaymentStatus.SUCCEEDED) {
+                LOG.warn("Ignoring failure callback for succeeded transaction {}", transactionId);
+                return assembler.toResponse(transaction);
+            }
+            if (transaction.getStatus() == PaymentStatus.FAILED) {
+                LOG.debug("Duplicate failure callback for transaction {}", transactionId);
+                return assembler.toResponse(transaction);
+            }
+            try {
+                transaction.markFailed(request.channelTransactionNo());
+            } catch (IllegalStateException ex) {
+                throw new BusinessException(ErrorCode.VALIDATION_ERROR, ex.getMessage());
+            }
+            notifyPaymentFailed(transaction);
         }
         return assembler.toResponse(transaction);
     }

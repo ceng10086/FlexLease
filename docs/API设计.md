@@ -71,6 +71,8 @@
 | PUT | `/vendors/{vendorId}` | VENDOR | 更新资料 | 请求体 `{ contactName, contactPhone, contactEmail?, province?, city?, address? }` |
 | POST | `/vendors/{vendorId}/suspend` | ADMIN | 更新厂商状态 | 请求体 `{ status }`，支持 `ACTIVE`/`SUSPENDED` |
 
+> 厂商账号需携带 JWT 中的 `vendorId` 才能访问；当账号仍在审批或尚未重新登录导致令牌缺少 `vendorId` 时，仅申请人本人可以继续查看/更新该厂商资料，其它厂商成员会被拒绝。
+
 ### 3.3 用户资料（已实现）
 | 方法 | URL | 角色 | 描述 | 请求/响应要点 |
 | ---- | --- | ---- | ---- | ------------- |
@@ -145,6 +147,7 @@
 | 方法 | URL | 角色 | 描述 | 请求体要点 |
 | ---- | --- | ---- | ---- | ---------- |
 | POST | `/orders/{orderId}/pay` | USER | 支付完成回执，订单从 `PENDING_PAYMENT` → `AWAITING_SHIPMENT` | `{ userId, paymentReference(UUID), paidAmount }` |
+| POST | `/internal/orders/{orderId}/payment-success` | INTERNAL | 支付服务回调订单成功 | `{ transactionId }`，幂等；需携带内部访问令牌 |
 | POST | `/orders/{orderId}/cancel` | USER | 支付前取消订单 | `{ userId, reason? }` |
 | POST | `/orders/{orderId}/ship` | VENDOR | 填写发货信息，订单进入 `IN_LEASE` | `{ vendorId, carrier, trackingNumber }` |
 | POST | `/orders/{orderId}/confirm-receive` | USER | 确认收货，记录事件 | `{ actorId }` |
@@ -159,7 +162,7 @@
 
 > `planSnapshot` 均为服务端认可的方案快照 JSON，字段包含 `planId`、`planType`、`termMonths`、`depositAmount`、`rentAmountMonthly`、`buyoutPrice`，前端/工具侧在构造请求或读取响应时请以该格式为准。
 
-> 订单支付确认会回调支付服务核验流水，`paymentReference` 需提供支付服务返回的交易 UUID，金额必须与订单应付一致。
+> 支付服务在标记成功后会调用 `/api/v1/internal/orders/{orderId}/payment-success`，订单服务将再次校验流水并自动更新状态，该接口为幂等设计。用户端的 `/orders/{orderId}/pay` 仍支持手动回执，两条路径都会核对支付金额与订单应付金额是否一致。
 
 ### 5.3 合同与票据（已实现）
 | 方法 | URL | 描述 | 请求要点 |
@@ -215,7 +218,7 @@
 ### 7.2 运营看板
 | 方法 | URL | 描述 | 响应字段 |
 | ---- | --- | ---- | -------- |
-| GET | `/analytics/dashboard` | 平台级运营指标 | `totalOrders`、`activeOrders`、`totalGmv`、`inLeaseCount`、`pendingReturns`、`ordersByStatus`（Map，键为 `OrderStatus` 枚举）|
+| GET | `/analytics/dashboard` | 平台级运营指标（ADMIN/INTERNAL） | `totalOrders`、`activeOrders`、`totalGmv`、`inLeaseCount`、`pendingReturns`、`ordersByStatus`（Map，键为 `OrderStatus` 枚举）|
 | GET | `/analytics/vendor/{vendorId}` | 指定厂商的运营指标 | `vendorId`、`totalOrders`、`activeOrders`、`totalGmv`、`inLeaseCount`、`pendingReturns`、`ordersByStatus` |
 
 > GMV 合计包含待发货、租赁中、退租中、已完成以及买断相关订单；`activeOrders` 聚合待发货、租赁中、退租处理中及买断申请的订单量。返回金额使用 `BigDecimal`（两位小数）。

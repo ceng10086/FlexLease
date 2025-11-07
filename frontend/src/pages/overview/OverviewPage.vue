@@ -13,7 +13,10 @@
     <a-row :gutter="16">
       <a-col :xs="24" :lg="16">
         <a-card title="平台运营指标" :loading="state.loadingMetrics">
-          <template v-if="state.metrics">
+          <template v-if="!canViewPlatformMetrics">
+            <a-alert type="info" show-icon message="仅管理员可查看平台指标" />
+          </template>
+          <template v-else-if="state.metrics">
             <a-row :gutter="16">
               <a-col :xs="12" :md="8">
                 <a-statistic title="总订单" :value="state.metrics.totalOrders" />
@@ -135,6 +138,7 @@ const state = reactive({
 const isVendor = computed(() => auth.hasRole('VENDOR'));
 const isAdmin = computed(() => auth.hasRole('ADMIN'));
 const isCustomer = computed(() => auth.hasRole('USER'));
+const canViewPlatformMetrics = computed(() => isAdmin.value || auth.hasRole('INTERNAL'));
 const currentVendorId = computed(() => auth.vendorId ?? auth.user?.id ?? null);
 
 const statusEntries = computed(() => {
@@ -187,6 +191,11 @@ const goOrders = () => router.push({ name: 'orders' });
 const goNotifications = () => router.push({ name: 'notifications' });
 
 const loadMetrics = async () => {
+  if (!canViewPlatformMetrics.value) {
+    state.metrics = null;
+    state.loadingMetrics = false;
+    return;
+  }
   state.loadingMetrics = true;
   try {
     state.metrics = await fetchDashboardMetrics();
