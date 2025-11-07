@@ -1,6 +1,7 @@
 package com.flexlease.product.controller;
 
 import com.flexlease.common.dto.ApiResponse;
+import com.flexlease.common.security.SecurityUtils;
 import com.flexlease.product.dto.InventoryReservationBatchRequest;
 import com.flexlease.product.service.InventoryReservationService;
 import jakarta.validation.Valid;
@@ -21,6 +22,7 @@ public class InternalInventoryController {
 
     @PostMapping("/reservations")
     public ApiResponse<Void> processReservations(@Valid @RequestBody InventoryReservationBatchRequest request) {
+        SecurityUtils.requireRole("INTERNAL");
         reservationService.processReservations(request);
         return ApiResponse.success(null);
     }

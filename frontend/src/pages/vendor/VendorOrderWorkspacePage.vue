@@ -1,5 +1,5 @@
 <template>
-  <div class="page-container">
+  <div v-if="vendorReady" class="page-container">
     <div class="page-header">
       <div>
         <h2>订单履约</h2>
@@ -98,10 +98,23 @@
       </a-spin>
     </a-drawer>
   </div>
+
+  <div v-else class="page-container">
+    <a-result status="warning" title="尚未获取厂商身份">
+      <template #subTitle>
+        请先重新同步账户或退出后重新登录，以加载厂商工作台。
+      </template>
+      <template #extra>
+        <a-space>
+          <a-button type="primary" :loading="syncingAccount" @click="refreshAccount">重新同步</a-button>
+        </a-space>
+      </template>
+    </a-result>
+  </div>
 </template>
 
 <script lang="ts" setup>
-import { reactive, ref } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import { message } from 'ant-design-vue';
 import { useAuthStore } from '../../stores/auth';
 import {
@@ -128,10 +141,14 @@ const vendorStatuses: OrderStatus[] = [
 ];
 
 const auth = useAuthStore();
-const vendorId = () => {
-  const id = auth.vendorId ?? auth.user?.id;
-  if (!id) {
-    throw new Error('未获取到厂商账号');
+const currentVendorId = computed(() => auth.vendorId ?? null);
+const vendorReady = computed(() => Boolean(currentVendorId.value));
+const syncingAccount = ref(false);
+
+const requireVendorId = (notify = false) => {
+  const id = currentVendorId.value;
+  if (!id && notify) {
+    message.warning('缺少厂商身份，请重新登录后重试');
   }
   return id;
 };
@@ -188,10 +205,16 @@ const resolveOrderTotal = (detail: RentalOrderDetail): number => {
 };
 
 const loadOrders = async () => {
+  const vendorId = requireVendorId();
+  if (!vendorId) {
+    orders.value = [];
+    pagination.total = 0;
+    return;
+  }
   loading.value = true;
   try {
     const result = await listOrders({
-      vendorId: vendorId(),
+      vendorId,
       status: filters.status,
       page: pagination.current,
       size: pagination.pageSize
@@ -238,6 +261,10 @@ const handleShip = async () => {
   if (!detail.order) {
     return;
   }
+  const vendorId = requireVendorId(true);
+  if (!vendorId) {
+    return;
+  }
   if (!shipForm.carrier || !shipForm.trackingNumber) {
     message.warning('请填写承运方与运单号');
     return;
@@ -245,7 +272,7 @@ const handleShip = async () => {
   shipForm.loading = true;
   try {
     await shipOrder(detail.order.id, {
-      vendorId: vendorId(),
+      vendorId,
       carrier: shipForm.carrier,
       trackingNumber: shipForm.trackingNumber
     });
@@ -264,10 +291,14 @@ const handleReturnDecision = async (approve: boolean) => {
   if (!detail.order) {
     return;
   }
+  const vendorId = requireVendorId(true);
+  if (!vendorId) {
+    return;
+  }
   returnForm.loading = true;
   try {
     await decideOrderReturn(detail.order.id, {
-      vendorId: vendorId(),
+      vendorId,
       approve,
       remark: returnForm.remark || (approve ? '同意退租' : '拒绝退租')
     });
@@ -282,7 +313,36 @@ const handleReturnDecision = async (approve: boolean) => {
   }
 };
 
-loadOrders();
+const refreshAccount = async () => {
+  syncingAccount.value = true;
+  try {
+    await auth.bootstrap();
+    if (currentVendorId.value) {
+      message.success('厂商身份已同步');
+      await loadOrders();
+    } else {
+      message.warning('仍未获取到厂商身份，请尝试重新登录');
+    }
+  } catch (error) {
+    console.error('刷新账号信息失败', error);
+    message.error('同步失败，请稍后重试');
+  } finally {
+    syncingAccount.value = false;
+  }
+};
+
+watch(
+  vendorReady,
+  (ready) => {
+    if (ready) {
+      loadOrders();
+    } else {
+      orders.value = [];
+      pagination.total = 0;
+    }
+  },
+  { immediate: true }
+);
 </script>
 
 <style scoped>

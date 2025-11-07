@@ -139,7 +139,7 @@ const isVendor = computed(() => auth.hasRole('VENDOR'));
 const isAdmin = computed(() => auth.hasRole('ADMIN'));
 const isCustomer = computed(() => auth.hasRole('USER'));
 const canViewPlatformMetrics = computed(() => isAdmin.value || auth.hasRole('INTERNAL'));
-const currentVendorId = computed(() => auth.vendorId ?? auth.user?.id ?? null);
+const currentVendorId = computed(() => auth.vendorId ?? null);
 
 const statusEntries = computed(() => {
   if (!state.metrics?.ordersByStatus) {
@@ -208,6 +208,7 @@ const loadMetrics = async () => {
 
 const loadVendorMetrics = async () => {
   if (!isVendor.value || !currentVendorId.value) {
+    state.vendorMetrics = null;
     return;
   }
   state.loadingVendorMetrics = true;

@@ -1,11 +1,11 @@
 <template>
-  <div class="page-container">
+  <div v-if="vendorReady" class="page-container">
     <div class="page-header">
       <div>
         <h2>结算中心</h2>
         <p class="page-header__meta">查看押金、租金与退款的结算情况，支撑财务对账。</p>
       </div>
-      <a-button type="primary" @click="loadSettlements" :loading="loading">刷新</a-button>
+      <a-button type="primary" @click="loadSettlements(true)" :loading="loading">刷新</a-button>
     </div>
 
     <a-card>
@@ -17,7 +17,7 @@
           <a-date-picker v-model:value="filters.to" format="YYYY-MM-DD" />
         </a-form-item>
         <a-form-item>
-          <a-button type="primary" @click="loadSettlements" :loading="loading">查询</a-button>
+          <a-button type="primary" @click="loadSettlements(true)" :loading="loading">查询</a-button>
         </a-form-item>
       </a-form>
 
@@ -47,10 +47,23 @@
       </a-table>
     </a-card>
   </div>
+
+  <div v-else class="page-container">
+    <a-result status="warning" title="尚未获取厂商身份">
+      <template #subTitle>
+        请先重新同步账户或退出后重新登录，以查看结算数据。
+      </template>
+      <template #extra>
+        <a-space>
+          <a-button type="primary" :loading="syncingAccount" @click="refreshAccount">重新同步</a-button>
+        </a-space>
+      </template>
+    </a-result>
+  </div>
 </template>
 
 <script lang="ts" setup>
-import { computed, reactive, ref } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import { message } from 'ant-design-vue';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useAuthStore } from '../../stores/auth';
@@ -59,22 +72,28 @@ import { listSettlements, type PaymentSettlementResponse } from '../../services/
 const auth = useAuthStore();
 const loading = ref(false);
 const records = ref<PaymentSettlementResponse[]>([]);
-const currentVendorId = computed(() => auth.vendorId ?? auth.user?.id ?? null);
+const currentVendorId = computed(() => auth.vendorId ?? null);
+const vendorReady = computed(() => Boolean(currentVendorId.value));
+const syncingAccount = ref(false);
 
 const filters = reactive<{ from?: Dayjs; to?: Dayjs }>({});
 
 const formatCurrency = (value: number) => value.toFixed(2);
 const formatDate = (value: string) => new Date(value).toLocaleString();
 
-const loadSettlements = async () => {
-  if (!currentVendorId.value) {
-    message.error('未获取到厂商账号');
+const loadSettlements = async (notify = false) => {
+  const vendorId = currentVendorId.value;
+  if (!vendorId) {
+    records.value = [];
+    if (notify) {
+      message.warning('缺少厂商身份，请重新登录后重试');
+    }
     return;
   }
   loading.value = true;
   try {
     records.value = await listSettlements({
-      vendorId: currentVendorId.value,
+      vendorId,
       from: filters.from ? dayjs(filters.from).startOf('day').toISOString() : undefined,
       to: filters.to ? dayjs(filters.to).endOf('day').toISOString() : undefined
     });
@@ -86,7 +105,35 @@ const loadSettlements = async () => {
   }
 };
 
-loadSettlements();
+const refreshAccount = async () => {
+  syncingAccount.value = true;
+  try {
+    await auth.bootstrap();
+    if (currentVendorId.value) {
+      message.success('厂商身份已同步');
+      await loadSettlements();
+    } else {
+      message.warning('仍未获取到厂商身份，请尝试重新登录');
+    }
+  } catch (error) {
+    console.error('刷新账号信息失败', error);
+    message.error('同步失败，请稍后重试');
+  } finally {
+    syncingAccount.value = false;
+  }
+};
+
+watch(
+  vendorReady,
+  (ready) => {
+    if (ready) {
+      loadSettlements();
+    } else {
+      records.value = [];
+    }
+  },
+  { immediate: true }
+);
 </script>
 
 <style scoped>

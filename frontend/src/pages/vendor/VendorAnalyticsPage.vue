@@ -1,11 +1,11 @@
 <template>
-  <div class="page-container">
+  <div v-if="vendorReady" class="page-container">
     <div class="page-header">
       <div>
         <h2>运营指标</h2>
         <p class="page-header__meta">实时查看 GMV、活跃订单等核心指标，辅助库存与策略决策。</p>
       </div>
-      <a-button type="default" @click="loadMetrics" :loading="loading">刷新</a-button>
+      <a-button type="default" @click="loadMetrics(true)" :loading="loading">刷新</a-button>
     </div>
 
     <a-row :gutter="16">
@@ -56,10 +56,23 @@
       </a-col>
     </a-row>
   </div>
+
+  <div v-else class="page-container">
+    <a-result status="warning" title="尚未获取厂商身份">
+      <template #subTitle>
+        请先重新同步账户或退出后重新登录，以查看厂商指标。
+      </template>
+      <template #extra>
+        <a-space>
+          <a-button type="primary" :loading="syncingAccount" @click="refreshAccount">重新同步</a-button>
+        </a-space>
+      </template>
+    </a-result>
+  </div>
 </template>
 
 <script lang="ts" setup>
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { message } from 'ant-design-vue';
 import { useAuthStore } from '../../stores/auth';
 import { fetchVendorMetrics, type VendorMetrics } from '../../services/analyticsService';
@@ -67,7 +80,9 @@ import { fetchVendorMetrics, type VendorMetrics } from '../../services/analytics
 const auth = useAuthStore();
 const loading = ref(false);
 const metrics = ref<VendorMetrics | null>(null);
-const currentVendorId = computed(() => auth.vendorId ?? auth.user?.id ?? null);
+const currentVendorId = computed(() => auth.vendorId ?? null);
+const vendorReady = computed(() => Boolean(currentVendorId.value));
+const syncingAccount = ref(false);
 
 const formatCurrency = (value: number) =>
   value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -90,14 +105,18 @@ const completionPercent = computed(() => {
   return Number(((completed / total) * 100).toFixed(2));
 });
 
-const loadMetrics = async () => {
-  if (!currentVendorId.value) {
-    message.error('未获取到厂商账号');
+const loadMetrics = async (notify = false) => {
+  const vendorId = currentVendorId.value;
+  if (!vendorId) {
+    metrics.value = null;
+    if (notify) {
+      message.warning('缺少厂商身份，请重新登录后重试');
+    }
     return;
   }
   loading.value = true;
   try {
-    metrics.value = await fetchVendorMetrics(currentVendorId.value);
+    metrics.value = await fetchVendorMetrics(vendorId);
   } catch (error) {
     console.error('加载厂商指标失败', error);
     message.error('加载指标失败，请稍后重试');
@@ -106,7 +125,35 @@ const loadMetrics = async () => {
   }
 };
 
-loadMetrics();
+const refreshAccount = async () => {
+  syncingAccount.value = true;
+  try {
+    await auth.bootstrap();
+    if (currentVendorId.value) {
+      message.success('厂商身份已同步');
+      await loadMetrics();
+    } else {
+      message.warning('仍未获取到厂商身份，请尝试重新登录');
+    }
+  } catch (error) {
+    console.error('刷新账号信息失败', error);
+    message.error('同步失败，请稍后重试');
+  } finally {
+    syncingAccount.value = false;
+  }
+};
+
+watch(
+  vendorReady,
+  (ready) => {
+    if (ready) {
+      loadMetrics();
+    } else {
+      metrics.value = null;
+    }
+  },
+  { immediate: true }
+);
 </script>
 
 <style scoped>

@@ -1,5 +1,5 @@
 <template>
-  <div class="page-container">
+  <div v-if="vendorReady" class="page-container">
     <div class="page-header">
       <div>
         <h2>商品与租赁方案</h2>
@@ -212,10 +212,23 @@
       </a-form>
     </a-modal>
   </div>
+
+  <div v-else class="page-container">
+    <a-result status="warning" title="尚未获取厂商身份">
+      <template #subTitle>
+        请先重新同步账户或退出后重新登录，即可管理厂商商品。
+      </template>
+      <template #extra>
+        <a-space>
+          <a-button type="primary" :loading="syncingAccount" @click="refreshAccount">重新同步</a-button>
+        </a-space>
+      </template>
+    </a-result>
+  </div>
 </template>
 
 <script lang="ts" setup>
-import { reactive, ref } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import { message } from 'ant-design-vue';
 import { useAuthStore } from '../../stores/auth';
 import {
@@ -237,10 +250,14 @@ import {
 } from '../../services/productService';
 
 const auth = useAuthStore();
-const vendorId = () => {
-  const id = auth.vendorId ?? auth.user?.id;
-  if (!id) {
-    throw new Error('未获取到厂商账号信息');
+const currentVendorId = computed(() => auth.vendorId ?? null);
+const vendorReady = computed(() => Boolean(currentVendorId.value));
+const syncingAccount = ref(false);
+
+const requireVendorId = (notify = false) => {
+  const id = currentVendorId.value;
+  if (!id && notify) {
+    message.warning('缺少厂商身份，请重新登录后重试');
   }
   return id;
 };
@@ -341,9 +358,15 @@ const formatDate = (value: string) => new Date(value).toLocaleString();
 const formatCurrency = (value?: number | null) => (value ?? 0).toFixed(2);
 
 const loadProducts = async () => {
+  const vendorId = requireVendorId();
+  if (!vendorId) {
+    products.value = [];
+    pagination.total = 0;
+    return;
+  }
   loading.value = true;
   try {
-    const result = await listVendorProducts(vendorId(), { page: pagination.page, size: pagination.size });
+    const result = await listVendorProducts(vendorId, { page: pagination.page, size: pagination.size });
     products.value = result.content;
     pagination.total = result.totalElements;
   } catch (error) {
@@ -376,9 +399,13 @@ const handleCreate = async () => {
     message.warning('请填写必填字段');
     return;
   }
+  const vendorId = requireVendorId(true);
+  if (!vendorId) {
+    return;
+  }
   modal.submitting = true;
   try {
-    await createVendorProduct(vendorId(), { ...modal.form });
+    await createVendorProduct(vendorId, { ...modal.form });
     message.success('商品已创建');
     modal.open = false;
     loadProducts();
@@ -391,10 +418,14 @@ const handleCreate = async () => {
 };
 
 const openDetail = async (productId: string) => {
+  const vendorId = requireVendorId(true);
+  if (!vendorId) {
+    return;
+  }
   detail.open = true;
   detail.loading = true;
   try {
-    detail.product = await fetchVendorProduct(vendorId(), productId);
+    detail.product = await fetchVendorProduct(vendorId, productId);
   } catch (error) {
     console.error('加载商品详情失败', error);
     message.error('加载详情失败');
@@ -412,8 +443,12 @@ const refreshDetail = async () => {
 };
 
 const handleSubmit = async (productId: string) => {
+  const vendorId = requireVendorId(true);
+  if (!vendorId) {
+    return;
+  }
   try {
-    await submitVendorProduct(vendorId(), productId);
+    await submitVendorProduct(vendorId, productId);
     message.success('商品已提交审核');
     loadProducts();
     if (detail.product?.id === productId) {
@@ -448,9 +483,13 @@ const handleCreatePlan = async () => {
   if (!detail.product) {
     return;
   }
+  const vendorId = requireVendorId(true);
+  if (!vendorId) {
+    return;
+  }
   planModal.submitting = true;
   try {
-    await createRentalPlan(vendorId(), detail.product.id, { ...planModal.form });
+    await createRentalPlan(vendorId, detail.product.id, { ...planModal.form });
     message.success('租赁方案已创建');
     planModal.open = false;
     refreshDetail();
@@ -466,12 +505,16 @@ const togglePlanStatus = async (plan: RentalPlan) => {
   if (!detail.product) {
     return;
   }
+  const vendorId = requireVendorId(true);
+  if (!vendorId) {
+    return;
+  }
   try {
     if (plan.status === 'ACTIVE') {
-      await deactivateRentalPlan(vendorId(), detail.product.id, plan.id);
+      await deactivateRentalPlan(vendorId, detail.product.id, plan.id);
       message.success('方案已停用');
     } else {
-      await activateRentalPlan(vendorId(), detail.product.id, plan.id);
+      await activateRentalPlan(vendorId, detail.product.id, plan.id);
       message.success('方案已启用');
     }
     refreshDetail();
@@ -506,15 +549,19 @@ const handleSaveSku = async () => {
     message.warning('请填写 SKU 编码');
     return;
   }
+  const vendorId = requireVendorId(true);
+  if (!vendorId) {
+    return;
+  }
   skuModal.submitting = true;
   try {
     if (skuModal.editing) {
-      await updateSku(vendorId(), detail.product.id, skuModal.planId, skuModal.skuId, {
+      await updateSku(vendorId, detail.product.id, skuModal.planId, skuModal.skuId, {
         ...skuModal.form
       });
       message.success('SKU 已更新');
     } else {
-      await createSku(vendorId(), detail.product.id, skuModal.planId, { ...skuModal.form });
+      await createSku(vendorId, detail.product.id, skuModal.planId, { ...skuModal.form });
       message.success('SKU 已创建');
     }
     skuModal.open = false;
@@ -543,10 +590,14 @@ const handleAdjustInventory = async () => {
   if (!detail.product) {
     return;
   }
+  const vendorId = requireVendorId(true);
+  if (!vendorId) {
+    return;
+  }
   inventoryModal.submitting = true;
   try {
     await adjustInventory(
-      vendorId(),
+      vendorId,
       detail.product.id,
       inventoryModal.planId,
       inventoryModal.skuId,
@@ -564,8 +615,36 @@ const handleAdjustInventory = async () => {
 };
 
 const planHeader = (plan: RentalPlan) => `${plan.planType} · ${plan.termMonths} 个月`;
+const refreshAccount = async () => {
+  syncingAccount.value = true;
+  try {
+    await auth.bootstrap();
+    if (currentVendorId.value) {
+      message.success('厂商身份已同步');
+      await loadProducts();
+    } else {
+      message.warning('仍未获取到厂商身份，请尝试重新登录');
+    }
+  } catch (error) {
+    console.error('刷新账号信息失败', error);
+    message.error('同步失败，请稍后重试');
+  } finally {
+    syncingAccount.value = false;
+  }
+};
 
-loadProducts();
+watch(
+  vendorReady,
+  (ready) => {
+    if (ready) {
+      loadProducts();
+    } else {
+      products.value = [];
+      pagination.total = 0;
+    }
+  },
+  { immediate: true }
+);
 </script>
 
 <style scoped>
