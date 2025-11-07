@@ -5,13 +5,9 @@ import com.flexlease.common.exception.ErrorCode;
 import com.flexlease.user.config.AuthServiceProperties;
 import java.util.Map;
 import java.util.UUID;
-import org.apache.hc.client5.http.impl.classic.CloseableHttpClient;
-import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
-import org.springframework.http.client.ClientHttpRequestFactory;
-import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -25,10 +21,7 @@ public class AuthServiceClient {
     private final AuthServiceProperties properties;
 
     public AuthServiceClient(RestClient.Builder builder, AuthServiceProperties properties) {
-        CloseableHttpClient httpClient = HttpClients.createDefault();
-        ClientHttpRequestFactory requestFactory = new HttpComponentsClientHttpRequestFactory(httpClient);
         this.restClient = builder
-            .requestFactory(requestFactory)
                 .baseUrl(properties.getBaseUrl())
                 .build();
         this.properties = properties;

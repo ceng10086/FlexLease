@@ -48,8 +48,21 @@
             <strong>¥{{ formatCurrency(preview?.totalAmount ?? 0) }}</strong>
           </div>
           <a-space direction="vertical" style="width: 100%">
-            <a-button type="default" block :loading="loading.preview" @click="handlePreview">试算费用</a-button>
-            <a-button type="primary" block size="large" :loading="loading.create" @click="handleCreate">提交订单</a-button>
+            <a-button
+              type="default"
+              block
+              :loading="loading.preview"
+              :disabled="!orderReady"
+              @click="handlePreview"
+            >试算费用</a-button>
+            <a-button
+              type="primary"
+              block
+              size="large"
+              :loading="loading.create"
+              :disabled="!orderReady"
+              @click="handleCreate"
+            >提交订单</a-button>
           </a-space>
         </a-card>
       </a-col>
@@ -94,6 +107,7 @@ const currentSkuId = computed(() => route.query.skuId as string | undefined);
 
 const currentPlan = computed(() => product.value?.rentalPlans.find((plan) => plan.id === currentPlanId.value));
 const currentSku = computed(() => currentPlan.value?.skus.find((sku) => sku.id === currentSkuId.value));
+const orderReady = computed(() => Boolean(product.value && currentPlan.value && currentSku.value && product.value.vendorId));
 
 const formatCurrency = (value: number) => value.toFixed(2);
 
@@ -146,11 +160,15 @@ const handlePreview = async () => {
     router.replace({ name: 'login', query: { redirect: route.fullPath } });
     return;
   }
+  if (!orderReady.value) {
+    message.warning('商品信息正在加载，请稍后再试');
+    return;
+  }
   loading.preview = true;
   try {
     preview.value = await previewOrder({
       userId: auth.user.id,
-      vendorId: product.value?.vendorId ?? '',
+      vendorId: product.value!.vendorId,
       leaseStartAt: form.leaseStart?.toISOString(),
       leaseEndAt: form.leaseEnd?.toISOString(),
       items: buildOrderItems()
@@ -169,11 +187,15 @@ const handleCreate = async () => {
     router.replace({ name: 'login', query: { redirect: route.fullPath } });
     return;
   }
+  if (!orderReady.value) {
+    message.warning('商品信息正在加载，请稍后再试');
+    return;
+  }
   loading.create = true;
   try {
     const response = await createOrder({
       userId: auth.user.id,
-      vendorId: product.value?.vendorId ?? '',
+      vendorId: product.value!.vendorId,
       leaseStartAt: form.leaseStart?.toISOString(),
       leaseEndAt: form.leaseEnd?.toISOString(),
       items: buildOrderItems()
