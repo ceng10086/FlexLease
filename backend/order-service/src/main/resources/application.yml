@@ -2,10 +2,10 @@ spring:
   application:
     name: order-service
   datasource:
-    url: jdbc:h2:mem:flexlease-order;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;INIT=CREATE SCHEMA IF NOT EXISTS "order"
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://postgres:5432/flexlease}
+    driver-class-name: org.postgresql.Driver
+    username: ${SPRING_DATASOURCE_USERNAME:flexlease}
+    password: ${SPRING_DATASOURCE_PASSWORD:flexlease}
   jpa:
     hibernate:
       ddl-auto: validate
@@ -17,21 +17,19 @@ spring:
     open-in-view: false
   flyway:
     enabled: true
+    create-schemas: true
+    default-schema: "order"
     schemas: "order"
     locations: classpath:db/migration
-  h2:
-    console:
-      enabled: true
-      path: /h2-console
   rabbitmq:
-    host: ${SPRING_RABBITMQ_HOST:localhost}
+    host: ${SPRING_RABBITMQ_HOST:rabbitmq}
     port: ${SPRING_RABBITMQ_PORT:5672}
     username: ${SPRING_RABBITMQ_USERNAME:guest}
     password: ${SPRING_RABBITMQ_PASSWORD:guest}
 eureka:
   client:
     service-url:
-      defaultZone: http://localhost:8761/eureka
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://registry-service:8761/eureka}
   instance:
     prefer-ip-address: true
 flexlease:
@@ -43,12 +41,12 @@ flexlease:
     base-url: http://product-service/api/v1
   order:
     maintenance:
-      pending-payment-expire-minutes: 30
-      scan-interval-ms: 60000
+      pending-payment-expire-minutes: ${FLEXLEASE_ORDER_MAINTENANCE_PENDING_PAYMENT_EXPIRE_MINUTES:30}
+      scan-interval-ms: ${FLEXLEASE_ORDER_MAINTENANCE_SCAN_INTERVAL_MS:60000}
   messaging:
-    enabled: true
+    enabled: ${FLEXLEASE_MESSAGING_ENABLED:true}
 server:
-  port: 9004
+  port: ${SERVER_PORT:9004}
 management:
   endpoints:
     web:

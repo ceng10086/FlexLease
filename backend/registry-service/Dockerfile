@@ -1,8 +1,9 @@
-FROM maven:3.9.6-eclipse-temurin-21 AS builder
+FROM maven:3.9.9-eclipse-temurin-21 AS builder
 WORKDIR /workspace
-COPY pom.xml ./
-COPY backend ./backend
-RUN mvn -pl backend/registry-service -am package -DskipTests
+COPY pom.xml mvnw mvnw.cmd ./
+COPY .mvn .mvn
+COPY backend backend
+RUN --mount=type=cache,target=/root/.m2 mvn -pl backend/registry-service -am clean package -DskipTests
 
 FROM eclipse-temurin:21-jre
 WORKDIR /app

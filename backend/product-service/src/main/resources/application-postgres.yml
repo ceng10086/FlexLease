@@ -1,6 +1,9 @@
 spring:
+  config:
+    activate:
+      on-profile: postgres
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/flexlease}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://postgres:5432/flexlease}
     driver-class-name: org.postgresql.Driver
     username: ${SPRING_DATASOURCE_USERNAME:flexlease}
     password: ${SPRING_DATASOURCE_PASSWORD:flexlease}

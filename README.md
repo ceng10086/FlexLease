@@ -25,59 +25,52 @@
 - ✅ 厂商身份同步：认证服务引入 `vendor_id` 字段与内部绑定接口，订单/前端根据 JWT 中的厂商身份进行租赁单校验，支持同一厂商的多账号共享 `vendor_id` 访问厂商工作台
 
 ## 快速开始
-### 后端服务
+### 一键启动生产化环境
 ```powershell
-# 先启动注册中心
-mvn -pl backend/registry-service spring-boot:run          # 注册中心，端口 8761
-
-# 在仓库根目录依次启动需要的服务
-mvn -pl backend/auth-service spring-boot:run      # 认证服务，端口 9001
-mvn -pl backend/user-service spring-boot:run      # 用户/厂商服务，端口 9002
-mvn -pl backend/product-service spring-boot:run   # 商品服务，端口 9003
-mvn -pl backend/order-service spring-boot:run     # 订单服务，端口 9004
-mvn -pl backend/payment-service spring-boot:run   # 支付服务，端口 9005
-mvn -pl backend/notification-service spring-boot:run  # 通知与运营服务，端口 9006
+docker compose up --build
 ```
-> 常用端口：Auth 9001、User 9002、Product 9003、Order 9004、Payment 9005、Notification 9006、Gateway 8080。
+首次执行包含镜像构建，耗时取决于网络与 Maven 构建缓存。命令成功后即可访问：
 
-> **内部访问令牌**：调用 `auth-service` 的 `/api/v1/internal/**` 接口时需携带 `X-Internal-Token`，默认值 `flexlease-internal-secret` 可在认证服务 `security.jwt.internal-access-token` 和调用方（如用户服务）`flexlease.auth-service.internal-token` 中调整。
+- 管理端入口：http://localhost:8080
+- API 网关入口：http://localhost:8080/api/v1
+- Eureka 注册中心：http://localhost:8761
+- RabbitMQ 控制台：http://localhost:15672（默认账号/密码 `guest`）
 
-> **运行依赖**：PostgreSQL 16.4、RabbitMQ 与 Redis 已包含在 `docker-compose.yml` 中，可执行 `docker compose up postgres rabbitmq redis` 一次性启动。商品媒体文件默认写入 `storage/uploads`，可通过环境变量 `FLEXLEASE_STORAGE_ROOT` 自定义。
+> **默认凭据与密钥**：容器内各微服务默认复用 Postgres 数据库 `flexlease/flexlease` 与内部访问令牌 `flexlease-internal-secret`，JWT 秘钥为 `flexlease-prod-secret`。生产环境应在 `.env` 或 CI/CD 中覆盖这些值。
 
-### 使用 PostgreSQL 运行
+所有后端服务在容器中默认连接 PostgreSQL、Redis 与 RabbitMQ，并交由 Spring Cloud Eureka 与 Gateway 协调；商品媒体文件持久化在命名卷 `product-media` 中。
 
-项目默认在 H2 内存库中运行以便测试，但生产化部署需启用 PostgreSQL：
+### 开发模式（H2 + 本地启动）
+
+若需保留原有快速验证体验，可为单个服务启用开发配置：
 
 ```powershell
-docker compose up postgres
-set SPRING_PROFILES_ACTIVE=postgres
-set SPRING_DATASOURCE_USERNAME=flexlease
-set SPRING_DATASOURCE_PASSWORD=flexlease
-mvn -pl backend/order-service spring-boot:run
+set SPRING_PROFILES_ACTIVE=dev
+mvn -pl backend/product-service spring-boot:run
 ```
 
-> 每个微服务都提供 `application-postgres.yml`，通过 `SPRING_PROFILES_ACTIVE=postgres` 即可切换；Flyway 迁移包含 `V000__create_schema.sql`，会在 PostgreSQL 中自动建好命名空间，其他服务启动命令与上述示例一致。
+`application-dev.yml` 维持了 H2 内存库与控制台配置，便于编写与调试测试用例。PostgreSQL 场景可继续使用 `SPRING_PROFILES_ACTIVE=postgres`。
 
-完成启动后，可参考 `docs/API设计.md` 流程体验“注册厂商 → 提交入驻 → 审批 → 创建商品 → 审核上架 → 用户下单/履约”链路，并可通过订单服务暴露的 `/api/v1/analytics/**` 接口验证平台及厂商运营指标，再结合 `notification-service` 的 `/api/v1/notifications/**` 验证通知发送与日志查询。
+前端本地调试依旧可用 Vite：
 
-### 前端管理端
 ```powershell
 cd frontend
 npm install
 npm run dev
-# 端到端测试
-npm run test:e2e
 ```
-开发环境默认通过 Vite 代理联调后台，可在 `vite.config.ts` 中调整；现已内置 `/api/v1/analytics`（订单服务）与 `/api/v1/notifications`（通知服务）等最新迭代的代理配置。如需统一走网关，可设置 `VITE_API_PROXY=http://localhost:8080`。
 
-新版前端登录后将根据角色显示差异化菜单：
-- **消费者（USER）**：商品目录、订单中心、通知中心。
-- **厂商（VENDOR）**：入驻进度、商品与租赁方案管理、订单履约、运营指标、结算中心。
-- **管理员（ADMIN）**：厂商审核、商品审核、订单监控、运营工具箱及系统公告。
-可通过 `localStorage.setItem('flexlease_token', '<token>')` 方式快速注入凭证配合 API Mock 体验页面渲染。
+当需要整合网关时，可设置 `VITE_API_PROXY=http://localhost:8080` 将全部请求代理至 Docker 中的 Gateway。
+
+完成启动后，可参考 `docs/API设计.md` 流程体验“注册厂商 → 提交入驻 → 审批 → 创建商品 → 审核上架 → 用户下单/履约”链路，并可通过订单服务暴露的 `/api/v1/analytics/**` 接口验证平台及厂商运营指标，再结合 `notification-service` 的 `/api/v1/notifications/**` 验证通知发送与日志查询。
 
 ### 常用命令
 ```powershell
+# 构建并启动容器化环境
+docker compose up --build
+
+# 停止并移除容器（保留数据卷）
+docker compose down
+
 # 单个服务测试
 mvn -pl backend/product-service -am test
 
@@ -87,13 +80,13 @@ mvn clean package
 
 ### 接口调试
 - 提供 Postman 集合：`docs/postman/cart-api.postman_collection.json`，覆盖购物车增删改查与基于购物车的下单流程，导入后配置环境变量 `baseUrl`、`userId` 等即可调用。
-- 使用 Docker Compose 时可直接运行 `docker compose up registry-service` 启动注册中心，其余依赖（Postgres/Redis/RabbitMQ）同一命令即可完成。
+- Docker Compose 默认会在单条命令中启动注册中心、依赖中间件与所有微服务，无需手动分步执行。
 
 ## CI 与质量保障
 
 - GitHub Actions 工作流位于 `.github/workflows/ci.yml`，后端作业会在 PostgreSQL（容器）下执行 `./mvnw clean verify`，前端作业运行 `npm ci` 与 `npm run build`。
 - Flyway 迁移脚本已覆盖所有 schema 的 `V000__create_schema.sql`，确保在 PostgreSQL 中先建命名空间再执行业务表结构迁移。
-- 代码默认使用 H2 进行快速测试，若需在本地复现 CI 行为，可参照前文 PostgreSQL 运行步骤。
+- 生产部署以 PostgreSQL 为默认数据源，单元/集成测试通过 `@ActiveProfiles("test")` 搭配 H2 隔离执行，若需在本地复现 CI 行为可直接运行 `./mvnw clean verify`。
 
 ## 目录结构
 ```

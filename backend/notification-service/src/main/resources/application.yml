@@ -2,10 +2,10 @@ spring:
   application:
     name: notification-service
   datasource:
-    url: jdbc:h2:mem:flexlease-notification;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;INIT=CREATE SCHEMA IF NOT EXISTS "notification"
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://postgres:5432/flexlease}
+    driver-class-name: org.postgresql.Driver
+    username: ${SPRING_DATASOURCE_USERNAME:flexlease}
+    password: ${SPRING_DATASOURCE_PASSWORD:flexlease}
   jpa:
     hibernate:
       ddl-auto: validate
@@ -17,26 +17,24 @@ spring:
     open-in-view: false
   flyway:
     enabled: true
+    create-schemas: true
+    default-schema: "notification"
     schemas: "notification"
     locations: classpath:db/migration
-  h2:
-    console:
-      enabled: true
-      path: /h2-console
   rabbitmq:
-    host: ${SPRING_RABBITMQ_HOST:localhost}
+    host: ${SPRING_RABBITMQ_HOST:rabbitmq}
     port: ${SPRING_RABBITMQ_PORT:5672}
     username: ${SPRING_RABBITMQ_USERNAME:guest}
     password: ${SPRING_RABBITMQ_PASSWORD:guest}
   redis:
-    host: ${SPRING_REDIS_HOST:localhost}
+    host: ${SPRING_REDIS_HOST:redis}
     port: ${SPRING_REDIS_PORT:6379}
 server:
-  port: 9006
+  port: ${SERVER_PORT:9006}
 eureka:
   client:
     service-url:
-      defaultZone: http://localhost:8761/eureka
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://registry-service:8761/eureka}
   instance:
     prefer-ip-address: true
 management:
@@ -46,9 +44,9 @@ management:
         include: health,info
 flexlease:
   messaging:
-    enabled: true
+    enabled: ${FLEXLEASE_MESSAGING_ENABLED:true}
   redis:
-    enabled: true
+    enabled: ${FLEXLEASE_REDIS_ENABLED:true}
 security:
   jwt:
     secret: ${SECURITY_JWT_SECRET:flexlease-default-secret-please-change}

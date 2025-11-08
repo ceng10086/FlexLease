@@ -2,10 +2,10 @@ spring:
   application:
     name: payment-service
   datasource:
-    url: jdbc:h2:mem:flexlease-payment;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;INIT=CREATE SCHEMA IF NOT EXISTS "payment"
-    driver-class-name: org.h2.Driver
-    username: sa
-    password:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://postgres:5432/flexlease}
+    driver-class-name: org.postgresql.Driver
+    username: ${SPRING_DATASOURCE_USERNAME:flexlease}
+    password: ${SPRING_DATASOURCE_PASSWORD:flexlease}
   jpa:
     hibernate:
       ddl-auto: validate
@@ -17,20 +17,18 @@ spring:
     open-in-view: false
   flyway:
     enabled: true
+    create-schemas: true
+    default-schema: "payment"
     schemas: "payment"
     locations: classpath:db/migration
-  h2:
-    console:
-      enabled: true
-      path: /h2-console
 eureka:
   client:
     service-url:
-      defaultZone: http://localhost:8761/eureka
+      defaultZone: ${EUREKA_CLIENT_SERVICEURL_DEFAULTZONE:http://registry-service:8761/eureka}
   instance:
     prefer-ip-address: true
 server:
-  port: 9005
+  port: ${SERVER_PORT:9005}
 flexlease:
   notification-service:
     base-url: http://notification-service/api/v1

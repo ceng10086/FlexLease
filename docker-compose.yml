@@ -1,12 +1,6 @@
+version: "3.9"
+
 services:
-  registry-service:
-    build:
-      context: .
-      dockerfile: backend/registry-service/Dockerfile
-    container_name: flexlease-registry
-    restart: unless-stopped
-    ports:
-      - "8761:8761"
   postgres:
     image: postgres:16.4-alpine
     container_name: flexlease-postgres
@@ -19,13 +13,17 @@ services:
       - "5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
+
   redis:
     image: redis:7-alpine
     container_name: flexlease-redis
     restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
     ports:
       - "6379:6379"
-    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+
   rabbitmq:
     image: rabbitmq:3-management-alpine
     container_name: flexlease-rabbitmq
@@ -33,5 +31,175 @@ services:
     ports:
       - "5672:5672"
       - "15672:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+      - rabbitmq-logs:/var/log/rabbitmq
+
+  registry-service:
+    build:
+      context: .
+      dockerfile: backend/registry-service/Dockerfile
+    container_name: flexlease-registry
+    restart: unless-stopped
+    environment:
+      SERVER_PORT: 8761
+    ports:
+      - "8761:8761"
+
+  gateway-service:
+    build:
+      context: .
+      dockerfile: backend/gateway-service/Dockerfile
+    container_name: flexlease-gateway
+    restart: unless-stopped
+    environment:
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://registry-service:8761/eureka
+      SERVER_PORT: 8080
+    depends_on:
+      - registry-service
+
+  auth-service:
+    build:
+      context: .
+      dockerfile: backend/auth-service/Dockerfile
+    container_name: flexlease-auth
+    restart: unless-stopped
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/flexlease
+      SPRING_DATASOURCE_USERNAME: flexlease
+      SPRING_DATASOURCE_PASSWORD: flexlease
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://registry-service:8761/eureka
+      SECURITY_JWT_SECRET: flexlease-prod-secret-please-change-32bytes
+      SECURITY_JWT_ISSUER: flexlease-auth-service
+      SECURITY_JWT_ACCESS_TOKEN_TTL_SECONDS: 3600
+      SECURITY_JWT_INTERNAL: flexlease-internal-secret
+      SERVER_PORT: 9001
+    depends_on:
+      - postgres
+      - registry-service
+
+  user-service:
+    build:
+      context: .
+      dockerfile: backend/user-service/Dockerfile
+    container_name: flexlease-user
+    restart: unless-stopped
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/flexlease
+      SPRING_DATASOURCE_USERNAME: flexlease
+      SPRING_DATASOURCE_PASSWORD: flexlease
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://registry-service:8761/eureka
+      SECURITY_JWT_SECRET: flexlease-prod-secret-please-change-32bytes
+      SECURITY_JWT_ISSUER: flexlease-auth-service
+      SECURITY_JWT_INTERNAL: flexlease-internal-secret
+      FLEXLEASE_AUTH_SERVICE_INTERNAL_TOKEN: flexlease-internal-secret
+      SERVER_PORT: 9002
+    depends_on:
+      - auth-service
+      - registry-service
+      - postgres
+
+  product-service:
+    build:
+      context: .
+      dockerfile: backend/product-service/Dockerfile
+    container_name: flexlease-product
+    restart: unless-stopped
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/flexlease
+      SPRING_DATASOURCE_USERNAME: flexlease
+      SPRING_DATASOURCE_PASSWORD: flexlease
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://registry-service:8761/eureka
+      SECURITY_JWT_SECRET: flexlease-prod-secret-please-change-32bytes
+      SECURITY_JWT_ISSUER: flexlease-auth-service
+      SECURITY_JWT_INTERNAL: flexlease-internal-secret
+      FLEXLEASE_STORAGE_ROOT: /app/storage/uploads
+      SERVER_PORT: 9003
+    volumes:
+      - product-media:/app/storage/uploads
+    depends_on:
+      - registry-service
+      - postgres
+
+  order-service:
+    build:
+      context: .
+      dockerfile: backend/order-service/Dockerfile
+    container_name: flexlease-order
+    restart: unless-stopped
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/flexlease
+      SPRING_DATASOURCE_USERNAME: flexlease
+      SPRING_DATASOURCE_PASSWORD: flexlease
+      SPRING_RABBITMQ_HOST: rabbitmq
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://registry-service:8761/eureka
+      SECURITY_JWT_SECRET: flexlease-prod-secret-please-change-32bytes
+      SECURITY_JWT_ISSUER: flexlease-auth-service
+      SECURITY_JWT_INTERNAL: flexlease-internal-secret
+      SERVER_PORT: 9004
+    depends_on:
+      - rabbitmq
+      - registry-service
+      - postgres
+
+  payment-service:
+    build:
+      context: .
+      dockerfile: backend/payment-service/Dockerfile
+    container_name: flexlease-payment
+    restart: unless-stopped
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/flexlease
+      SPRING_DATASOURCE_USERNAME: flexlease
+      SPRING_DATASOURCE_PASSWORD: flexlease
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://registry-service:8761/eureka
+      SECURITY_JWT_SECRET: flexlease-prod-secret-please-change-32bytes
+      SECURITY_JWT_ISSUER: flexlease-auth-service
+      SECURITY_JWT_INTERNAL: flexlease-internal-secret
+      SERVER_PORT: 9005
+    depends_on:
+      - registry-service
+      - postgres
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: backend/notification-service/Dockerfile
+    container_name: flexlease-notification
+    restart: unless-stopped
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/flexlease
+      SPRING_DATASOURCE_USERNAME: flexlease
+      SPRING_DATASOURCE_PASSWORD: flexlease
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_REDIS_HOST: redis
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://registry-service:8761/eureka
+      SECURITY_JWT_SECRET: flexlease-prod-secret-please-change-32bytes
+      SECURITY_JWT_ISSUER: flexlease-auth-service
+      SECURITY_JWT_INTERNAL: flexlease-internal-secret
+      SERVER_PORT: 9006
+    depends_on:
+      - rabbitmq
+      - redis
+      - registry-service
+      - postgres
+
+  frontend:
+    build:
+      context: frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: /api/v1
+    container_name: flexlease-frontend
+    restart: unless-stopped
+    depends_on:
+      - gateway-service
+    ports:
+      - "8080:80"
+
 volumes:
   postgres-data:
+  redis-data:
+  rabbitmq-data:
+  rabbitmq-logs:
+  product-media:
