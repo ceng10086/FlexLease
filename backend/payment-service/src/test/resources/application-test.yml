@@ -1,0 +1,46 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:flexlease-payment-test;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;INIT=CREATE SCHEMA IF NOT EXISTS "payment"
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: "payment"
+        format_sql: true
+        globally_quoted_identifiers: true
+    open-in-view: false
+  flyway:
+    enabled: true
+    schemas: "payment"
+    locations: classpath:db/migration
+  h2:
+    console:
+      enabled: false
+  test:
+    database:
+      replace: none
+logging:
+  level:
+    org.hibernate.SQL: warn
+    org.springframework: warn
+flexlease:
+  notification-service:
+    base-url: http://localhost:0
+  order-service:
+    base-url: http://localhost:0
+  payment:
+    auto-confirm: true
+eureka:
+  client:
+    enabled: false
+  instance:
+    prefer-ip-address: true
+security:
+  jwt:
+    secret: flexlease-test-suite-secret-key-which-is-at-least-32-bytes-long
+    issuer: test-suite
+    internal-access-token: test-internal

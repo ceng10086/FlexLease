@@ -33,9 +33,12 @@ import java.util.Map;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 @Transactional
@@ -47,15 +50,18 @@ public class PaymentTransactionService {
     private final PaymentAssembler assembler;
     private final NotificationClient notificationClient;
     private final OrderServiceClient orderServiceClient;
+    private final boolean autoConfirmPayments;
 
     public PaymentTransactionService(PaymentTransactionRepository paymentTransactionRepository,
                                      PaymentAssembler assembler,
                                      NotificationClient notificationClient,
-                                     OrderServiceClient orderServiceClient) {
+                                     OrderServiceClient orderServiceClient,
+                                     @Value("${flexlease.payment.auto-confirm:true}") boolean autoConfirmPayments) {
         this.paymentTransactionRepository = paymentTransactionRepository;
         this.assembler = assembler;
         this.notificationClient = notificationClient;
         this.orderServiceClient = orderServiceClient;
+        this.autoConfirmPayments = autoConfirmPayments;
     }
 
     public PaymentTransactionResponse initPayment(UUID orderId, PaymentInitRequest request) {
@@ -89,6 +95,7 @@ public class PaymentTransactionService {
                                 splitRequest.beneficiary())));
             }
             PaymentTransaction saved = paymentTransactionRepository.save(transaction);
+            autoConfirmIfEnabled(saved);
             return assembler.toResponse(saved);
         } catch (IllegalArgumentException | IllegalStateException ex) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, ex.getMessage());
@@ -124,8 +131,7 @@ public class PaymentTransactionService {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "当前支付状态不支持确认");
         }
         if (transitioned) {
-            orderServiceClient.notifyPaymentSucceeded(transaction.getOrderId(), transaction.getId());
-            notifyPaymentSucceeded(transaction);
+            publishPaymentSuccessEvent(transaction);
         }
         return assembler.toResponse(transaction);
     }
@@ -156,8 +162,7 @@ public class PaymentTransactionService {
                 throw new BusinessException(ErrorCode.VALIDATION_ERROR, "支付流水已标记失败，无法回滚为成功");
             }
             if (transitioned) {
-                orderServiceClient.notifyPaymentSucceeded(transaction.getOrderId(), transaction.getId());
-                notifyPaymentSucceeded(transaction);
+                publishPaymentSuccessEvent(transaction);
             }
         } else {
             if (transaction.getStatus() == PaymentStatus.SUCCEEDED) {
@@ -196,6 +201,23 @@ public class PaymentTransactionService {
                     .orElseThrow();
         } catch (IllegalArgumentException | IllegalStateException ex) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, ex.getMessage());
+        }
+    }
+
+    private void autoConfirmIfEnabled(PaymentTransaction transaction) {
+        if (!autoConfirmPayments || transaction.getStatus() != PaymentStatus.PENDING) {
+            return;
+        }
+        boolean transitioned = false;
+        try {
+            transaction.markSucceeded("AUTO-CONFIRMED", OffsetDateTime.now());
+            transitioned = true;
+        } catch (IllegalStateException ex) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, ex.getMessage());
+        }
+        if (transitioned) {
+            LOG.debug("Payment {} auto-confirmed, scheduling order notification", transaction.getId());
+            publishPaymentSuccessEvent(transaction);
         }
     }
 
@@ -280,15 +302,15 @@ public class PaymentTransactionService {
         throw new BusinessException(ErrorCode.FORBIDDEN, "当前身份无权查看支付流水");
     }
 
-    private void notifyPaymentSucceeded(PaymentTransaction transaction) {
-        String sceneName = sceneLabel(transaction.getScene());
+    private void notifyPaymentSucceeded(PaymentSuccessContext context) {
+        String sceneName = sceneLabel(context.scene());
         NotificationSendRequest request = new NotificationSendRequest(
                 null,
                 NotificationChannel.IN_APP,
-                transaction.getUserId().toString(),
+                context.userId().toString(),
                 "支付成功",
-                "订单 %s 的%s支付 ¥%s 已完成。".formatted(transaction.getOrderId(), sceneName, transaction.getAmount()),
-                Map.of("orderId", transaction.getOrderId().toString())
+                "订单 %s 的%s支付 ¥%s 已完成。".formatted(context.orderId(), sceneName, context.amount()),
+                Map.of("orderId", context.orderId().toString())
         );
         notificationClient.send(request);
     }
@@ -324,6 +346,39 @@ public class PaymentTransactionService {
             case BUYOUT -> "买断款";
             case PENALTY -> "违约金";
         };
+    }
+
+    private void publishPaymentSuccessEvent(PaymentTransaction transaction) {
+        PaymentSuccessContext context = new PaymentSuccessContext(
+                transaction.getId(),
+                transaction.getOrderId(),
+                transaction.getUserId(),
+                transaction.getScene(),
+                transaction.getAmount()
+        );
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    dispatchPaymentSuccess(context);
+                }
+            });
+        } else {
+            dispatchPaymentSuccess(context);
+        }
+    }
+
+    private void dispatchPaymentSuccess(PaymentSuccessContext context) {
+        LOG.debug("Payment {} succeeded, notifying order service", context.transactionId());
+        orderServiceClient.notifyPaymentSucceeded(context.orderId(), context.transactionId());
+        notifyPaymentSucceeded(context);
+    }
+
+    private record PaymentSuccessContext(UUID transactionId,
+                                         UUID orderId,
+                                         UUID userId,
+                                         PaymentScene scene,
+                                         BigDecimal amount) {
     }
 
     private static class SettlementAccumulator {

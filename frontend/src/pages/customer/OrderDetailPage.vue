@@ -214,7 +214,7 @@ const handleCreatePayment = async () => {
       amount: paymentForm.amount
     });
     paymentForm.lastResult = result.id ?? '';
-    message.success('支付单已创建，请在支付服务完成支付');
+    message.success('支付单已创建并自动完成支付');
   } catch (error) {
     console.error('创建支付单失败', error);
     message.error('创建支付单失败，请稍后重试');

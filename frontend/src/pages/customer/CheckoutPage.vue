@@ -77,8 +77,9 @@ import { message } from 'ant-design-vue';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useAuthStore } from '../../stores/auth';
 import { fetchCatalogProduct, type CatalogProductDetail } from '../../services/catalogService';
-import { previewOrder, createOrder, type OrderPreviewResponse } from '../../services/orderService';
+import { previewOrder, createOrder, type OrderPreviewResponse, type RentalOrderDetail } from '../../services/orderService';
 import { serializePlanSnapshot } from '../../utils/planSnapshot';
+import { autoCompleteInitialPayment } from '../../utils/autoPayment';
 
 const route = useRoute();
 const router = useRouter();
@@ -193,20 +194,39 @@ const handleCreate = async () => {
   }
   loading.create = true;
   try {
-    const response = await createOrder({
+    const order = await createOrder({
       userId: auth.user.id,
       vendorId: product.value!.vendorId,
       leaseStartAt: form.leaseStart?.toISOString(),
       leaseEndAt: form.leaseEnd?.toISOString(),
       items: buildOrderItems()
     });
-    message.success('订单创建成功');
+    await handleAutoPayment(order);
     router.replace({ name: 'orders' });
   } catch (error: any) {
     console.error('创建订单失败', error);
     message.error(error?.response?.data?.message ?? '创建订单失败');
   } finally {
     loading.create = false;
+  }
+};
+
+const handleAutoPayment = async (order: RentalOrderDetail) => {
+  try {
+    const paid = await autoCompleteInitialPayment({
+      orderId: order.id,
+      vendorId: order.vendorId,
+      userId: auth.user!.id,
+      amount: order.totalAmount
+    });
+    if (paid) {
+      message.success('订单创建并自动完成支付');
+    } else {
+      message.success('订单创建成功');
+    }
+  } catch (error) {
+    console.error('自动支付失败', error);
+    message.warning('订单已创建，但自动支付失败，请在订单详情中完成付款');
   }
 };
 

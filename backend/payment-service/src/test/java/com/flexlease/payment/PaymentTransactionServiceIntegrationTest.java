@@ -29,25 +29,40 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
-import org.mockito.Mockito;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 
 @SpringBootTest
+@ActiveProfiles("test")
 class PaymentTransactionServiceIntegrationTest {
+
+    private static final String H2_JDBC_URL =
+            "jdbc:h2:mem:flexlease-payment-test;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;INIT=CREATE SCHEMA IF NOT EXISTS payment";
+
+    @DynamicPropertySource
+    static void overrideDatasource(DynamicPropertyRegistry registry) {
+        registry.add("spring.datasource.url", () -> H2_JDBC_URL);
+        registry.add("spring.datasource.driver-class-name", () -> "org.h2.Driver");
+        registry.add("spring.datasource.username", () -> "sa");
+        registry.add("spring.datasource.password", () -> "");
+    }
 
     @Autowired
     private PaymentTransactionService paymentTransactionService;
 
-        @MockBean
-        private NotificationClient notificationClient;
+    @MockBean
+    private NotificationClient notificationClient;
 
-        @MockBean
-        private OrderServiceClient orderServiceClient;
+    @MockBean
+    private OrderServiceClient orderServiceClient;
 
     @Test
-    void shouldInitConfirmRefundAndSettlePayment() {
+    void shouldAutoConfirmAndSettlePayment() {
         UUID orderId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
         UUID vendorId = UUID.randomUUID();
@@ -73,16 +88,8 @@ class PaymentTransactionServiceIntegrationTest {
                 List.of(platformSplit, vendorSplit)
         ));
 
-        assertThat(created.status()).isEqualTo(PaymentStatus.PENDING);
-        assertThat(created.splits()).hasSize(2);
-
-        PaymentTransactionResponse confirmed = paymentTransactionService.confirmPayment(created.id(), new PaymentConfirmRequest(
-                "MOCK-123456",
-                OffsetDateTime.now()
-        ));
-        assertThat(confirmed.status()).isEqualTo(PaymentStatus.SUCCEEDED);
-        assertThat(confirmed.paidAt()).isNotNull();
-        verify(orderServiceClient).notifyPaymentSucceeded(created.orderId(), created.id());
+        assertThat(created.status()).isEqualTo(PaymentStatus.SUCCEEDED);
+        verify(orderServiceClient, times(1)).notifyPaymentSucceeded(created.orderId(), created.id());
 
         RefundTransactionResponse refund = paymentTransactionService.createRefund(created.id(), new PaymentRefundRequest(
                 new BigDecimal("200.00"),
@@ -132,37 +139,7 @@ class PaymentTransactionServiceIntegrationTest {
     }
 
     @Test
-    void shouldHandleFailureCallback() {
-        UUID orderId = UUID.randomUUID();
-        UUID userId = UUID.randomUUID();
-        UUID vendorId = UUID.randomUUID();
-
-        PaymentTransactionResponse created = paymentTransactionService.initPayment(orderId, new PaymentInitRequest(
-                userId,
-                vendorId,
-                PaymentScene.RENT,
-                PaymentChannel.MOCK,
-                new BigDecimal("800.00"),
-                "租金",
-                null
-        ));
-
-        PaymentTransactionResponse failed = paymentTransactionService.handleCallback(created.id(), new PaymentCallbackRequest(
-                PaymentStatus.FAILED,
-                "MOCK-FAILED-001",
-                null,
-                "余额不足"
-        ));
-
-        assertThat(failed.status()).isEqualTo(PaymentStatus.FAILED);
-        verify(orderServiceClient, never()).notifyPaymentSucceeded(any(), any());
-
-        assertThatThrownBy(() -> paymentTransactionService.confirmPayment(created.id(), new PaymentConfirmRequest("MOCK-123", OffsetDateTime.now())))
-                .isInstanceOf(BusinessException.class);
-    }
-
-    @Test
-    void shouldIgnoreDuplicateSuccessCallback() {
+    void shouldNoOpManualConfirmAfterAutoSuccess() {
         UUID orderId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
         UUID vendorId = UUID.randomUUID();
@@ -177,6 +154,68 @@ class PaymentTransactionServiceIntegrationTest {
                 null
         ));
 
+        assertThat(created.status()).isEqualTo(PaymentStatus.SUCCEEDED);
+        Mockito.clearInvocations(orderServiceClient, notificationClient);
+
+        PaymentTransactionResponse confirmed = paymentTransactionService.confirmPayment(created.id(), new PaymentConfirmRequest(
+                "MANUAL-123",
+                OffsetDateTime.now()
+        ));
+        assertThat(confirmed.status()).isEqualTo(PaymentStatus.SUCCEEDED);
+        verify(orderServiceClient, never()).notifyPaymentSucceeded(any(), any());
+        verify(notificationClient, never()).send(any());
+    }
+
+    @Test
+    void shouldIgnoreFailureCallbackAfterAutoSuccess() {
+        UUID orderId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        UUID vendorId = UUID.randomUUID();
+
+        PaymentTransactionResponse created = paymentTransactionService.initPayment(orderId, new PaymentInitRequest(
+                userId,
+                vendorId,
+                PaymentScene.RENT,
+                PaymentChannel.MOCK,
+                new BigDecimal("800.00"),
+                "租金",
+                null
+        ));
+        assertThat(created.status()).isEqualTo(PaymentStatus.SUCCEEDED);
+
+        Mockito.clearInvocations(orderServiceClient, notificationClient);
+
+        PaymentTransactionResponse failed = paymentTransactionService.handleCallback(created.id(), new PaymentCallbackRequest(
+                PaymentStatus.FAILED,
+                "MOCK-FAILED-001",
+                null,
+                "余额不足"
+        ));
+
+        assertThat(failed.status()).isEqualTo(PaymentStatus.SUCCEEDED);
+        verify(orderServiceClient, never()).notifyPaymentSucceeded(any(), any());
+        verify(notificationClient, never()).send(any());
+    }
+
+    @Test
+    void shouldIgnoreDuplicateSuccessCallbackAfterAutoSuccess() {
+        UUID orderId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        UUID vendorId = UUID.randomUUID();
+
+        PaymentTransactionResponse created = paymentTransactionService.initPayment(orderId, new PaymentInitRequest(
+                userId,
+                vendorId,
+                PaymentScene.RENT,
+                PaymentChannel.MOCK,
+                new BigDecimal("700.00"),
+                "租金",
+                null
+        ));
+        assertThat(created.status()).isEqualTo(PaymentStatus.SUCCEEDED);
+
+        Mockito.clearInvocations(orderServiceClient, notificationClient);
+
         PaymentCallbackRequest callbackRequest = new PaymentCallbackRequest(
                 PaymentStatus.SUCCEEDED,
                 "MOCK-CALLBACK-001",
@@ -184,15 +223,8 @@ class PaymentTransactionServiceIntegrationTest {
                 null
         );
 
-        PaymentTransactionResponse first = paymentTransactionService.handleCallback(created.id(), callbackRequest);
-        assertThat(first.status()).isEqualTo(PaymentStatus.SUCCEEDED);
-        verify(orderServiceClient, times(1)).notifyPaymentSucceeded(created.orderId(), created.id());
-        verify(notificationClient, times(1)).send(any());
-
-        Mockito.clearInvocations(orderServiceClient, notificationClient);
-
-        PaymentTransactionResponse second = paymentTransactionService.handleCallback(created.id(), callbackRequest);
-        assertThat(second.status()).isEqualTo(PaymentStatus.SUCCEEDED);
+        PaymentTransactionResponse callback = paymentTransactionService.handleCallback(created.id(), callbackRequest);
+        assertThat(callback.status()).isEqualTo(PaymentStatus.SUCCEEDED);
         verify(orderServiceClient, never()).notifyPaymentSucceeded(any(), any());
         verify(notificationClient, never()).send(any());
     }
@@ -208,16 +240,11 @@ class PaymentTransactionServiceIntegrationTest {
                 vendorId,
                 PaymentScene.RENT,
                 PaymentChannel.MOCK,
-                new BigDecimal("800.00"),
+                new BigDecimal("900.00"),
                 "租金",
                 null
         ));
-
-        paymentTransactionService.confirmPayment(created.id(), new PaymentConfirmRequest(
-                "MOCK-OK-01",
-                OffsetDateTime.now()
-        ));
-        verify(orderServiceClient).notifyPaymentSucceeded(created.orderId(), created.id());
+        assertThat(created.status()).isEqualTo(PaymentStatus.SUCCEEDED);
 
         paymentTransactionService.createRefund(created.id(), new PaymentRefundRequest(
                 new BigDecimal("300.00"),
@@ -232,6 +259,6 @@ class PaymentTransactionServiceIntegrationTest {
                 .orElseThrow();
 
         assertThat(settlement.refundedAmount()).isEqualByComparingTo(BigDecimal.ZERO);
-        assertThat(settlement.netAmount()).isEqualByComparingTo("800.00");
+        assertThat(settlement.netAmount()).isEqualByComparingTo("900.00");
     }
 }

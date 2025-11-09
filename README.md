@@ -9,7 +9,8 @@
 - ✅ 账号与厂商入驻（Iteration 1）：认证中心登录/注册、厂商申请审核、审核通过后自动激活账号
 - ✅ 商品与租赁方案（Iteration 2）：商品 CRUD、租赁方案与 SKU 管理、库存调整流水、管理员审核、前台商品目录查询
 - ✅ 管理端前端（Iteration 1-2）：登录与仪表盘、厂商商品管理、管理员商品审核流程
-- ✅ 多角色工作台前端重构（Iteration 6）：统一侧边导航与角色菜单、厂商工作台（商品/订单/指标/结算）、消费者目录与订单中心、管理员运营工具与通知中心
+- ✅ 多角色工作台前端重构（Iteration 6）：统一侧边导航与角色菜单、厂商工作台（商品/订单/指标/结算）、消费者目录与订单中心、管理员订单监控与通知中心（运营工具由自动支付模拟取代）
+- ✅ 支付模拟自动化：订单创建或用户发起支付时自动生成并确认支付流水，彻底移除运营工具箱手动调试依赖
 - ✅ 产品域集成测试：`backend/product-service` 覆盖商品生命周期 e2e 场景
 - ✅ 订单与履约流程（Iteration 3）：交付独立 `order-service`，修复仓储命名问题并完成下单预览、创建、支付确认、发货、收货、续租、退租、买断等状态流转及集成测试
 - ✅ 支付与结算（Iteration 4）：交付 `payment-service` 支付流水/分账/退款能力与厂商结算统计，订单服务集成支付凭证校验并补充跨服务集成测试，支付回调现已自动通知订单服务并具备幂等保障
@@ -37,6 +38,7 @@ docker compose up --build
 - RabbitMQ 控制台：http://localhost:15672（默认账号/密码 `guest`）
 
 > **默认凭据与密钥**：容器内各微服务默认复用 Postgres 数据库 `flexlease/flexlease` 与内部访问令牌 `flexlease-internal-secret`，JWT 秘钥为 `flexlease-prod-secret`。生产环境应在 `.env` 或 CI/CD 中覆盖这些值。
+> **内部服务回调**：支付服务默认通过 `FLEXLEASE_ORDER_SERVICE_BASE_URL`（默认为 `http://localhost:9004/api/v1`）和 `FLEXLEASE_NOTIFICATION_SERVICE_BASE_URL`（默认为 `http://localhost:9006/api/v1`）调用订单/通知服务，Docker Compose 已在环境变量中覆盖为容器内地址；若自行拆分部署，请确保这两个变量指向可访问的地址以保证自动支付成功回调。
 
 所有后端服务在容器中默认连接 PostgreSQL、Redis 与 RabbitMQ，并交由 Spring Cloud Eureka 与 Gateway 协调；商品媒体文件持久化在命名卷 `product-media` 中。
 

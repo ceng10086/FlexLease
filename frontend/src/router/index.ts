@@ -94,12 +94,6 @@ const router = createRouter({
           meta: { roles: ['ADMIN'], navKey: 'admin-orders' }
         },
         {
-          path: 'admin/operations',
-          name: 'admin-operations',
-          component: () => import('../pages/admin/AdminOperationsCenterPage.vue'),
-          meta: { roles: ['ADMIN'], navKey: 'admin-operations' }
-        },
-        {
           path: 'vendor/onboarding',
           name: 'vendor-onboarding',
           component: () => import('../pages/vendor/VendorOnboardingPage.vue'),

@@ -70,13 +70,6 @@ const NAV_SCHEMA: NavItem[] = [
         path: '/app/admin/orders',
         icon: 'ProfileOutlined',
         roles: ['ADMIN']
-      },
-      {
-        key: 'admin-operations',
-        label: '运营工具箱',
-        path: '/app/admin/operations',
-        icon: 'ToolOutlined',
-        roles: ['ADMIN']
       }
     ]
   },

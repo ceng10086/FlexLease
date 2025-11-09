@@ -81,8 +81,9 @@ import {
   clearCart,
   type CartItem
 } from '../../services/cartService';
-import { createOrder } from '../../services/orderService';
+import { createOrder, type RentalOrderDetail } from '../../services/orderService';
 import { parsePlanSnapshot, resolveDeposit, resolveRent } from '../../utils/planSnapshot';
+import { autoCompleteInitialPayment } from '../../utils/autoPayment';
 
 const router = useRouter();
 const auth = useAuthStore();
@@ -229,13 +230,13 @@ const handleCheckout = async () => {
   submitting.value = true;
   try {
     const [vendorId] = Array.from(vendorIds);
-    await createOrder({
+    const order = await createOrder({
       userId,
       vendorId,
       items: [],
       cartItemIds: [...selectedRowKeys.value]
     });
-    message.success('订单创建成功');
+    await handleAutoPayment(order, userId);
     selectedRowKeys.value = [];
     await loadCart();
     router.push({ name: 'orders' });
@@ -245,6 +246,25 @@ const handleCheckout = async () => {
     message.error(msg);
   } finally {
     submitting.value = false;
+  }
+};
+
+const handleAutoPayment = async (order: RentalOrderDetail, userId: string) => {
+  try {
+    const paid = await autoCompleteInitialPayment({
+      orderId: order.id,
+      vendorId: order.vendorId,
+      userId,
+      amount: order.totalAmount
+    });
+    if (paid) {
+      message.success('订单创建并自动完成支付');
+    } else {
+      message.success('订单创建成功');
+    }
+  } catch (error) {
+    console.error('自动支付失败', error);
+    message.warning('订单已创建，但自动支付失败，请在订单详情完成付款');
   }
 };
 
