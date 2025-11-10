@@ -1,10 +1,13 @@
-import { initPayment } from '../services/paymentService';
+import { initPayment, type PaymentSplitPayload } from '../services/paymentService';
 
 export type AutoPaymentParams = {
   orderId: string;
   vendorId: string;
   userId: string;
   amount?: number | null;
+  depositAmount?: number | null;
+  rentAmount?: number | null;
+  buyoutAmount?: number | null;
   description?: string;
 };
 
@@ -13,18 +16,54 @@ export const autoCompleteInitialPayment = async ({
   vendorId,
   userId,
   amount,
+  depositAmount,
+  rentAmount,
+  buyoutAmount,
   description
 }: AutoPaymentParams): Promise<boolean> => {
-  if (!amount || amount <= 0) {
+  const normalize = (value?: number | null) => {
+    if (value === undefined || value === null || Number.isNaN(value)) {
+      return 0;
+    }
+    return Math.max(0, Math.round(value * 100) / 100);
+  };
+
+  const depositPortion = normalize(depositAmount);
+  const rentPortionRaw = normalize(rentAmount);
+  const buyoutPortionRaw = normalize(buyoutAmount);
+  const totalAmount = normalize(amount ?? (depositPortion + rentPortionRaw + buyoutPortionRaw));
+
+  if (!totalAmount || totalAmount <= 0) {
     return false;
   }
+
+  const splits: PaymentSplitPayload[] = [];
+  if (depositPortion > 0) {
+    splits.push({
+      splitType: 'DEPOSIT_RESERVE',
+      amount: Math.min(depositPortion, totalAmount),
+      beneficiary: 'PLATFORM_RESERVE'
+    });
+  }
+
+  const maxVendorPortion = Math.max(totalAmount - (splits[0]?.amount ?? 0), 0);
+  const vendorIncomePortion = Math.min(rentPortionRaw + buyoutPortionRaw, maxVendorPortion);
+  if (vendorIncomePortion > 0) {
+    splits.push({
+      splitType: 'VENDOR_INCOME',
+      amount: vendorIncomePortion,
+      beneficiary: `VENDOR_${vendorId}`
+    });
+  }
+
   await initPayment(orderId, {
     userId,
     vendorId,
     scene: 'DEPOSIT',
     channel: 'MOCK',
-    amount,
-    description: description ?? '自动支付（下单即付）'
+    amount: totalAmount,
+    description: description ?? '自动支付（下单即付）',
+    splits: splits.length ? splits : undefined
   });
   return true;
 };

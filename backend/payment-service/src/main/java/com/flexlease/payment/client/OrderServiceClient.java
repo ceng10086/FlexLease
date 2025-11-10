@@ -23,7 +23,7 @@ import org.springframework.web.client.RestTemplate;
 public class OrderServiceClient {
 
     private static final Logger LOG = LoggerFactory.getLogger(OrderServiceClient.class);
-    private static final ParameterizedTypeReference<ApiResponse<Void>> RESPONSE_TYPE =
+    private static final ParameterizedTypeReference<ApiResponse<Object>> RESPONSE_TYPE =
             new ParameterizedTypeReference<>() {
             };
 
@@ -44,14 +44,14 @@ public class OrderServiceClient {
         try {
             HttpHeaders headers = buildHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
-            ResponseEntity<ApiResponse<Void>> response = restTemplate.exchange(
+                ResponseEntity<ApiResponse<Object>> response = restTemplate.exchange(
                     baseUrl + "/internal/orders/{orderId}/payment-success",
                     HttpMethod.POST,
                     new HttpEntity<>(payload, headers),
                     RESPONSE_TYPE,
                     orderId
             );
-            ApiResponse<Void> body = response.getBody();
+                ApiResponse<Object> body = response.getBody();
             if (body == null) {
                 throw new BusinessException(ErrorCode.INTERNAL_ERROR, "订单服务响应为空");
             }

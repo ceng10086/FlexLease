@@ -213,11 +213,18 @@ const handleCreate = async () => {
 
 const handleAutoPayment = async (order: RentalOrderDetail) => {
   try {
+    const deposit = resolveOrderDeposit(order);
+    const rent = resolveOrderRent(order);
+    const buyout = order.buyoutAmount ?? 0;
+    const total = resolveOrderTotal(order);
     const paid = await autoCompleteInitialPayment({
       orderId: order.id,
       vendorId: order.vendorId,
       userId: auth.user!.id,
-      amount: order.totalAmount
+      amount: total,
+      depositAmount: deposit,
+      rentAmount: rent,
+      buyoutAmount: buyout
     });
     if (paid) {
       message.success('订单创建并自动完成支付');

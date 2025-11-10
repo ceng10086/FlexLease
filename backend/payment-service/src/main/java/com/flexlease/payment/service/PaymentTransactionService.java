@@ -399,13 +399,40 @@ public class PaymentTransactionService {
         }
 
         void add(PaymentTransaction transaction) {
-            total = total.add(transaction.getAmount());
-            switch (transaction.getScene()) {
-                case DEPOSIT -> deposit = deposit.add(transaction.getAmount());
-                case RENT -> rent = rent.add(transaction.getAmount());
-                case BUYOUT -> buyout = buyout.add(transaction.getAmount());
-                case PENALTY -> penalty = penalty.add(transaction.getAmount());
+            BigDecimal transactionAmount = transaction.getAmount();
+            total = total.add(transactionAmount);
+
+            BigDecimal depositPortion = BigDecimal.ZERO;
+            BigDecimal rentPortion = BigDecimal.ZERO;
+            BigDecimal commissionPortion = BigDecimal.ZERO;
+
+            if (transaction.getSplits() != null && !transaction.getSplits().isEmpty()) {
+                for (PaymentSplit split : transaction.getSplits()) {
+                    BigDecimal amount = split.getAmount();
+                    if (amount == null) {
+                        continue;
+                    }
+                    switch (split.getSplitType()) {
+                        case DEPOSIT_RESERVE -> depositPortion = depositPortion.add(amount);
+                        case VENDOR_INCOME -> rentPortion = rentPortion.add(amount);
+                        case PLATFORM_COMMISSION -> commissionPortion = commissionPortion.add(amount);
+                    }
+                }
             }
+
+            BigDecimal allocated = depositPortion.add(rentPortion).add(commissionPortion);
+            if (allocated.compareTo(transactionAmount) < 0) {
+                BigDecimal remainder = transactionAmount.subtract(allocated);
+                switch (transaction.getScene()) {
+                    case DEPOSIT -> depositPortion = depositPortion.add(remainder);
+                    case RENT -> rentPortion = rentPortion.add(remainder);
+                    case BUYOUT -> buyout = buyout.add(remainder);
+                    case PENALTY -> penalty = penalty.add(remainder);
+                }
+            }
+
+            deposit = deposit.add(depositPortion);
+            rent = rent.add(rentPortion.add(commissionPortion));
             OffsetDateTime paidAt = transaction.getPaidAt() != null ? transaction.getPaidAt() : transaction.getUpdatedAt();
             if (lastPaidAt == null || paidAt.isAfter(lastPaidAt)) {
                 lastPaidAt = paidAt;

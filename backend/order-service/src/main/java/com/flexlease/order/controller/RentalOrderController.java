@@ -87,16 +87,19 @@ public class RentalOrderController {
                                                                              @RequestParam(defaultValue = "1") int page,
                                                                              @RequestParam(defaultValue = "10") int size) {
         FlexleasePrincipal principal = SecurityUtils.requirePrincipal();
-        UUID effectiveUserId = null;
-        UUID effectiveVendorId = null;
-
         if (principal.hasRole("ADMIN") || principal.hasRole("INTERNAL")) {
             if (userId != null && vendorId != null) {
                 throw new BusinessException(ErrorCode.VALIDATION_ERROR, "userId 与 vendorId 不能同时提供");
             }
-            effectiveUserId = userId;
-            effectiveVendorId = vendorId;
-        } else if (principal.hasRole("VENDOR")) {
+            Pageable adminPageable = PageRequest.of(Math.max(page - 1, 0), Math.max(1, Math.min(size, 100)),
+                    Sort.by(Sort.Direction.DESC, "createdAt"));
+            return ApiResponse.success(rentalOrderService.listOrdersForAdmin(userId, vendorId, status, adminPageable));
+        }
+
+        UUID effectiveUserId = null;
+        UUID effectiveVendorId = null;
+
+        if (principal.hasRole("VENDOR")) {
             UUID currentVendorId = principal.vendorId();
             if (currentVendorId == null) {
                 throw new BusinessException(ErrorCode.UNAUTHORIZED, "当前身份缺少厂商标识");

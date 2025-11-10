@@ -105,7 +105,8 @@ class PaymentTransactionServiceIntegrationTest {
                 .orElseThrow();
         assertThat(settlement.vendorId()).isEqualTo(vendorId);
         assertThat(settlement.totalAmount()).isEqualByComparingTo("1200.00");
-        assertThat(settlement.depositAmount()).isEqualByComparingTo("1200.00");
+        assertThat(settlement.depositAmount()).isEqualByComparingTo("1000.00");
+        assertThat(settlement.rentAmount()).isEqualByComparingTo("200.00");
         assertThat(settlement.refundedAmount()).isEqualByComparingTo("200.00");
         assertThat(settlement.netAmount()).isEqualByComparingTo("1000.00");
         assertThat(settlement.transactionCount()).isEqualTo(1);
