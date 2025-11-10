@@ -33,10 +33,11 @@ public class SecurityConfig {
                                                    JwtAuthenticationFilter authenticationFilter,
                                                    JwtAuthProperties properties) throws Exception {
         http.csrf(csrf -> csrf.disable())
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(properties.getPermitAll().toArray(String[]::new)).permitAll()
-                        .anyRequest().authenticated())
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/media/**").permitAll()
+                .requestMatchers(properties.getPermitAll().toArray(String[]::new)).permitAll()
+                .anyRequest().authenticated())
                 .addFilterBefore(authenticationFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }

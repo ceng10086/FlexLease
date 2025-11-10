@@ -79,6 +79,11 @@ export default defineConfig((configEnv: ConfigEnv) => {
       target: 'http://localhost:9006',
       changeOrigin: true,
       secure: false
+    },
+    '/media': {
+      target: 'http://localhost:9003',
+      changeOrigin: true,
+      secure: false
     }
   } as const;
 
