@@ -102,7 +102,6 @@ public class PaymentTransactionService {
         }
     }
 
-    @Transactional(Transactional.TxType.SUPPORTS)
     public PaymentTransactionResponse getTransaction(UUID transactionId) {
         PaymentTransaction transaction = paymentTransactionRepository.findById(transactionId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "支付流水不存在"));

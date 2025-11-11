@@ -77,8 +77,19 @@ import { message } from 'ant-design-vue';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useAuthStore } from '../../stores/auth';
 import { fetchCatalogProduct, type CatalogProductDetail } from '../../services/catalogService';
-import { previewOrder, createOrder, type OrderPreviewResponse, type RentalOrderDetail } from '../../services/orderService';
-import { serializePlanSnapshot } from '../../utils/planSnapshot';
+import {
+  previewOrder,
+  createOrder,
+  type OrderPreviewResponse,
+  type RentalOrderDetail,
+  type RentalOrderItem
+} from '../../services/orderService';
+import {
+  serializePlanSnapshot,
+  parsePlanSnapshot,
+  resolveDeposit,
+  resolveRent
+} from '../../utils/planSnapshot';
 import { autoCompleteInitialPayment } from '../../utils/autoPayment';
 
 const route = useRoute();
@@ -111,6 +122,37 @@ const currentSku = computed(() => currentPlan.value?.skus.find((sku) => sku.id =
 const orderReady = computed(() => Boolean(product.value && currentPlan.value && currentSku.value && product.value.vendorId));
 
 const formatCurrency = (value: number) => value.toFixed(2);
+
+const resolveItemDeposit = (item: RentalOrderItem): number => {
+  const snapshot = parsePlanSnapshot(item.planSnapshot);
+  return resolveDeposit(item.unitDepositAmount, snapshot) ?? 0;
+};
+
+const resolveItemRent = (item: RentalOrderItem): number => {
+  const snapshot = parsePlanSnapshot(item.planSnapshot);
+  return resolveRent(item.unitRentAmount, snapshot) ?? 0;
+};
+
+const resolveOrderDeposit = (detail: RentalOrderDetail): number => {
+  if (detail.depositAmount != null) {
+    return detail.depositAmount;
+  }
+  return detail.items.reduce((sum, item) => sum + resolveItemDeposit(item) * item.quantity, 0);
+};
+
+const resolveOrderRent = (detail: RentalOrderDetail): number => {
+  if (detail.rentAmount != null) {
+    return detail.rentAmount;
+  }
+  return detail.items.reduce((sum, item) => sum + resolveItemRent(item) * item.quantity, 0);
+};
+
+const resolveOrderTotal = (detail: RentalOrderDetail): number => {
+  if (detail.totalAmount != null) {
+    return detail.totalAmount;
+  }
+  return resolveOrderDeposit(detail) + resolveOrderRent(detail);
+};
 
 const loadProduct = async () => {
   const productId = route.query.productId as string | undefined;
