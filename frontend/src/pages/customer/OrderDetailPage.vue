@@ -14,9 +14,9 @@
           <a-descriptions :column="2" bordered size="small">
             <a-descriptions-item label="状态">{{ order.status }}</a-descriptions-item>
             <a-descriptions-item label="厂商">{{ order.vendorId }}</a-descriptions-item>
-            <a-descriptions-item label="押金">¥{{ formatCurrency(resolveOrderDeposit(order)) }}</a-descriptions-item>
-            <a-descriptions-item label="租金">¥{{ formatCurrency(resolveOrderRent(order)) }}</a-descriptions-item>
-            <a-descriptions-item label="总金额">¥{{ formatCurrency(resolveOrderTotal(order)) }}</a-descriptions-item>
+            <a-descriptions-item label="押金">¥{{ formatCurrency(rentalOrderDeposit(order)) }}</a-descriptions-item>
+            <a-descriptions-item label="租金">¥{{ formatCurrency(rentalOrderRent(order)) }}</a-descriptions-item>
+            <a-descriptions-item label="总金额">¥{{ formatCurrency(rentalOrderTotal(order)) }}</a-descriptions-item>
             <a-descriptions-item label="创建时间">{{ formatDate(order.createdAt) }}</a-descriptions-item>
             <a-descriptions-item label="开始日期" v-if="order.leaseStartAt">{{ formatDate(order.leaseStartAt) }}</a-descriptions-item>
             <a-descriptions-item label="结束日期" v-if="order.leaseEndAt">{{ formatDate(order.leaseEndAt) }}</a-descriptions-item>
@@ -54,6 +54,20 @@
       </a-col>
 
       <a-col :xs="24" :lg="8">
+        <a-card title="电子合同" class="mt-16">
+          <a-space direction="vertical" style="width: 100%">
+            <a-button
+              type="primary"
+              ghost
+              block
+              :disabled="!order"
+              @click="contractDrawerOpen = true"
+            >
+              查看合同
+            </a-button>
+            <span class="contract-hint">签署完成后将自动回写订单并记录操作日志。</span>
+          </a-space>
+        </a-card>
         <a-card title="付款">
           <a-form layout="vertical">
             <a-form-item label="支付场景">
@@ -100,6 +114,13 @@
         </a-card>
       </a-col>
     </a-row>
+    <OrderContractDrawer
+      v-model:open="contractDrawerOpen"
+      :order-id="orderId"
+      :user-id="auth.user?.id ?? null"
+      :default-signature="auth.user?.username ?? ''"
+      @signed="handleContractSigned"
+    />
   </div>
   <div v-else class="page-container">
     <a-card :loading="loading">正在加载...</a-card>
@@ -120,7 +141,14 @@ import {
   type RentalOrderDetail
 } from '../../services/orderService';
 import { initPayment } from '../../services/paymentService';
-import { parsePlanSnapshot, resolveDeposit, resolveRent } from '../../utils/planSnapshot';
+import {
+  resolveItemDeposit,
+  resolveItemRent,
+  rentalOrderDeposit,
+  rentalOrderRent,
+  rentalOrderTotal
+} from '../../utils/orderAmounts';
+import OrderContractDrawer from '../../components/orders/OrderContractDrawer.vue';
 
 const route = useRoute();
 const router = useRouter();
@@ -130,8 +158,6 @@ const orderId = route.params.orderId as string;
 const loading = ref(false);
 const order = ref<RentalOrderDetail | null>(null);
 const receiveLoading = ref(false);
-
-type RentalOrderItem = RentalOrderDetail['items'][number];
 
 const paymentForm = reactive({
   scene: 'DEPOSIT',
@@ -143,46 +169,16 @@ const paymentForm = reactive({
 const extensionForm = reactive({ months: 3, loading: false });
 const returnForm = reactive({ reason: '', loading: false });
 const buyoutForm = reactive({ loading: false });
+const contractDrawerOpen = ref(false);
 
 const formatCurrency = (value: number) => value.toFixed(2);
 const formatDate = (value: string) => new Date(value).toLocaleString();
-
-const resolveItemDeposit = (item: RentalOrderItem): number => {
-  const snapshot = parsePlanSnapshot(item.planSnapshot);
-  return resolveDeposit(item.unitDepositAmount, snapshot) ?? 0;
-};
-
-const resolveItemRent = (item: RentalOrderItem): number => {
-  const snapshot = parsePlanSnapshot(item.planSnapshot);
-  return resolveRent(item.unitRentAmount, snapshot) ?? 0;
-};
-
-const resolveOrderDeposit = (detail: RentalOrderDetail): number => {
-  if (detail.depositAmount != null) {
-    return detail.depositAmount;
-  }
-  return detail.items.reduce((sum, item) => sum + resolveItemDeposit(item) * item.quantity, 0);
-};
-
-const resolveOrderRent = (detail: RentalOrderDetail): number => {
-  if (detail.rentAmount != null) {
-    return detail.rentAmount;
-  }
-  return detail.items.reduce((sum, item) => sum + resolveItemRent(item) * item.quantity, 0);
-};
-
-const resolveOrderTotal = (detail: RentalOrderDetail): number => {
-  if (detail.totalAmount != null) {
-    return detail.totalAmount;
-  }
-  return resolveOrderDeposit(detail) + resolveOrderRent(detail);
-};
 
 const loadOrder = async () => {
   loading.value = true;
   try {
     order.value = await fetchOrder(orderId);
-    paymentForm.amount = order.value ? resolveOrderTotal(order.value) : 0;
+    paymentForm.amount = order.value ? rentalOrderTotal(order.value) : 0;
   } catch (error) {
     console.error('加载订单失败', error);
     message.error('加载订单失败，请稍后重试');
@@ -299,6 +295,10 @@ const handleBuyout = async () => {
 };
 
 loadOrder();
+
+const handleContractSigned = async () => {
+  await loadOrder();
+};
 </script>
 
 <style scoped>
@@ -314,5 +314,10 @@ loadOrder();
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.contract-hint {
+  color: #64748b;
+  font-size: 12px;
 }
 </style>

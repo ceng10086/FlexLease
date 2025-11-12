@@ -85,6 +85,9 @@
           <a-descriptions-item label="承运方" v-if="detailDrawer.order.shippingCarrier">{{ detailDrawer.order.shippingCarrier }}</a-descriptions-item>
           <a-descriptions-item label="运单号" v-if="detailDrawer.order.shippingTrackingNo">{{ detailDrawer.order.shippingTrackingNo }}</a-descriptions-item>
         </a-descriptions>
+        <a-space style="margin: 12px 0;">
+          <a-button type="link" @click="contractDrawerOpen = true">查看电子合同</a-button>
+        </a-space>
         <a-divider />
         <h4>租赁明细</h4>
         <a-table
@@ -138,11 +141,17 @@
         <a-empty description="未找到订单详情" />
       </template>
     </a-drawer>
+    <OrderContractDrawer
+      v-if="detailDrawer.order"
+      v-model:open="contractDrawerOpen"
+      :order-id="detailDrawer.order.id"
+      :allow-sign="false"
+    />
   </div>
 </template>
 
 <script lang="ts" setup>
-import { computed, reactive, ref } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import { message } from 'ant-design-vue';
 import {
   listAdminOrders,
@@ -152,7 +161,14 @@ import {
   type OrderStatus,
   type RentalOrderDetail
 } from '../../services/orderService';
-import { parsePlanSnapshot, resolveDeposit, resolveRent } from '../../utils/planSnapshot';
+import {
+  resolveItemDeposit,
+  resolveItemRent,
+  rentalOrderDeposit,
+  rentalOrderRent,
+  rentalOrderTotal
+} from '../../utils/orderAmounts';
+import OrderContractDrawer from '../../components/orders/OrderContractDrawer.vue';
 
 const orderStatusOptions: OrderStatus[] = [
   'PENDING_PAYMENT',
@@ -180,9 +196,7 @@ const detailDrawer = reactive<{ open: boolean; loading: boolean; order: RentalOr
 );
 
 const forceCloseForm = reactive({ reason: '', loading: false });
-
-type RentalOrderItem = RentalOrderDetail['items'][number];
-
+const contractDrawerOpen = ref(false);
 
 const formatCurrency = (value: number) => value.toFixed(2);
 const formatDate = (value: string) => new Date(value).toLocaleString();
@@ -194,36 +208,9 @@ const canForceClose = computed(() => {
   return !['COMPLETED', 'CANCELLED', 'BUYOUT_COMPLETED'].includes(detailDrawer.order.status);
 });
 
-const resolveItemDeposit = (item: RentalOrderItem): number => {
-  const snapshot = parsePlanSnapshot(item.planSnapshot);
-  return resolveDeposit(item.unitDepositAmount, snapshot) ?? 0;
-};
-
-const resolveItemRent = (item: RentalOrderItem): number => {
-  const snapshot = parsePlanSnapshot(item.planSnapshot);
-  return resolveRent(item.unitRentAmount, snapshot) ?? 0;
-};
-
-const resolveOrderDeposit = (detail: RentalOrderDetail): number => {
-  if (detail.depositAmount != null) {
-    return detail.depositAmount;
-  }
-  return detail.items.reduce((sum, item) => sum + resolveItemDeposit(item) * item.quantity, 0);
-};
-
-const resolveOrderRent = (detail: RentalOrderDetail): number => {
-  if (detail.rentAmount != null) {
-    return detail.rentAmount;
-  }
-  return detail.items.reduce((sum, item) => sum + resolveItemRent(item) * item.quantity, 0);
-};
-
-const resolveOrderTotal = (detail: RentalOrderDetail): number => {
-  if (detail.totalAmount != null) {
-    return detail.totalAmount;
-  }
-  return resolveOrderDeposit(detail) + resolveOrderRent(detail);
-};
+const resolveOrderDeposit = (detail: RentalOrderDetail): number => rentalOrderDeposit(detail);
+const resolveOrderRent = (detail: RentalOrderDetail): number => rentalOrderRent(detail);
+const resolveOrderTotal = (detail: RentalOrderDetail): number => rentalOrderTotal(detail);
 
 const loadOrders = async () => {
   loading.value = true;
@@ -299,6 +286,15 @@ const handleForceClose = async () => {
 };
 
 loadOrders();
+
+watch(
+  () => detailDrawer.open,
+  (open) => {
+    if (!open) {
+      contractDrawerOpen.value = false;
+    }
+  }
+);
 </script>
 
 <style scoped>

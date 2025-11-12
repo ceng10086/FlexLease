@@ -40,11 +40,14 @@
             <a-descriptions-item label="订单号">{{ detail.order.orderNo }}</a-descriptions-item>
             <a-descriptions-item label="状态">{{ detail.order.status }}</a-descriptions-item>
             <a-descriptions-item label="用户">{{ detail.order.userId }}</a-descriptions-item>
-            <a-descriptions-item label="总金额">¥{{ formatCurrency(resolveOrderTotal(detail.order)) }}</a-descriptions-item>
-            <a-descriptions-item label="押金">¥{{ formatCurrency(resolveOrderDeposit(detail.order)) }}</a-descriptions-item>
-            <a-descriptions-item label="租金">¥{{ formatCurrency(resolveOrderRent(detail.order)) }}</a-descriptions-item>
+            <a-descriptions-item label="总金额">¥{{ formatCurrency(rentalOrderTotal(detail.order)) }}</a-descriptions-item>
+            <a-descriptions-item label="押金">¥{{ formatCurrency(rentalOrderDeposit(detail.order)) }}</a-descriptions-item>
+            <a-descriptions-item label="租金">¥{{ formatCurrency(rentalOrderRent(detail.order)) }}</a-descriptions-item>
             <a-descriptions-item label="创建时间">{{ formatDate(detail.order.createdAt) }}</a-descriptions-item>
           </a-descriptions>
+          <a-space style="margin: 12px 0;">
+            <a-button type="link" @click="contractDrawerOpen = true">查看电子合同</a-button>
+          </a-space>
 
           <a-divider />
           <h4>明细</h4>
@@ -60,9 +63,29 @@
             <div class="action-box">
               <h5>发货</h5>
               <a-form layout="vertical">
-                <a-form-item label="承运方" required><a-input v-model:value="shipForm.carrier" placeholder="如 SF" /></a-form-item>
-                <a-form-item label="运单号" required><a-input v-model:value="shipForm.trackingNumber" placeholder="物流单号" /></a-form-item>
-                <a-button type="primary" :loading="shipForm.loading" @click="handleShip">提交发货</a-button>
+                <a-form-item label="承运方" required>
+                  <a-input
+                    v-model:value="shipForm.carrier"
+                    placeholder="如 SF"
+                    :disabled="!canShip"
+                  />
+                </a-form-item>
+                <a-form-item label="运单号" required>
+                  <a-input
+                    v-model:value="shipForm.trackingNumber"
+                    placeholder="物流单号"
+                    :disabled="!canShip"
+                  />
+                </a-form-item>
+                <a-button
+                  type="primary"
+                  :loading="shipForm.loading"
+                  :disabled="!canShip"
+                  @click="handleShip"
+                >
+                  提交发货
+                </a-button>
+                <p class="form-hint" v-if="!canShip">仅待发货订单可填写物流。</p>
               </a-form>
             </div>
             <div class="action-box">
@@ -72,8 +95,82 @@
                   <a-textarea v-model:value="returnForm.remark" :rows="3" placeholder="可选" />
                 </a-form-item>
                 <a-space>
-                  <a-button type="primary" danger :loading="returnForm.loading" @click="handleReturnDecision(false)">拒绝退租</a-button>
-                  <a-button type="primary" :loading="returnForm.loading" @click="handleReturnDecision(true)">确认退租</a-button>
+                  <a-button
+                    type="primary"
+                    danger
+                    :loading="returnForm.loading"
+                    :disabled="!canHandleReturn"
+                    @click="handleReturnDecision(false)"
+                  >
+                    拒绝退租
+                  </a-button>
+                  <a-button
+                    type="primary"
+                    :loading="returnForm.loading"
+                    :disabled="!canHandleReturn"
+                    @click="handleReturnDecision(true)"
+                  >
+                    确认退租
+                  </a-button>
+                </a-space>
+                <p class="form-hint" v-if="!canHandleReturn">仅退租流程中可审批。</p>
+              </a-form>
+            </div>
+            <div class="action-box" v-if="pendingExtension">
+              <h5>续租审批</h5>
+              <p class="action-box__meta">申请延长 {{ pendingExtension.additionalMonths }} 个月</p>
+              <a-form layout="vertical">
+                <a-form-item label="审批备注">
+                  <a-textarea
+                    v-model:value="extensionDecisionForm.remark"
+                    :rows="3"
+                    placeholder="可选"
+                  />
+                </a-form-item>
+                <a-space>
+                  <a-button
+                    danger
+                    :loading="extensionDecisionForm.loading"
+                    @click="handleExtensionDecision(false)"
+                  >
+                    驳回续租
+                  </a-button>
+                  <a-button
+                    type="primary"
+                    :loading="extensionDecisionForm.loading"
+                    @click="handleExtensionDecision(true)"
+                  >
+                    同意续租
+                  </a-button>
+                </a-space>
+              </a-form>
+            </div>
+            <div class="action-box" v-if="isBuyoutRequested">
+              <h5>买断审批</h5>
+              <p class="action-box__meta">确认后订单将进入买断完成状态。</p>
+              <a-form layout="vertical">
+                <a-form-item label="审批备注">
+                  <a-textarea
+                    v-model:value="buyoutDecisionForm.remark"
+                    :rows="3"
+                    placeholder="可选"
+                  />
+                </a-form-item>
+                <a-space>
+                  <a-button
+                    danger
+                    :loading="buyoutDecisionForm.loading"
+                    @click="handleBuyoutDecision(false)"
+                  >
+                    拒绝买断
+                  </a-button>
+                  <a-button
+                    type="primary"
+                    :loading="buyoutDecisionForm.loading"
+                    @click="handleBuyoutDecision(true)"
+                  >
+                    确认买断
+                  </a-button>
                 </a-space>
               </a-form>
             </div>
@@ -97,6 +194,12 @@
         </template>
       </a-spin>
     </a-drawer>
+    <OrderContractDrawer
+      v-if="detail.order"
+      v-model:open="contractDrawerOpen"
+      :order-id="detail.order.id"
+      :allow-sign="false"
+    />
   </div>
 
   <div v-else class="page-container">
@@ -106,7 +209,7 @@
       </template>
       <template #extra>
         <a-space>
-          <a-button type="primary" :loading="syncingAccount" @click="refreshAccount">重新同步</a-button>
+          <a-button type="primary" :loading="syncingVendor" @click="refreshAccount">重新同步</a-button>
         </a-space>
       </template>
     </a-result>
@@ -116,17 +219,26 @@
 <script lang="ts" setup>
 import { computed, reactive, ref, watch } from 'vue';
 import { message } from 'ant-design-vue';
-import { useAuthStore } from '../../stores/auth';
+import { useVendorContext } from '../../composables/useVendorContext';
 import {
   listOrders,
   fetchOrder,
   shipOrder,
   decideOrderReturn,
+  decideOrderExtension,
+  decideOrderBuyout,
   type OrderStatus,
   type RentalOrderSummary,
   type RentalOrderDetail
 } from '../../services/orderService';
-import { parsePlanSnapshot, resolveDeposit, resolveRent } from '../../utils/planSnapshot';
+import {
+  resolveItemDeposit,
+  resolveItemRent,
+  rentalOrderDeposit,
+  rentalOrderRent,
+  rentalOrderTotal
+} from '../../utils/orderAmounts';
+import OrderContractDrawer from '../../components/orders/OrderContractDrawer.vue';
 
 const vendorStatuses: OrderStatus[] = [
   'PENDING_PAYMENT',
@@ -140,18 +252,13 @@ const vendorStatuses: OrderStatus[] = [
   'CANCELLED'
 ];
 
-const auth = useAuthStore();
-const currentVendorId = computed(() => auth.vendorId ?? null);
-const vendorReady = computed(() => Boolean(currentVendorId.value));
-const syncingAccount = ref(false);
-
-const requireVendorId = (notify = false) => {
-  const id = currentVendorId.value;
-  if (!id && notify) {
-    message.warning('缺少厂商身份，请重新登录后重试');
-  }
-  return id;
-};
+const {
+  vendorId: currentVendorId,
+  vendorReady,
+  requireVendorId,
+  refreshVendorContext,
+  syncingVendor
+} = useVendorContext();
 
 const loading = ref(false);
 const orders = ref<RentalOrderSummary[]>([]);
@@ -168,41 +275,21 @@ const detail = reactive<{ open: boolean; loading: boolean; order: RentalOrderDet
 
 const shipForm = reactive({ carrier: '', trackingNumber: '', loading: false });
 const returnForm = reactive({ remark: '', loading: false });
+const extensionDecisionForm = reactive({ remark: '', loading: false });
+const buyoutDecisionForm = reactive({ remark: '', loading: false });
+const contractDrawerOpen = ref(false);
 
 const formatCurrency = (value: number) => value.toFixed(2);
 const formatDate = (value: string) => new Date(value).toLocaleString();
-
-type RentalOrderItem = RentalOrderDetail['items'][number];
-
-const resolveItemRent = (item: RentalOrderItem): number => {
-  const snapshot = parsePlanSnapshot(item.planSnapshot);
-  return resolveRent(item.unitRentAmount, snapshot) ?? 0;
-};
-const resolveItemDeposit = (item: RentalOrderItem): number => {
-  const snapshot = parsePlanSnapshot(item.planSnapshot);
-  return resolveDeposit(item.unitDepositAmount, snapshot) ?? 0;
-};
-
-const resolveOrderDeposit = (detail: RentalOrderDetail): number => {
-  if (detail.depositAmount != null) {
-    return detail.depositAmount;
-  }
-  return detail.items.reduce((sum, item) => sum + resolveItemDeposit(item) * item.quantity, 0);
-};
-
-const resolveOrderRent = (detail: RentalOrderDetail): number => {
-  if (detail.rentAmount != null) {
-    return detail.rentAmount;
-  }
-  return detail.items.reduce((sum, item) => sum + resolveItemRent(item) * item.quantity, 0);
-};
-
-const resolveOrderTotal = (detail: RentalOrderDetail): number => {
-  if (detail.totalAmount != null) {
-    return detail.totalAmount;
-  }
-  return resolveOrderDeposit(detail) + resolveOrderRent(detail);
-};
+const pendingExtension = computed(() =>
+  detail.order?.extensions?.find((item) => item.status === 'PENDING') ?? null
+);
+const isBuyoutRequested = computed(() => detail.order?.status === 'BUYOUT_REQUESTED');
+const canShip = computed(() => detail.order?.status === 'AWAITING_SHIPMENT');
+const canHandleReturn = computed(() => {
+  const status = detail.order?.status;
+  return status === 'RETURN_REQUESTED' || status === 'RETURN_IN_PROGRESS';
+});
 
 const loadOrders = async () => {
   const vendorId = requireVendorId();
@@ -242,6 +329,9 @@ const openDetail = async (orderId: string) => {
     detail.order = await fetchOrder(orderId);
     shipForm.carrier = detail.order?.shippingCarrier ?? '';
     shipForm.trackingNumber = detail.order?.shippingTrackingNo ?? '';
+    returnForm.remark = '';
+    extensionDecisionForm.remark = '';
+    buyoutDecisionForm.remark = '';
   } catch (error) {
     console.error('加载订单详情失败', error);
     message.error('加载详情失败');
@@ -259,6 +349,10 @@ const refreshDetail = async () => {
 
 const handleShip = async () => {
   if (!detail.order) {
+    return;
+  }
+  if (!canShip.value) {
+    message.warning('当前状态无需发货');
     return;
   }
   const vendorId = requireVendorId(true);
@@ -291,6 +385,10 @@ const handleReturnDecision = async (approve: boolean) => {
   if (!detail.order) {
     return;
   }
+  if (!canHandleReturn.value) {
+    message.warning('当前没有待处理的退租申请');
+    return;
+  }
   const vendorId = requireVendorId(true);
   if (!vendorId) {
     return;
@@ -313,21 +411,72 @@ const handleReturnDecision = async (approve: boolean) => {
   }
 };
 
-const refreshAccount = async () => {
-  syncingAccount.value = true;
+const handleExtensionDecision = async (approve: boolean) => {
+  if (!detail.order) {
+    return;
+  }
+  if (!pendingExtension.value) {
+    message.warning('当前没有待处理的续租申请');
+    return;
+  }
+  const vendorId = requireVendorId(true);
+  if (!vendorId) {
+    return;
+  }
+  extensionDecisionForm.loading = true;
   try {
-    await auth.bootstrap();
-    if (currentVendorId.value) {
-      message.success('厂商身份已同步');
-      await loadOrders();
-    } else {
-      message.warning('仍未获取到厂商身份，请尝试重新登录');
-    }
+    await decideOrderExtension(detail.order.id, {
+      vendorId,
+      approve,
+      remark: extensionDecisionForm.remark || (approve ? '同意续租' : '拒绝续租')
+    });
+    message.success(approve ? '已同意续租申请' : '已驳回续租申请');
+    extensionDecisionForm.remark = '';
+    await refreshDetail();
+    await loadOrders();
   } catch (error) {
-    console.error('刷新账号信息失败', error);
-    message.error('同步失败，请稍后重试');
+    console.error('续租审批失败', error);
+    message.error('续租审批失败，请稍后重试');
   } finally {
-    syncingAccount.value = false;
+    extensionDecisionForm.loading = false;
+  }
+};
+
+const handleBuyoutDecision = async (approve: boolean) => {
+  if (!detail.order) {
+    return;
+  }
+  if (!isBuyoutRequested.value) {
+    message.warning('当前没有待处理的买断申请');
+    return;
+  }
+  const vendorId = requireVendorId(true);
+  if (!vendorId) {
+    return;
+  }
+  buyoutDecisionForm.loading = true;
+  try {
+    await decideOrderBuyout(detail.order.id, {
+      vendorId,
+      approve,
+      remark: buyoutDecisionForm.remark || (approve ? '确认买断' : '拒绝买断')
+    });
+    message.success(approve ? '已确认买断' : '已拒绝买断申请');
+    buyoutDecisionForm.remark = '';
+    await refreshDetail();
+    await loadOrders();
+  } catch (error) {
+    console.error('买断审批失败', error);
+    message.error('买断审批失败，请稍后重试');
+  } finally {
+    buyoutDecisionForm.loading = false;
+  }
+};
+
+const refreshAccount = async () => {
+  await refreshVendorContext();
+  if (currentVendorId.value) {
+    await loadOrders();
   }
 };
 
@@ -342,6 +491,15 @@ watch(
     }
   },
   { immediate: true }
+);
+
+watch(
+  () => detail.open,
+  (open) => {
+    if (!open) {
+      contractDrawerOpen.value = false;
+    }
+  }
 );
 </script>
 
@@ -360,6 +518,17 @@ watch(
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.action-box__meta {
+  color: #475569;
+  font-size: 13px;
+}
+
+.form-hint {
+  margin-top: 6px;
+  color: #94a3b8;
+  font-size: 12px;
 }
 
 .timeline-item {

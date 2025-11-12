@@ -55,7 +55,7 @@
       </template>
       <template #extra>
         <a-space>
-          <a-button type="primary" :loading="syncingAccount" @click="refreshAccount">重新同步</a-button>
+          <a-button type="primary" :loading="syncingVendor" @click="refreshAccount">重新同步</a-button>
         </a-space>
       </template>
     </a-result>
@@ -63,18 +63,20 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, reactive, ref, watch } from 'vue';
+import { reactive, ref, watch } from 'vue';
 import { message } from 'ant-design-vue';
 import dayjs, { type Dayjs } from 'dayjs';
-import { useAuthStore } from '../../stores/auth';
+import { useVendorContext } from '../../composables/useVendorContext';
 import { listSettlements, type PaymentSettlementResponse } from '../../services/paymentService';
 
-const auth = useAuthStore();
 const loading = ref(false);
 const records = ref<PaymentSettlementResponse[]>([]);
-const currentVendorId = computed(() => auth.vendorId ?? null);
-const vendorReady = computed(() => Boolean(currentVendorId.value));
-const syncingAccount = ref(false);
+const {
+  vendorId: currentVendorId,
+  vendorReady,
+  refreshVendorContext,
+  syncingVendor
+} = useVendorContext();
 
 const filters = reactive<{ from?: Dayjs; to?: Dayjs }>({});
 
@@ -106,20 +108,9 @@ const loadSettlements = async (notify = false) => {
 };
 
 const refreshAccount = async () => {
-  syncingAccount.value = true;
-  try {
-    await auth.bootstrap();
-    if (currentVendorId.value) {
-      message.success('厂商身份已同步');
-      await loadSettlements();
-    } else {
-      message.warning('仍未获取到厂商身份，请尝试重新登录');
-    }
-  } catch (error) {
-    console.error('刷新账号信息失败', error);
-    message.error('同步失败，请稍后重试');
-  } finally {
-    syncingAccount.value = false;
+  await refreshVendorContext();
+  if (currentVendorId.value) {
+    await loadSettlements();
   }
 };
 

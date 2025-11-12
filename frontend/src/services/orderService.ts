@@ -170,6 +170,21 @@ export type OrderReturn = {
   remark?: string | null;
 };
 
+export type OrderContractStatus = 'DRAFT' | 'SIGNED';
+
+export type OrderContract = {
+  contractId: string;
+  orderId: string;
+  contractNumber: string;
+  status: OrderContractStatus;
+  content: string;
+  signature?: string | null;
+  signedBy?: string | null;
+  generatedAt: string;
+  signedAt?: string | null;
+  updatedAt: string;
+};
+
 export type RentalOrderDetail = {
   id: string;
   orderNo: string;
@@ -323,5 +338,18 @@ export const forceCloseOrder = async (
   payload: OrderForceClosePayload
 ) : Promise<RentalOrderDetail> => {
   const response = await http.post<ApiResponse<RentalOrderDetail>>(`/admin/orders/${orderId}/force-close`, payload);
+  return response.data.data;
+};
+
+export const fetchOrderContract = async (orderId: string): Promise<OrderContract> => {
+  const response = await http.get<ApiResponse<OrderContract>>(`/orders/${orderId}/contract`);
+  return response.data.data;
+};
+
+export const signOrderContract = async (
+  orderId: string,
+  payload: { userId: string; signature: string }
+): Promise<OrderContract> => {
+  const response = await http.post<ApiResponse<OrderContract>>(`/orders/${orderId}/contract/sign`, payload);
   return response.data.data;
 };

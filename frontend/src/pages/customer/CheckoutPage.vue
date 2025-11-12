@@ -81,15 +81,10 @@ import {
   previewOrder,
   createOrder,
   type OrderPreviewResponse,
-  type RentalOrderDetail,
-  type RentalOrderItem
+  type RentalOrderDetail
 } from '../../services/orderService';
-import {
-  serializePlanSnapshot,
-  parsePlanSnapshot,
-  resolveDeposit,
-  resolveRent
-} from '../../utils/planSnapshot';
+import { serializePlanSnapshot } from '../../utils/planSnapshot';
+import { rentalOrderDeposit, rentalOrderRent, rentalOrderTotal } from '../../utils/orderAmounts';
 import { autoCompleteInitialPayment } from '../../utils/autoPayment';
 
 const route = useRoute();
@@ -122,37 +117,6 @@ const currentSku = computed(() => currentPlan.value?.skus.find((sku) => sku.id =
 const orderReady = computed(() => Boolean(product.value && currentPlan.value && currentSku.value && product.value.vendorId));
 
 const formatCurrency = (value: number) => value.toFixed(2);
-
-const resolveItemDeposit = (item: RentalOrderItem): number => {
-  const snapshot = parsePlanSnapshot(item.planSnapshot);
-  return resolveDeposit(item.unitDepositAmount, snapshot) ?? 0;
-};
-
-const resolveItemRent = (item: RentalOrderItem): number => {
-  const snapshot = parsePlanSnapshot(item.planSnapshot);
-  return resolveRent(item.unitRentAmount, snapshot) ?? 0;
-};
-
-const resolveOrderDeposit = (detail: RentalOrderDetail): number => {
-  if (detail.depositAmount != null) {
-    return detail.depositAmount;
-  }
-  return detail.items.reduce((sum, item) => sum + resolveItemDeposit(item) * item.quantity, 0);
-};
-
-const resolveOrderRent = (detail: RentalOrderDetail): number => {
-  if (detail.rentAmount != null) {
-    return detail.rentAmount;
-  }
-  return detail.items.reduce((sum, item) => sum + resolveItemRent(item) * item.quantity, 0);
-};
-
-const resolveOrderTotal = (detail: RentalOrderDetail): number => {
-  if (detail.totalAmount != null) {
-    return detail.totalAmount;
-  }
-  return resolveOrderDeposit(detail) + resolveOrderRent(detail);
-};
 
 const loadProduct = async () => {
   const productId = route.query.productId as string | undefined;
@@ -255,10 +219,10 @@ const handleCreate = async () => {
 
 const handleAutoPayment = async (order: RentalOrderDetail) => {
   try {
-    const deposit = resolveOrderDeposit(order);
-    const rent = resolveOrderRent(order);
+    const deposit = rentalOrderDeposit(order);
+    const rent = rentalOrderRent(order);
     const buyout = order.buyoutAmount ?? 0;
-    const total = resolveOrderTotal(order);
+    const total = rentalOrderTotal(order);
     const paid = await autoCompleteInitialPayment({
       orderId: order.id,
       vendorId: order.vendorId,
