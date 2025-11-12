@@ -199,19 +199,20 @@
 | POST | `/payments/{transactionId}/confirm` | 后台手动确认支付成功 | `{ channelTransactionNo, paidAt? }` | `PaymentTransactionResponse` |
 | POST | `/payments/{transactionId}/callback` | 模拟支付通道回调 | `{ status, channelTransactionNo, paidAt?, failureReason? }` | `PaymentTransactionResponse` |
 | POST | `/payments/{transactionId}/refund` | 发起退款（立即成功） | `{ amount, reason? }` | `RefundTransactionResponse` |
+| POST | `/internal/payments/{transactionId}/refund` | 内部服务触发退款（订单服务用于退租、押金返还） | `{ amount, reason? }`，Header 需携带 `X-Internal-Token` | `RefundTransactionResponse` |
 | GET | `/payments/settlements` | 查询厂商结算汇总 | `vendorId?`、`from?`、`to?`、`refundFrom?`、`refundTo?`（ISO8601 时间） | `List<PaymentSettlementResponse>` |
 
-> `PaymentTransactionResponse` 返回基础字段、`splits`（分账明细）以及 `refunds`（退款流水）。`PaymentSettlementResponse` 汇总厂商维度的总金额、押金/租金/买断/违约金拆分、已退款金额、净入账金额以及最近一次支付时间；可按支付时间和退款完成时间两个时间窗过滤。
+> `PaymentTransactionResponse` 返回基础字段、`splits`（分账明细）以及 `refunds`（退款流水）。`PaymentSettlementResponse` 汇总厂商维度的总金额、押金/租金/买断/违约金拆分、已退款金额、净入账金额以及最近一次支付时间；可按支付时间和退款完成时间两个时间窗过滤。所有 `/internal/**` 接口均需携带 `X-Internal-Token` 以限制为服务间调用。
 
 ## 7. 通知与运营（notification-service, analytics）
 ### 7.1 通知服务
 | 方法 | URL | 描述 | 请求体要点 | 响应 |
 | ---- | --- | ---- | -------- | ---- |
 | POST | `/notifications/send` | 发送单条通知，支持模板渲染或自定义内容 | `{ templateCode?, channel?, recipient, subject?, content?, variables? }`<br>当 `templateCode` 指定时，可省略 `channel/subject/content`，系统按模板渲染；`variables` 为键值对用于替换 `{{key}}` 占位符。 | `NotificationLogResponse`（包含通知 ID、渠道、状态、发送时间等）|
-| GET | `/notifications/logs` | 查询最近 50 条通知记录，可按状态过滤 | `status?=PENDING|SENT|FAILED` | `List<NotificationLogResponse>` |
+| GET | `/notifications/logs` | 查询最近 50 条通知记录，可按状态/接收方过滤 | `status?=PENDING|SENT|FAILED`、`recipient?=<userId/vendorId>` | `List<NotificationLogResponse>` |
 | GET | `/notifications/templates` | 查看系统内置模板 | - | `List<NotificationTemplateResponse>` |
 
-> 目前通知发送为模拟实现：若渠道为 `EMAIL` 且收件人不为合法邮箱格式，将返回校验错误；其它渠道默认视为发送成功并写入通知日志。
+> 目前通知发送为模拟实现：若渠道为 `EMAIL` 且收件人不为合法邮箱格式，将返回校验错误；其它渠道默认视为发送成功并写入通知日志。`/notifications/logs` 会根据当前角色自动收敛可见范围——消费者仅能查看自身 `userId`，厂商仅能查看其 `vendorId`，管理员/内部可查看任何 `recipient` 或省略参数获取全局 Top 50。
 
 > 说明：运营指标接口实际由订单服务提供，仍透出在 `/api/v1/analytics/**` 路径下，网关/前端需路由至 `order-service`。
 
