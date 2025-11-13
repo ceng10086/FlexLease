@@ -1,7 +1,7 @@
 <template>
   <a-drawer
     :open="open"
-    :width="720"
+    :width="drawerWidth"
     title="电子合同"
     :closable="true"
     @close="handleClose"
@@ -71,6 +71,7 @@ import {
   signOrderContract,
   type OrderContract
 } from '../../services/orderService';
+import { useViewport } from '../../composables/useViewport';
 
 const props = defineProps<{
   orderId: string;
@@ -84,6 +85,15 @@ const emit = defineEmits<{
   (e: 'update:open', value: boolean): void;
   (e: 'signed', contract: OrderContract): void;
 }>();
+
+const { isMobile, width: viewportWidth } = useViewport();
+const drawerWidth = computed(() => {
+  if (!isMobile.value) {
+    return 720;
+  }
+  const base = viewportWidth.value || 360;
+  return Math.min(Math.max(base - 32, 320), 720);
+});
 
 const loading = ref(false);
 const signing = ref(false);

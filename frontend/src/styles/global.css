@@ -45,3 +45,24 @@ a {
 .section-divider {
   margin: 24px 0;
 }
+
+@media (max-width: 768px) {
+  .page-container {
+    padding: 16px;
+  }
+
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .page-header > * {
+    width: 100%;
+  }
+
+  .page-header .ant-space {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+}

@@ -31,6 +31,12 @@ export type NotificationLog = {
   createdAt: string;
 };
 
+export type NotificationLogQuery = {
+  status?: NotificationStatus;
+  channel?: NotificationChannel;
+  recipient?: string;
+};
+
 export type NotificationTemplate = {
   id: string;
   code: string;
@@ -45,9 +51,9 @@ export const sendNotification = async (payload: NotificationSendPayload) => {
   return response.data.data;
 };
 
-export const listNotificationLogs = async (status?: NotificationStatus) => {
+export const listNotificationLogs = async (filters: NotificationLogQuery = {}) => {
   const response = await http.get<ApiResponse<NotificationLog[]>>('/notifications/logs', {
-    params: { status }
+    params: filters
   });
   return response.data.data;
 };

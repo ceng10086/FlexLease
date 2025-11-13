@@ -8,22 +8,39 @@
     </div>
 
     <a-card>
-      <a-form layout="inline" :model="filters" class="filter-form" @submit.prevent>
+      <a-form
+        :layout="formLayout"
+        :model="filters"
+        :class="['filter-form', { 'filter-form--stacked': isMobile }]"
+        @submit.prevent
+      >
         <a-form-item label="用户 ID">
-          <a-input v-model:value="filters.userId" placeholder="可选" style="width: 240px" />
+          <a-input
+            v-model:value="filters.userId"
+            placeholder="可选"
+            :style="{ width: isMobile ? '100%' : '240px' }"
+          />
         </a-form-item>
         <a-form-item label="厂商 ID">
-          <a-input v-model:value="filters.vendorId" placeholder="可选" style="width: 240px" />
+          <a-input
+            v-model:value="filters.vendorId"
+            placeholder="可选"
+            :style="{ width: isMobile ? '100%' : '240px' }"
+          />
         </a-form-item>
         <a-form-item label="状态">
-          <a-select v-model:value="filters.status" allow-clear style="width: 200px">
+          <a-select
+            v-model:value="filters.status"
+            allow-clear
+            :style="{ width: isMobile ? '100%' : '200px' }"
+          >
             <a-select-option v-for="status in orderStatusOptions" :key="status" :value="status">
               {{ status }}
             </a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item>
-          <a-space>
+        <a-form-item class="filter-form__actions">
+          <a-space :wrap="isMobile">
             <a-button type="primary" :loading="loading" @click="loadOrders">查询</a-button>
             <a-button @click="resetFilters">重置</a-button>
           </a-space>
@@ -35,6 +52,8 @@
         :loading="loading"
         row-key="id"
         :pagination="pagination"
+        :scroll="tableScroll"
+        size="middle"
         @change="handleTableChange"
       >
         <a-table-column title="订单号" data-index="orderNo" key="orderNo" />
@@ -66,14 +85,14 @@
     <a-drawer
       v-model:open="detailDrawer.open"
       title="订单详情"
-      :width="720"
+      :width="detailDrawerWidth"
       destroy-on-close
     >
       <template v-if="detailDrawer.loading">
         <a-spin />
       </template>
       <template v-else-if="detailDrawer.order">
-        <a-descriptions title="基础信息" :column="2" bordered size="small">
+        <a-descriptions title="基础信息" :column="descriptionsColumn" bordered size="small">
           <a-descriptions-item label="订单号">{{ detailDrawer.order.orderNo }}</a-descriptions-item>
           <a-descriptions-item label="状态">{{ detailDrawer.order.status }}</a-descriptions-item>
           <a-descriptions-item label="用户">{{ detailDrawer.order.userId }}</a-descriptions-item>
@@ -169,6 +188,7 @@ import {
   rentalOrderTotal
 } from '../../utils/orderAmounts';
 import OrderContractDrawer from '../../components/orders/OrderContractDrawer.vue';
+import { useViewport } from '../../composables/useViewport';
 
 const orderStatusOptions: OrderStatus[] = [
   'PENDING_PAYMENT',
@@ -181,6 +201,18 @@ const orderStatusOptions: OrderStatus[] = [
   'BUYOUT_COMPLETED',
   'CANCELLED'
 ];
+
+const { isMobile, width: viewportWidth } = useViewport();
+const formLayout = computed(() => (isMobile.value ? 'vertical' : 'inline'));
+const tableScroll = computed(() => (isMobile.value ? { x: 900 } : undefined));
+const descriptionsColumn = computed(() => (isMobile.value ? 1 : 2));
+const detailDrawerWidth = computed(() => {
+  if (!isMobile.value) {
+    return 720;
+  }
+  const base = viewportWidth.value || 360;
+  return Math.min(Math.max(base - 32, 320), 720);
+});
 
 const filters = reactive<{ userId?: string; vendorId?: string; status?: OrderStatus }>({});
 const loading = ref(false);
@@ -302,6 +334,18 @@ watch(
   margin-bottom: 16px;
 }
 
+.filter-form--stacked :deep(.ant-form-item) {
+  width: 100%;
+}
+
+.filter-form__actions {
+  margin-left: auto;
+}
+
+.filter-form__actions .ant-space {
+  justify-content: flex-end;
+}
+
 .info-alert {
   margin-bottom: 16px;
 }
@@ -310,5 +354,15 @@ watch(
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+@media (max-width: 768px) {
+  .filter-form__actions {
+    width: 100%;
+  }
+
+  .filter-form__actions .ant-space {
+    width: 100%;
+  }
 }
 </style>

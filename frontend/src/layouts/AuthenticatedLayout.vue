@@ -8,11 +8,13 @@
         v-model:collapsed="collapsed"
         collapsible
         :width="240"
+        :collapsedWidth="siderCollapsedWidth"
         breakpoint="lg"
         class="auth-layout__sider"
       >
         <div class="auth-layout__logo">FlexLease</div>
         <a-menu
+          theme="dark"
           mode="inline"
           :selectedKeys="selectedKeys"
           :openKeys="openKeys"
@@ -42,13 +44,20 @@
       </a-layout-sider>
       <a-layout>
         <a-layout-header class="auth-layout__header">
-          <div class="auth-layout__breadcrumbs">
-            <a-breadcrumb>
-              <a-breadcrumb-item v-for="crumb in breadcrumbs" :key="crumb.key">
-                {{ crumb.label }}
-              </a-breadcrumb-item>
-            </a-breadcrumb>
-            <h1 class="auth-layout__title">{{ activeTitle }}</h1>
+          <div class="auth-layout__header-left">
+            <a-button
+              v-if="isMobile"
+              class="auth-layout__menu-toggle"
+              type="text"
+              @click="toggleSider"
+            >
+              <template #icon>
+                <component :is="collapsed ? MenuUnfoldOutlined : MenuFoldOutlined" />
+              </template>
+            </a-button>
+            <div class="auth-layout__breadcrumbs">
+              <h1 class="auth-layout__title">{{ activeTitle }}</h1>
+            </div>
           </div>
           <div class="auth-layout__actions">
             <a-space align="center">
@@ -98,17 +107,22 @@ import {
   ContainerOutlined,
   SendOutlined,
   FundOutlined,
-  TransactionOutlined
+  TransactionOutlined,
+  MenuFoldOutlined,
+  MenuUnfoldOutlined
 } from '@ant-design/icons-vue';
 import { useAuthStore } from '../stores/auth';
 import { resolveMenuForRoles, findNavItem, findNavPath, type NavItem } from '../router/menu';
+import { useViewport } from '../composables/useViewport';
 
 const auth = useAuthStore();
 const router = useRouter();
 const route = useRoute();
+const { isMobile } = useViewport();
 
 const collapsed = ref(false);
 const openKeys = ref<string[]>([]);
+const siderCollapsedWidth = computed(() => (isMobile.value ? 0 : 80));
 
 const iconMap: Record<string, any> = {
   DashboardOutlined,
@@ -177,6 +191,16 @@ watch(collapsed, () => {
   syncOpenKeys();
 });
 
+watch(
+  isMobile,
+  (mobile) => {
+    if (mobile) {
+      collapsed.value = true;
+    }
+  },
+  { immediate: true }
+);
+
 const breadcrumbs = computed(() => {
   const navKey = (route.meta.navKey as string | undefined) ?? 'overview';
   const pathKeys = findNavPath(navKey, menuItems.value) ?? ['overview'];
@@ -210,6 +234,10 @@ const handleSelect = ({ key }: { key: string }) => {
 const handleLogout = () => {
   auth.logout();
   router.replace({ name: 'login' });
+};
+
+const toggleSider = () => {
+  collapsed.value = !collapsed.value;
 };
 
 onMounted(async () => {
@@ -294,5 +322,71 @@ onMounted(async () => {
   min-height: calc(100vh - 64px);
   background: #f5f7fa;
   overflow: auto;
+}
+
+.auth-layout__header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.auth-layout__menu-toggle {
+  width: 40px;
+  height: 40px;
+}
+
+:deep(.auth-layout__sider .ant-layout-sider-children) {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+:deep(.auth-layout__sider .ant-menu) {
+  background: transparent;
+  color: #e2e8f0;
+  border-inline-end: none;
+}
+
+:deep(.auth-layout__sider .ant-menu-item),
+:deep(.auth-layout__sider .ant-menu-submenu-title) {
+  height: auto;
+  line-height: 1.4;
+  padding-top: 10px;
+  padding-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: normal;
+}
+
+:deep(.auth-layout__sider .ant-menu .ant-menu-title-content) {
+  flex: 1;
+}
+
+:deep(.auth-layout__sider .ant-menu-item-selected) {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+@media (max-width: 768px) {
+  .auth-layout__header {
+    flex-direction: column;
+    align-items: flex-start;
+    height: auto;
+    padding: 12px 16px;
+    gap: 12px;
+  }
+
+  .auth-layout__actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .auth-layout__content {
+    padding: 16px;
+  }
+
+  .auth-layout__title {
+    font-size: 16px;
+  }
 }
 </style>
