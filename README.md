@@ -49,9 +49,45 @@ FlexLease 面向 B2C 场景，为厂商与消费者提供从入驻、商品配�
   - 模板化站内通知（支持变量渲染/自定义内容），Redis 缓存模板，最近 50 条日志查询。
   - 订阅订单创建事件，自动向对应厂商推送“新订单待处理”通知。
 - **前端体验**
-  - 单点登录 + 多角色菜单：消费者（目录/购物车/订单/通知）・厂商（商品/订单/指标/结算）・管理员（入驻审核/商品审核/订单监控）。
-  - 平台 & 厂商仪表盘提供 7 日 GMV/订单趋势、租赁模式构成与环比洞察，支持运营快速识别波动。
-  - 自动支付模拟替换手动运营工具，Playwright 覆盖仪表盘渲染。
+  - 单点登录 + 多角色工作台：消费者覆盖商品目录/详情、购物车、结算、订单详情（含支付、续租/退租/买断、电子合同）与通知中心；厂商拥有商品/媒体工作台、库存流水、订单履约抽屉、运营指标与结算看板；管理员负责入驻审核、商品审核与订单监控（含合同预览、强制关闭）。
+  - 仪表盘提供平台/厂商双视角 GMV、订单状态与 7 日趋势，同步呈现租赁模式构成与常用入口。
+  - 自动支付模拟、`useVendorContext` 厂商身份刷新、Ant Design Vue + Pinia + Vue Router 组合支撑桌面级交互，Playwright 覆盖仪表盘渲染。
+- **系统保障**
+  - `platform-common` 内置轻量级 `IdempotencyService`，`/orders`、`/payments` 等写操作支持 `Idempotency-Key` 防重复提交。
+  - `OrderMaintenanceScheduler` 周期性取消超时订单、释放库存并推送通知，RabbitMQ `order.events` → `notification-service` 统一消费。
+  - `flexlease.payment.auto-confirm` 默认开启以模拟端到端自动支付，置为 `false` 后可通过 `/payments/{id}/confirm`/`/callback` 体验人工确认与失败回调。
+
+## 微服务实现要点
+
+- **auth-service**：`backend/auth-service/src/main/java/com/flexlease/auth/config/DataInitializer.java` 会根据 `flexlease.bootstrap.admin.*` 环境变量初始化管理员账号并写入 `ADMIN/VENDOR/USER` 三种角色，账号状态使用 `ENABLED/DISABLED/PENDING_REVIEW` 枚举，`/api/v1/internal/users/**` 以内置 `X-Internal-Token` 保护供其它服务启停账号或绑定 `vendorId`。
+- **user-service**：`VendorApplicationController` 支持厂商反复提交/查看申请，`VendorService` 统一维护 `users.vendor` 表，管理员在 `/vendors/applications/{id}/approve` 触发 `AuthServiceClient` 激活账号；`CustomerProfileController` 会在首次访问时自动建档，管理员可通过 `/admin/users/**` 远程调用认证服务冻结账号。
+- **product-service**：`VendorProductController` 暴露商品/方案/SKU 以及库存调整 API，`InventoryChangeType` 支持 `INBOUND/OUTBOUND/RESERVE/RELEASE`，并通过 `InventoryReservationService` 处理 `/api/v1/internal/inventory/reservations` 批量预占；`ProductMediaController` 以上传到 `FLEXLEASE_STORAGE_ROOT` 目录为中心，返回媒体的 `fileName/fileUrl/contentType/fileSize/sortOrder`。
+- **order-service**：`RentalOrderService` 会读取 `product-service` Catalog 验证计划与 SKU，支持 `cartItemIds` 合并下单、生成 `OrderContract` 并同步 `order_event`、续租/退租/买断审批、押金自动退款以及 `CartService` 的访问控制；`OrderMaintenanceScheduler` 根据 `flexlease.order.maintenance.*` 周期取消 `PENDING_PAYMENT` 订单；`OrderAnalyticsService` 聚合平台与厂商指标供 `/analytics/**` 使用。
+- **payment-service**：`PaymentTransactionService` 结合 `IdempotencyService` 限制同一订单/场景只存在一条待支付流水，`flexlease.payment.auto-confirm` 为真时自动将状态切换为 `SUCCEEDED` 并调用 `order-service` `/internal/orders/{id}/payment-success`；退款通过 `PaymentClient.createRefund` 回流，结算接口会统计押金/租金/买断/违约金及退款窗口。
+- **notification-service**：开启 `flexlease.redis.enabled=true` 时通过 `NotificationTemplateProvider` + Spring Cache 缓存模板，`NotificationService` 根据角色自动收敛 `/notifications/logs` 查询范围，`OrderEventListener` 监听 `order.events.notification` 队列对厂商推送“新订单”站内信。
+- **gateway-service / registry-service**：Gateway 依据 `backend/gateway-service/src/main/resources/application.yml` 中的路由表把 `/api/v1/**` 映射到各微服务，Eureka 负责注册发现，所有服务默认以 `prefer-ip-address=true` 注册节点。
+- **frontend**：Vite + Vue 3 + Ant Design Vue。`pages/overview/OverviewPage.vue` 同时拉取 `/analytics/dashboard`、`/analytics/vendor/{id}`、`/notifications/logs` 与最新订单，消费者端通过 `CartPage.vue` + `autoCompleteInitialPayment` 与 `/payments/{orderId}/init` 形成“下单即付”的体验，厂商端依赖 `useVendorContext` 自动刷新 `/auth/me` 返回的 `vendorId`。
+
+## 配置要点
+
+- 所有服务共用 `security.jwt.secret` 与 `security.jwt.internal-access-token`，请在部署时统一覆盖；内部调用统一在 Header 中写入 `X-Internal-Token`（默认 `flexlease-internal-secret`）。
+- `flexlease.bootstrap.admin.username/password` 控制认证服务默认管理员账号；`FLEXLEASE_STORAGE_ROOT` 指定商品媒体文件目录；`FLEXLEASE_*_BASE_URL` 用于跨服务调用（order→product/payment/notification 等）。
+- `FLEXLEASE_PAYMENT_AUTO_CONFIRM`（或 `flexlease.payment.auto-confirm`）控制支付是否自动成功；`FLEXLEASE_ORDER_MAINTENANCE_PENDING_PAYMENT_EXPIRE_MINUTES` 与 `FLEXLEASE_ORDER_MAINTENANCE_SCAN_INTERVAL_MS` 调整待支付超时策略；`FLEXLEASE_MESSAGING_ENABLED` 与 `FLEXLEASE_REDIS_ENABLED` 可在开发环境禁用 RabbitMQ 或 Redis 依赖。
+
+## 多角色能力速览
+
+- **平台管理员**
+  - 入驻审核：`/app/admin/vendor-review` 通过 `user-service` 审核接口激活厂商账号并回写认证中心。
+  - 商品审核：`/app/admin/product-review` 直连 `product-service` 的 `/api/v1/admin/products/**`。
+  - 订单监控：`/app/admin/orders` 支持按用户/厂商/状态过滤，抽屉内嵌电子合同查看、操作时间线与 `/admin/orders/{id}/force-close`。
+- **厂商**
+  - 商品与库存：`VendorProductWorkspace` 绑定 `vendorId`，可配置方案、SKU、媒体并调用 `/inventory/adjust`。
+  - 履约操作：`VendorOrderWorkspace` 针对 `/orders/{id}/ship`、续租/退租/买断审批等动作提供抽屉，内置库存出入库补偿。
+  - 指标与结算：`VendorAnalyticsPage`、`VendorSettlementPage` 调用 `/analytics/vendor/{vendorId}`、`/payments/settlements`，配合 `useVendorContext` 组件随时刷新厂商身份。
+- **消费者**
+  - 自助下单：商品目录 → 详情 → 购物车/结算页 → `/orders` & `/payments` 的试算、下单与自动支付流程。
+  - 订单售后：详情页直接操作续租/退租/买断/确认收货并触发合同生成、通知推送。
+  - 通知中心：基于 `/notifications/logs` 的时间轴展示最新站内信，可交叉验证订单事件。
 
 ## 运行指南
 
@@ -81,7 +117,7 @@ docker compose up --build
    npm install
    npm run dev
    ```
-   需要代理网关可设置 `VITE_API_PROXY=http://localhost:8080`。
+   开发期默认使用 Vite 代理分别联调 9001～9006 服务，也可设置 `VITE_API_PROXY=http://localhost:8080` 直接走网关；构建阶段通过 `VITE_API_BASE_URL`（默认 `/api/v1`）切换 API 前缀。
 3. **常用命令**
    ```bash
    ./mvnw clean verify      # 全量构建+测试
@@ -91,19 +127,24 @@ docker compose up --build
 
 ### 功能体验建议
 
-1. 通过 `/api/v1/auth/register/vendor` 注册厂商账号 → 登录前端 → 提交入驻申请 → 管理员审核通过。
-2. 在厂商工作台创建商品/方案/SKU → 上传媒体 → 提交审核 → 管理员审批。
-3. 消费者登录 → 浏览 Catalog → 试算 & 下单（可从购物车导入）→ 自动支付回调 → 厂商发货 → 用户确认收货。
-4. 后续可体验续租/退租/买断/合同签署等流程，并在 `/api/v1/analytics/**`、`/api/v1/notifications/**` 验证指标与通知。
-5. Postman 集合 `docs/postman/cart-api.postman_collection.json` 覆盖购物车 → 下单链路，可用于 API 调试。
+1. 通过 `/api/v1/auth/register/vendor` 注册厂商账号 → 登录管理端 → 填写入驻资料 → 管理员在 `/vendors/applications/{id}/approve` 审核通过（认证中心自动激活账号）。
+2. 厂商工作台创建商品/方案/SKU，上传媒体、调整库存并提交审核，管理员在 `/api/v1/admin/products/**` 审核后即可在 Catalog 中看到。
+3. 消费者登录 → 浏览 `/app/catalog` → 进入商品详情 → 加入购物车/直接试算 `/orders/preview` → 创建订单（可附带 `cartItemIds`）→ 支付由 `payment-service` 自动确认。
+4. 在订单详情体验续租/退租/买断、支付回执与电子合同签署，同时打开通知中心验证 `/notifications/logs` 的最新日志。
+5. 切换到厂商角色，在订单履约抽屉中完成发货/审批，接着打开运营指标与结算页面（若缺少 `vendorId`，可用“刷新厂商身份”触发 `useVendorContext` 重拉 `/auth/me`）。
+6. 切换管理员查看订单监控列表、过滤条件与合同抽屉，并使用强制关闭演练补偿流程；如需纯 API 调试可导入 `docs/postman/cart-api.postman_collection.json`。
 
 ## 测试与质量
 
-- 后端各服务均包含 Spring Boot 集成测试：  
-  `product-service`（商品生命周期）、`order-service`（下单/购物车/调度）、`payment-service`（支付+退款+结算）、`notification-service`（模板 & 日志）。
-- `./mvnw clean verify` 在 H2 + Flyway 下执行，CI 同步 PostgreSQL 行为。  
-  `npm run build && npm run test:e2e` 覆盖前端构建与 Playwright 仪表盘回归。
-- 全局 `platform-common` 提供统一异常封装、JWT 解析、幂等工具、消息常量，保障跨服务一致性。
+- `backend/auth-service`：`AuthServiceApplicationTests` 覆盖注册/登录/刷新/密码重置，确保默认管理员初始化与 JWT 解析配置无误。
+- `backend/user-service`：`UserServiceApplicationTests` 演练厂商入驻到审批流程，校验对认证中心内部接口的启用与厂商 ID 绑定。
+- `backend/product-service`：`ProductServiceIntegrationTest` 走通商品创建→方案/SKU→库存调整→审核→ Catalog 暴露的完整链路。
+- `backend/order-service`：`RentalOrderServiceIntegrationTest` 验证购物车合并、库存预占/释放、支付回执、发货、售后、电子合同与 `OrderMaintenanceScheduler`；`OrderAnalyticsServiceIntegrationTest` 校验 `/analytics/**` 聚合。
+- `backend/payment-service`：`PaymentTransactionServiceIntegrationTest`（自动确认 + 结算）、`PaymentTransactionServiceManualFlowTest`（手动确认与失败回调）覆盖退款/分账/事件回调。
+- `backend/notification-service`：`NotificationServiceIntegrationTest` 检查模板渲染与 Redis 缓存，`OrderEventListener` 监听 RabbitMQ 并推送厂商提醒。
+- 前端 `tests/dashboard.spec.ts` 使用 Playwright 模拟 `/auth/me` 与 `/analytics/dashboard`，校验 Overview 指标渲染。
+- `./mvnw clean verify` 在 H2 + Flyway 下执行，CI 挂载 PostgreSQL 验证脚本一致性；`npm run build && npm run test:e2e` 覆盖前端构建与端到端回归。
+- `platform-common` 提供异常枚举、JWT 解析、幂等工具、消息常量等基础能力，保障跨服务契约。
 
 ## 文档索引
 

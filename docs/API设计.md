@@ -59,9 +59,11 @@
 | ---- | --- | ---- | ---- | ---- |
 | POST | `/vendors/applications` | 厂商 | 提交入驻资料 | 需厂商账号登录；已被驳回的申请可在原记录上重新提交 |
 | GET | `/vendors/applications/{id}` | 管理员/申请人 | 查看申请详情 | - |
-| GET | `/vendors/applications` | 管理员 | 列表查询 | 支持 `status` 过滤 |
+| GET | `/vendors/applications` | 管理员/厂商 | 列表查询 | 管理员可查看全部；厂商仅能查看自己提交的记录，均支持 `status` 过滤 |
 | POST | `/vendors/applications/{id}/approve` | 管理员 | 审核通过 | 请求体 `{ remark? }`，调用认证服务激活账号并同步厂商 `vendorId` 至认证中心 |
 | POST | `/vendors/applications/{id}/reject` | 管理员 | 审核驳回 | 请求体 `{ remark? }` |
+
+> `status` 取值 `DRAFT/SUBMITTED/APPROVED/REJECTED/SUSPENDED`，厂商重新提交时会在原记录上更新资料与 `submitted_at`。
 
 ### 3.2 厂商资料（已实现）
 | 方法 | URL | 角色 | 描述 | 请求/响应要点 |
@@ -80,6 +82,8 @@
 | PUT | `/customers/profile` | USER | 编辑个人资料 | 请求体 `{ fullName, gender, phone, email, address }`，`gender` 取值 `UNKNOWN/MALE/FEMALE` |
 | GET | `/admin/users` | ADMIN | 查询用户列表 | 支持 `keyword` 模糊搜索姓名，返回分页 |
 | PUT | `/admin/users/{userId}/status` | ADMIN | 启用/禁用用户 | 请求体 `{ status }`，通过认证服务内部接口生效 |
+
+> `/customers/profile` 在首次访问时会自动补建档案；`/admin/users/{userId}/status` 实际由 user-service 代为调用认证服务 `/api/v1/internal/users/{id}/status`，请求头需携带 `X-Internal-Token`。
 
 ## 4. 商品与租赁方案（product-service）
 ### 4.1 商品管理（B 端）
@@ -109,7 +113,7 @@
 | POST | `/vendors/{vendorId}/products/{productId}/rental-plans/{planId}/deactivate` | 停用方案 | - |
 | POST | `/vendors/{vendorId}/products/{productId}/rental-plans/{planId}/skus` | 新增 SKU | `{ skuCode, attributes?, stockTotal, stockAvailable?, status? }` |
 | PUT | `/vendors/{vendorId}/products/{productId}/rental-plans/{planId}/skus/{skuId}` | 编辑 SKU | SKU 编码唯一校验 |
-| POST | `/vendors/{vendorId}/products/{productId}/rental-plans/{planId}/skus/{skuId}/inventory/adjust` | 调整库存 | `{ changeType, quantity, referenceId? }`，自动记录库存流水 |
+| POST | `/vendors/{vendorId}/products/{productId}/rental-plans/{planId}/skus/{skuId}/inventory/adjust` | 调整库存 | `{ changeType, quantity, referenceId? }`，`changeType` 取值 `INBOUND/OUTBOUND/RESERVE/RELEASE`，`quantity` 需 ≥1，执行后会写入 `inventory_snapshot` |
 
 ### 4.4 商品媒体资源
 | 方法 | URL | 描述 | 请求/响应要点 |
@@ -119,12 +123,12 @@
 | PUT | `/vendors/{vendorId}/products/{productId}/media/{mediaId}/sort-order` | 调整显示顺序 | 请求体 `{ sortOrder }` |
 | DELETE | `/vendors/{vendorId}/products/{productId}/media/{mediaId}` | 删除媒体文件 | 同步移除本地文件并更新列表 |
 
-> 商品媒体目前保存在本地 `storage/uploads` 目录，通过 `product-service` 暴露的 `/media/**` 静态资源访问，可用 `FLEXLEASE_STORAGE_ROOT` 环境变量调整目录。
+> 媒体资源会返回 `fileName/fileUrl/contentType/fileSize/sortOrder` 等字段；上传需使用 `multipart/form-data`，文件默认落盘至 `FLEXLEASE_STORAGE_ROOT` 配置的目录，由 `product-service` 对外暴露 `/media/**` 静态资源。
 
 ### 4.5 C 端商品展示
 | 方法 | URL | 描述 | 响应要点 |
 | ---- | --- | ---- | -------- |
-| GET | `/catalog/products` | 商品搜索/分类过滤 | 返回分页数据，包含商品摘要与可用方案/库存概览 |
+| GET | `/catalog/products` | 商品搜索/分类过滤 | 返回 `ACTIVE` 商品的分页数据，可按 `keyword`/`categoryCode` 筛选，包含方案与库存摘要 |
 | GET | `/catalog/products/{productId}` | 商品详情 | 仅允许查询 `ACTIVE` 商品，返回同上结构 |
 
 ### 4.6 库存内部接口
@@ -132,7 +136,7 @@
 | ---- | --- | ---- | ---------- |
 | POST | `/internal/inventory/reservations` | 批量预占/释放库存（内部调用） | `{ referenceId, items: [{ skuId, quantity, changeType }] }`，`changeType` 取值 `RESERVE`/`RELEASE`/`INBOUND`/`OUTBOUND` |
 
-> 请求需由内部服务发起，没有厂商上下文限制，系统会以悲观锁处理库存并记录 `inventory_snapshot` 流水。
+> 请求需由内部服务发起并在 Header 附带 `X-Internal-Token`；接口会以数据库锁保证库存一致性，并在 `inventory_snapshot` 中记录流水。
 
 ## 5. 订单与租赁流程（order-service，已实现）
 ### 5.1 下单与草稿
@@ -143,10 +147,12 @@
 | GET | `/orders/{orderId}` | 查看订单详情 | - | `RentalOrderResponse` |
 | GET | `/orders` | 查询订单列表 | 需提供 `userId` 或 `vendorId` 其一，可选 `status`、`page`、`size` | `PagedResponse<RentalOrderSummaryResponse>` |
 
+> 注意：`userId` 会与当前登录用户二次校验；传入 `cartItemIds` 时要求所有条目属于同一 `vendorId`，成功下单后自动删除对应购物车记录；订单明细会调用 Catalog 校验 plan/sku，并更新 `planSnapshot` 以固化定价。
+
 ### 5.2 订单状态流转
 | 方法 | URL | 角色 | 描述 | 请求体要点 |
 | ---- | --- | ---- | ---- | ---------- |
-| POST | `/orders/{orderId}/pay` | USER | 支付完成回执，订单从 `PENDING_PAYMENT` → `AWAITING_SHIPMENT` | `{ userId, paymentReference(UUID), paidAmount }` |
+| POST | `/orders/{orderId}/pay` | USER | 支付完成回执，订单从 `PENDING_PAYMENT` → `AWAITING_SHIPMENT` | `{ userId, paymentReference, paidAmount }`，`paymentReference` 为支付流水 ID（UUID 字符串），服务端会调用 payment-service 校验 |
 | POST | `/internal/orders/{orderId}/payment-success` | INTERNAL | 支付服务回调订单成功 | `{ transactionId }`，幂等；需携带内部访问令牌 |
 | POST | `/orders/{orderId}/cancel` | USER | 支付前取消订单 | `{ userId, reason? }` |
 | POST | `/orders/{orderId}/ship` | VENDOR | 填写发货信息，订单进入 `IN_LEASE` | `{ vendorId, carrier, trackingNumber }` |
@@ -158,11 +164,11 @@
 | POST | `/orders/{orderId}/buyout` | USER | 申请买断，可调整买断金额 | `{ userId, buyoutAmount?, remark? }` |
 | POST | `/orders/{orderId}/buyout/confirm` | VENDOR | 处理买断请求（通过/驳回） | `{ vendorId, approve, remark? }` |
 
-> 厂商端订单操作需携带登录厂商的 `vendorId`，服务端会基于 JWT 内的厂商身份做二次校验，仅允许匹配租赁单的厂商执行操作；管理员/内部角色可跳过该限制以便干预。
+> 厂商端订单操作需携带登录厂商的 `vendorId`，服务端会基于 JWT 内的厂商身份做二次校验，仅允许匹配租赁单的厂商执行操作；管理员/内部角色可跳过该限制以便干预。发货会自动触发库存 `OUTBOUND + RELEASE`，退租同样会执行 `INBOUND` 并按押金余额发起退款。
 
 > `planSnapshot` 均为服务端认可的方案快照 JSON，字段包含 `planId`、`planType`、`termMonths`、`depositAmount`、`rentAmountMonthly`、`buyoutPrice`，前端/工具侧在构造请求或读取响应时请以该格式为准。
 
-> 支付服务在标记成功后会调用 `/api/v1/internal/orders/{orderId}/payment-success`，订单服务将再次校验流水并自动更新状态，该接口为幂等设计。用户端的 `/orders/{orderId}/pay` 仍支持手动回执，两条路径都会核对支付金额与订单应付金额是否一致。
+> 支付服务在标记成功后会调用 `/api/v1/internal/orders/{orderId}/payment-success`，订单服务将再次校验流水并自动更新状态，该接口为幂等设计。用户端的 `/orders/{orderId}/pay` 仍支持手动回执，两条路径都会核对支付金额与订单应付金额是否一致；若超过 `flexlease.order.maintenance.pending-payment-expire-minutes` 未支付，将由调度器自动取消并释放库存。
 
 ### 5.3 合同与票据（已实现）
 | 方法 | URL | 描述 | 请求要点 |
@@ -204,6 +210,8 @@
 
 > `PaymentTransactionResponse` 返回基础字段、`splits`（分账明细）以及 `refunds`（退款流水）。`PaymentSettlementResponse` 汇总厂商维度的总金额、押金/租金/买断/违约金拆分、已退款金额、净入账金额以及最近一次支付时间；可按支付时间和退款完成时间两个时间窗过滤。所有 `/internal/**` 接口均需携带 `X-Internal-Token` 以限制为服务间调用。
 
+> 说明：`scene` 取值 `DEPOSIT/RENT/BUYOUT/PENALTY`，`splitType` 取值 `DEPOSIT_RESERVE/VENDOR_INCOME/PLATFORM_COMMISSION`；`/payments/{orderId}/init` 支持 `Idempotency-Key` 并拒绝同一订单 + 场景存在多条 `PENDING` 流水；`confirm` 与 `callback` 仅允许 ADMIN/INTERNAL 手动触发；外部退款接口面向管理员，`/internal/payments/**` 提供给订单服务在退租/押金归还时调用；`/payments/settlements` 管理员可查询任意厂商，厂商角色需要在 JWT 中具备 `vendorId` 且只能查询自身（未传 `vendorId` 时默认取当前厂商）。
+
 ## 7. 通知与运营（notification-service, analytics）
 ### 7.1 通知服务
 | 方法 | URL | 描述 | 请求体要点 | 响应 |
@@ -225,6 +233,8 @@
 `recentTrend` 数组结构：`[{ "date": "2025-01-01", "orders": 5, "gmv": 1234.56 }]`，按日期顺序补齐 7 天数据。`planBreakdown` 返回每个租赁模式的 `planType`、`orders`、`gmv`，用于前端绘制占比卡片。
 
 > GMV 合计包含待发货、租赁中、退租中、已完成以及买断相关订单；`activeOrders` 聚合待发货、租赁中、退租处理中及买断申请的订单量。返回金额使用 `BigDecimal`（两位小数）。
+
+> `/analytics/dashboard` 仅 ADMIN/INTERNAL 账号可访问；`/analytics/vendor/{vendorId}` 允许管理员查看任意厂商，厂商角色将强制使用自身 `vendorId`。
 
 ## 8. 网关与前端约定
 - 所有微服务注册到 Eureka（`registry-service`，端口 8761），网关根据路径转发：
