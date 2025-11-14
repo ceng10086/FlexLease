@@ -2,6 +2,18 @@ import http from './http';
 
 export type OrderStatusBreakdown = Record<string, number>;
 
+export type TrendPoint = {
+  date: string;
+  orders: number;
+  gmv: number;
+};
+
+export type PlanBreakdownEntry = {
+  planType: string;
+  orders: number;
+  gmv: number;
+};
+
 export type DashboardMetrics = {
   totalOrders: number;
   activeOrders: number;
@@ -9,6 +21,8 @@ export type DashboardMetrics = {
   inLeaseCount: number;
   pendingReturns: number;
   ordersByStatus: OrderStatusBreakdown;
+  recentTrend: TrendPoint[];
+  planBreakdown: PlanBreakdownEntry[];
 };
 
 export type VendorMetrics = DashboardMetrics & {

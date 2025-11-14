@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
-    "preview:test": "vite preview --port 4173 --strictPort --host",
+    "preview:test": "vite preview --port 4173 --strictPort --host 127.0.0.1",
     "playwright:test": "playwright test",
     "playwright:test:ci": "playwright test --reporter=dot",
     "test:e2e": "npm run playwright:test",

@@ -176,6 +176,7 @@ const handlePreview = async () => {
     preview.value = await previewOrder({
       userId: auth.user.id,
       vendorId: product.value!.vendorId,
+      planType: currentPlan.value?.planType,
       leaseStartAt: form.leaseStart?.toISOString(),
       leaseEndAt: form.leaseEnd?.toISOString(),
       items: buildOrderItems()
@@ -203,6 +204,7 @@ const handleCreate = async () => {
     const order = await createOrder({
       userId: auth.user.id,
       vendorId: product.value!.vendorId,
+      planType: currentPlan.value?.planType,
       leaseStartAt: form.leaseStart?.toISOString(),
       leaseEndAt: form.leaseEnd?.toISOString(),
       items: buildOrderItems()

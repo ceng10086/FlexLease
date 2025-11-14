@@ -3,6 +3,7 @@ package com.flexlease.order.repository;
 import com.flexlease.order.domain.OrderStatus;
 import com.flexlease.order.domain.RentalOrder;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.List;
@@ -57,9 +58,68 @@ public interface RentalOrderRepository extends JpaRepository<RentalOrder, UUID> 
     BigDecimal sumTotalAmountByVendorIdAndStatusIn(@Param("vendorId") UUID vendorId,
                                                    @Param("statuses") Collection<OrderStatus> statuses);
 
+    @Query("""
+            select cast(coalesce(o.leaseStartAt, o.createdAt) as date) as day,
+                   count(o) as orderCount,
+                   coalesce(sum(o.totalAmount), 0) as totalAmount
+            from RentalOrder o
+            where coalesce(o.leaseStartAt, o.createdAt) between :start and :end
+            group by cast(coalesce(o.leaseStartAt, o.createdAt) as date)
+            order by cast(coalesce(o.leaseStartAt, o.createdAt) as date)
+            """)
+    List<DailyMetric> aggregateDailyMetrics(@Param("start") OffsetDateTime start, @Param("end") OffsetDateTime end);
+
+    @Query("""
+            select cast(coalesce(o.leaseStartAt, o.createdAt) as date) as day,
+                   count(o) as orderCount,
+                   coalesce(sum(o.totalAmount), 0) as totalAmount
+            from RentalOrder o
+            where o.vendorId = :vendorId and coalesce(o.leaseStartAt, o.createdAt) between :start and :end
+            group by cast(coalesce(o.leaseStartAt, o.createdAt) as date)
+            order by cast(coalesce(o.leaseStartAt, o.createdAt) as date)
+            """)
+    List<DailyMetric> aggregateDailyMetricsByVendor(@Param("vendorId") UUID vendorId,
+                                                    @Param("start") OffsetDateTime start,
+                                                    @Param("end") OffsetDateTime end);
+
+    @Query("""
+            select coalesce(o.planType, 'UNKNOWN') as planType,
+                   count(o) as orderCount,
+                   coalesce(sum(o.totalAmount), 0) as totalAmount
+            from RentalOrder o
+            group by coalesce(o.planType, 'UNKNOWN')
+            """)
+    List<PlanTypeAggregate> aggregatePlanTypeMetrics();
+
+    @Query("""
+            select coalesce(o.planType, 'UNKNOWN') as planType,
+                   count(o) as orderCount,
+                   coalesce(sum(o.totalAmount), 0) as totalAmount
+            from RentalOrder o
+            where o.vendorId = :vendorId
+            group by coalesce(o.planType, 'UNKNOWN')
+            """)
+    List<PlanTypeAggregate> aggregatePlanTypeMetricsByVendor(@Param("vendorId") UUID vendorId);
+
     interface OrderStatusCount {
         OrderStatus getStatus();
 
         long getCount();
+    }
+
+    interface DailyMetric {
+        LocalDate getDay();
+
+        long getOrderCount();
+
+        BigDecimal getTotalAmount();
+    }
+
+    interface PlanTypeAggregate {
+        String getPlanType();
+
+        long getOrderCount();
+
+        BigDecimal getTotalAmount();
     }
 }

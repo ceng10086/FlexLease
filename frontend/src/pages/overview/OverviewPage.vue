@@ -61,6 +61,35 @@
       </a-col>
     </a-row>
 
+    <a-row v-if="canViewPlatformMetrics && platformTrend.length" :gutter="16" class="mt-16">
+      <a-col :xs="24" :lg="16">
+        <a-card title="7 日 GMV 与订单趋势" :loading="state.loadingMetrics">
+          <TrendChart :data="platformTrend" />
+          <div v-if="platformTrendDelta" class="trend-summary">
+            <div class="trend-summary__item">
+              <span class="trend-summary__label">GMV 环比</span>
+              <span :class="['trend-summary__value', deltaClass(platformTrendDelta.gmv.direction)]">
+                ¥{{ formatCurrency(platformTrendDelta.gmv.diff) }}
+                <small>{{ formatPercent(platformTrendDelta.gmv.rate) }}</small>
+              </span>
+            </div>
+            <div class="trend-summary__item">
+              <span class="trend-summary__label">订单环比</span>
+              <span :class="['trend-summary__value', deltaClass(platformTrendDelta.orders.direction)]">
+                {{ formatSigned(platformTrendDelta.orders.diff) }} 单
+                <small>{{ formatPercent(platformTrendDelta.orders.rate) }}</small>
+              </span>
+            </div>
+          </div>
+        </a-card>
+      </a-col>
+      <a-col :xs="24" :lg="8">
+        <a-card title="租赁模式构成" :loading="state.loadingMetrics">
+          <PlanBreakdownCard :data="platformPlanBreakdown" />
+        </a-card>
+      </a-col>
+    </a-row>
+
     <a-row v-if="isVendor" :gutter="16">
       <a-col :span="24">
         <a-card title="我的厂商指标" :loading="state.loadingVendorMetrics">
@@ -92,6 +121,35 @@
       </a-col>
     </a-row>
 
+    <a-row v-if="isVendor && vendorTrend.length" :gutter="16" class="mt-16">
+      <a-col :xs="24" :lg="16">
+        <a-card title="厂商趋势洞察" :loading="state.loadingVendorMetrics">
+          <TrendChart :data="vendorTrend" />
+          <div v-if="vendorTrendDelta" class="trend-summary">
+            <div class="trend-summary__item">
+              <span class="trend-summary__label">GMV 环比</span>
+              <span :class="['trend-summary__value', deltaClass(vendorTrendDelta.gmv.direction)]">
+                ¥{{ formatCurrency(vendorTrendDelta.gmv.diff) }}
+                <small>{{ formatPercent(vendorTrendDelta.gmv.rate) }}</small>
+              </span>
+            </div>
+            <div class="trend-summary__item">
+              <span class="trend-summary__label">订单环比</span>
+              <span :class="['trend-summary__value', deltaClass(vendorTrendDelta.orders.direction)]">
+                {{ formatSigned(vendorTrendDelta.orders.diff) }} 单
+                <small>{{ formatPercent(vendorTrendDelta.orders.rate) }}</small>
+              </span>
+            </div>
+          </div>
+        </a-card>
+      </a-col>
+      <a-col :xs="24" :lg="8">
+        <a-card title="租赁模式构成" :loading="state.loadingVendorMetrics">
+          <PlanBreakdownCard :data="vendorPlanBreakdown" />
+        </a-card>
+      </a-col>
+    </a-row>
+
     <a-row v-if="isCustomer" :gutter="16">
       <a-col :span="12">
         <a-card title="最新订单">
@@ -118,10 +176,16 @@
 import { computed, h, onMounted, reactive } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../../stores/auth';
-import { fetchDashboardMetrics, fetchVendorMetrics } from '../../services/analyticsService';
+import {
+  fetchDashboardMetrics,
+  fetchVendorMetrics,
+  type TrendPoint
+} from '../../services/analyticsService';
 import { listOrders } from '../../services/orderService';
 import { listNotificationLogs, type NotificationLog } from '../../services/notificationService';
 import type { RentalOrderSummary } from '../../services/orderService';
+import TrendChart from '../../components/analytics/TrendChart.vue';
+import PlanBreakdownCard from '../../components/analytics/PlanBreakdownCard.vue';
 
 const auth = useAuthStore();
 const router = useRouter();
@@ -140,6 +204,10 @@ const isAdmin = computed(() => auth.hasRole('ADMIN'));
 const isCustomer = computed(() => auth.hasRole('USER'));
 const canViewPlatformMetrics = computed(() => isAdmin.value || auth.hasRole('INTERNAL'));
 const currentVendorId = computed(() => auth.vendorId ?? null);
+const platformTrend = computed(() => state.metrics?.recentTrend ?? []);
+const platformPlanBreakdown = computed(() => state.metrics?.planBreakdown ?? []);
+const vendorTrend = computed(() => state.vendorMetrics?.recentTrend ?? []);
+const vendorPlanBreakdown = computed(() => state.vendorMetrics?.planBreakdown ?? []);
 
 const statusEntries = computed(() => {
   if (!state.metrics?.ordersByStatus) {
@@ -163,6 +231,20 @@ const formatCurrency = (value: number) =>
   value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const formatDate = (value: string) => new Date(value).toLocaleString();
+const formatPercent = (value: number | null) => {
+  if (value === null || Number.isNaN(value)) {
+    return '—';
+  }
+  const prefix = value > 0 ? '+' : '';
+  return `${prefix}${value.toFixed(1)}%`;
+};
+
+const formatSigned = (value: number) => {
+  if (value > 0) {
+    return `+${value}`;
+  }
+  return value.toString();
+};
 
 const statusPercent = (count: number, total: number) => {
   if (!total) {
@@ -170,6 +252,56 @@ const statusPercent = (count: number, total: number) => {
   }
   return Number(((count / total) * 100).toFixed(2));
 };
+
+type MetricDirection = 'up' | 'down' | 'flat';
+
+type MetricDelta = {
+  diff: number;
+  rate: number | null;
+  direction: MetricDirection;
+};
+
+type TrendDelta = {
+  gmv: MetricDelta;
+  orders: MetricDelta;
+};
+
+const deltaClass = (direction: MetricDirection) => {
+  if (direction === 'up') {
+    return 'trend-summary__value--up';
+  }
+  if (direction === 'down') {
+    return 'trend-summary__value--down';
+  }
+  return '';
+};
+
+const computeMetricDelta = (latest: number, previous: number): MetricDelta => {
+  const diff = Number((latest - previous).toFixed(2));
+  const rate = previous === 0 ? null : Number(((diff / previous) * 100).toFixed(1));
+  let direction: MetricDirection = 'flat';
+  if (diff > 0) {
+    direction = 'up';
+  } else if (diff < 0) {
+    direction = 'down';
+  }
+  return { diff, rate, direction };
+};
+
+const computeTrendDelta = (trend: TrendPoint[]): TrendDelta | null => {
+  if (!trend.length || trend.length < 2) {
+    return null;
+  }
+  const latest = trend[trend.length - 1];
+  const previous = trend[trend.length - 2];
+  return {
+    gmv: computeMetricDelta(latest.gmv ?? 0, previous.gmv ?? 0),
+    orders: computeMetricDelta(latest.orders ?? 0, previous.orders ?? 0)
+  };
+};
+
+const platformTrendDelta = computed(() => computeTrendDelta(platformTrend.value));
+const vendorTrendDelta = computed(() => computeTrendDelta(vendorTrend.value));
 
 const renderOrder = (order: RentalOrderSummary) =>
   h(
@@ -249,6 +381,10 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+.mt-16 {
+  margin-top: 16px;
+}
+
 .status-breakdown {
   margin-top: 24px;
 }
@@ -286,5 +422,43 @@ onMounted(async () => {
 .order-item__meta {
   color: #64748b;
   font-size: 12px;
+}
+
+.trend-summary {
+  margin-top: 16px;
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.trend-summary__item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.trend-summary__label {
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.trend-summary__value {
+  font-size: 16px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.trend-summary__value--up {
+  color: #16a34a;
+}
+
+.trend-summary__value--down {
+  color: #dc2626;
+}
+
+.trend-summary__value small {
+  margin-left: 8px;
+  font-weight: 400;
+  color: #94a3b8;
 }
 </style>

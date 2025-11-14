@@ -6,6 +6,7 @@ import com.flexlease.order.domain.OrderStatus;
 import com.flexlease.order.domain.RentalOrder;
 import com.flexlease.order.domain.RentalOrderItem;
 import com.flexlease.order.dto.DashboardMetricsResponse;
+import com.flexlease.order.dto.PlanTypeMetric;
 import com.flexlease.order.dto.VendorMetricsResponse;
 import com.flexlease.order.repository.RentalOrderRepository;
 import com.flexlease.order.service.OrderAnalyticsService;
@@ -37,16 +38,38 @@ class OrderAnalyticsServiceIntegrationTest {
         userId = UUID.randomUUID();
         vendorId = UUID.randomUUID();
 
-        RentalOrder awaitingShipment = createOrder(OrderStatus.AWAITING_SHIPMENT, new BigDecimal("100.00"));
+        OffsetDateTime now = OffsetDateTime.now();
+
+        RentalOrder awaitingShipment = createOrder(
+                OrderStatus.AWAITING_SHIPMENT,
+                new BigDecimal("100.00"),
+                "STANDARD",
+                now.minusDays(4)
+        );
         rentalOrderRepository.save(awaitingShipment);
 
-        RentalOrder inLease = createOrder(OrderStatus.IN_LEASE, new BigDecimal("200.00"));
+        RentalOrder inLease = createOrder(
+                OrderStatus.IN_LEASE,
+                new BigDecimal("200.00"),
+                "RENT_TO_OWN",
+                now.minusDays(2)
+        );
         rentalOrderRepository.save(inLease);
 
-        RentalOrder returnRequested = createOrder(OrderStatus.RETURN_REQUESTED, new BigDecimal("300.00"));
+        RentalOrder returnRequested = createOrder(
+                OrderStatus.RETURN_REQUESTED,
+                new BigDecimal("300.00"),
+                "LEASE_TO_SALE",
+                now.minusDays(1)
+        );
         rentalOrderRepository.save(returnRequested);
 
-        RentalOrder cancelled = createOrder(OrderStatus.PENDING_PAYMENT, new BigDecimal("150.00"));
+        RentalOrder cancelled = createOrder(
+                OrderStatus.PENDING_PAYMENT,
+                new BigDecimal("150.00"),
+                "STANDARD",
+                now.minusDays(3)
+        );
         cancelled.cancel();
         rentalOrderRepository.save(cancelled);
     }
@@ -60,6 +83,11 @@ class OrderAnalyticsServiceIntegrationTest {
         assertThat(response.pendingReturns()).isEqualTo(1);
         assertThat(response.totalGmv()).isEqualByComparingTo("600.00");
         assertThat(response.ordersByStatus().get(OrderStatus.RETURN_REQUESTED)).isEqualTo(1);
+        assertThat(response.recentTrend()).hasSize(7);
+        assertThat(response.recentTrend().getLast().gmv()).isNotNull();
+        assertThat(response.planBreakdown())
+                .extracting(PlanTypeMetric::planType)
+                .contains("STANDARD", "RENT_TO_OWN", "LEASE_TO_SALE");
     }
 
     @Test
@@ -69,19 +97,24 @@ class OrderAnalyticsServiceIntegrationTest {
         assertThat(response.activeOrders()).isEqualTo(3);
         assertThat(response.pendingReturns()).isEqualTo(1);
         assertThat(response.totalGmv()).isEqualByComparingTo("600.00");
+        assertThat(response.recentTrend()).hasSize(7);
+        assertThat(response.planBreakdown()).isNotEmpty();
     }
 
-    private RentalOrder createOrder(OrderStatus targetStatus, BigDecimal totalAmount) {
+    private RentalOrder createOrder(OrderStatus targetStatus,
+                                    BigDecimal totalAmount,
+                                    String planType,
+                                    OffsetDateTime leaseStart) {
         RentalOrder order = RentalOrder.create(
                 userId,
                 vendorId,
-                "STANDARD",
+                planType,
                 totalAmount.divide(BigDecimal.valueOf(2)),
                 totalAmount.divide(BigDecimal.valueOf(2)),
                 null,
                 totalAmount,
-                OffsetDateTime.now(),
-                OffsetDateTime.now().plusMonths(12)
+                leaseStart,
+                leaseStart.plusMonths(12)
         );
         RentalOrderItem item = RentalOrderItem.create(
                 UUID.randomUUID(),

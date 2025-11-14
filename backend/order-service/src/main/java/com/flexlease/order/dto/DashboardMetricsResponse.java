@@ -2,6 +2,7 @@ package com.flexlease.order.dto;
 
 import com.flexlease.order.domain.OrderStatus;
 import java.math.BigDecimal;
+import java.util.List;
 import java.util.Map;
 
 public record DashboardMetricsResponse(
@@ -10,6 +11,8 @@ public record DashboardMetricsResponse(
         BigDecimal totalGmv,
         long inLeaseCount,
         long pendingReturns,
-        Map<OrderStatus, Long> ordersByStatus
+        Map<OrderStatus, Long> ordersByStatus,
+        List<TrendPoint> recentTrend,
+        List<PlanTypeMetric> planBreakdown
 ) {
 }

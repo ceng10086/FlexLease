@@ -31,6 +31,35 @@
       </a-col>
     </a-row>
 
+    <a-row v-if="metrics" :gutter="16" class="mt-16">
+      <a-col :xs="24" :lg="16">
+        <a-card title="7 日 GMV 与订单趋势" :loading="loading">
+          <TrendChart :data="trendPoints" />
+          <div v-if="trendDelta" class="trend-summary">
+            <div class="trend-summary__item">
+              <span class="trend-summary__label">GMV 环比</span>
+              <span :class="['trend-summary__value', deltaClass(trendDelta.gmv.direction)]">
+                ¥{{ formatCurrency(trendDelta.gmv.diff) }}
+                <small>{{ formatPercent(trendDelta.gmv.rate) }}</small>
+              </span>
+            </div>
+            <div class="trend-summary__item">
+              <span class="trend-summary__label">订单环比</span>
+              <span :class="['trend-summary__value', deltaClass(trendDelta.orders.direction)]">
+                {{ formatSigned(trendDelta.orders.diff) }} 单
+                <small>{{ formatPercent(trendDelta.orders.rate) }}</small>
+              </span>
+            </div>
+          </div>
+        </a-card>
+      </a-col>
+      <a-col :xs="24" :lg="8">
+        <a-card title="租赁模式构成" :loading="loading">
+          <PlanBreakdownCard :data="planBreakdown" />
+        </a-card>
+      </a-col>
+    </a-row>
+
     <a-row :gutter="16" class="mt-16">
       <a-col :xs="24" :lg="12">
         <a-card title="状态分布">
@@ -76,6 +105,8 @@ import { computed, ref, watch } from 'vue';
 import { message } from 'ant-design-vue';
 import { useVendorContext } from '../../composables/useVendorContext';
 import { fetchVendorMetrics, type VendorMetrics } from '../../services/analyticsService';
+import TrendChart from '../../components/analytics/TrendChart.vue';
+import PlanBreakdownCard from '../../components/analytics/PlanBreakdownCard.vue';
 
 const loading = ref(false);
 const metrics = ref<VendorMetrics | null>(null);
@@ -89,6 +120,8 @@ const {
 const formatCurrency = (value: number) =>
   value.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
+const planBreakdown = computed(() => metrics.value?.planBreakdown ?? []);
+const trendPoints = computed(() => metrics.value?.recentTrend ?? []);
 const statusEntries = computed(() => {
   if (!metrics.value?.ordersByStatus) {
     return [] as Array<{ status: string; count: number }>;
@@ -105,6 +138,68 @@ const completionPercent = computed(() => {
   const completed = metrics.value.ordersByStatus?.COMPLETED ?? 0;
   const total = metrics.value.totalOrders || 1;
   return Number(((completed / total) * 100).toFixed(2));
+});
+
+type Direction = 'up' | 'down' | 'flat';
+
+type MetricDelta = {
+  diff: number;
+  rate: number | null;
+  direction: Direction;
+};
+
+type TrendDelta = {
+  gmv: MetricDelta;
+  orders: MetricDelta;
+};
+
+const deltaClass = (direction: Direction) => {
+  if (direction === 'up') {
+    return 'trend-summary__value--up';
+  }
+  if (direction === 'down') {
+    return 'trend-summary__value--down';
+  }
+  return '';
+};
+
+const formatPercent = (value: number | null) => {
+  if (value === null || Number.isNaN(value)) {
+    return '—';
+  }
+  const prefix = value > 0 ? '+' : '';
+  return `${prefix}${value.toFixed(1)}%`;
+};
+
+const formatSigned = (value: number) => {
+  if (value > 0) {
+    return `+${value}`;
+  }
+  return value.toString();
+};
+
+const computeMetricDelta = (latest: number, previous: number): MetricDelta => {
+  const diff = Number((latest - previous).toFixed(2));
+  const rate = previous === 0 ? null : Number(((diff / previous) * 100).toFixed(1));
+  let direction: Direction = 'flat';
+  if (diff > 0) {
+    direction = 'up';
+  } else if (diff < 0) {
+    direction = 'down';
+  }
+  return { diff, rate, direction };
+};
+
+const trendDelta = computed<TrendDelta | null>(() => {
+  if (!trendPoints.value.length || trendPoints.value.length < 2) {
+    return null;
+  }
+  const latest = trendPoints.value[trendPoints.value.length - 1];
+  const previous = trendPoints.value[trendPoints.value.length - 2];
+  return {
+    gmv: computeMetricDelta(latest.gmv ?? 0, previous.gmv ?? 0),
+    orders: computeMetricDelta(latest.orders ?? 0, previous.orders ?? 0)
+  };
 });
 
 const loadMetrics = async (notify = false) => {
@@ -155,5 +250,43 @@ watch(
 .insight {
   margin-top: 12px;
   color: #64748b;
+}
+
+.trend-summary {
+  margin-top: 16px;
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.trend-summary__item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.trend-summary__label {
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.trend-summary__value {
+  font-size: 16px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.trend-summary__value--up {
+  color: #16a34a;
+}
+
+.trend-summary__value--down {
+  color: #dc2626;
+}
+
+.trend-summary__value small {
+  margin-left: 8px;
+  font-weight: 400;
+  color: #94a3b8;
 }
 </style>

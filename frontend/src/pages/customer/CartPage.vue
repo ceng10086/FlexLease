@@ -220,9 +220,11 @@ const handleCheckout = async () => {
   submitting.value = true;
   try {
     const [vendorId] = Array.from(vendorIds);
+    const planType = resolvePlanTypeFromSelection();
     const order = await createOrder({
       userId,
       vendorId,
+      planType,
       items: [],
       cartItemIds: [...selectedRowKeys.value]
     });
@@ -262,6 +264,22 @@ const handleAutoPayment = async (order: RentalOrderDetail, userId: string) => {
   } catch (error) {
     console.error('自动支付失败', error);
     message.warning('订单已创建，但自动支付失败，请在订单详情完成付款');
+  }
+};
+
+const resolvePlanTypeFromSelection = (): string | undefined => {
+  const sample = selectedItems.value[0];
+  if (!sample) {
+    return undefined;
+  }
+  if (!sample.planSnapshot) {
+    return undefined;
+  }
+  try {
+    const snapshot = JSON.parse(sample.planSnapshot);
+    return snapshot?.planType ?? undefined;
+  } catch {
+    return undefined;
   }
 };
 

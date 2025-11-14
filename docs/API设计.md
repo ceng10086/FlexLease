@@ -219,8 +219,10 @@
 ### 7.2 运营看板
 | 方法 | URL | 描述 | 响应字段 |
 | ---- | --- | ---- | -------- |
-| GET | `/analytics/dashboard` | 平台级运营指标（ADMIN/INTERNAL） | `totalOrders`、`activeOrders`、`totalGmv`、`inLeaseCount`、`pendingReturns`、`ordersByStatus`（Map，键为 `OrderStatus` 枚举）|
-| GET | `/analytics/vendor/{vendorId}` | 指定厂商的运营指标 | `vendorId`、`totalOrders`、`activeOrders`、`totalGmv`、`inLeaseCount`、`pendingReturns`、`ordersByStatus` |
+| GET | `/analytics/dashboard` | 平台级运营指标（ADMIN/INTERNAL） | `totalOrders`、`activeOrders`、`totalGmv`、`inLeaseCount`、`pendingReturns`、`ordersByStatus`（Map，键为 `OrderStatus` 枚举）、`recentTrend`（最近 7 日 GMV/订单趋势数组）、`planBreakdown`（按租赁模式拆分的订单/Gmv 汇总）|
+| GET | `/analytics/vendor/{vendorId}` | 指定厂商的运营指标 | `vendorId`、`totalOrders`、`activeOrders`、`totalGmv`、`inLeaseCount`、`pendingReturns`、`ordersByStatus`、`recentTrend`、`planBreakdown` |
+
+`recentTrend` 数组结构：`[{ "date": "2025-01-01", "orders": 5, "gmv": 1234.56 }]`，按日期顺序补齐 7 天数据。`planBreakdown` 返回每个租赁模式的 `planType`、`orders`、`gmv`，用于前端绘制占比卡片。
 
 > GMV 合计包含待发货、租赁中、退租中、已完成以及买断相关订单；`activeOrders` 聚合待发货、租赁中、退租处理中及买断申请的订单量。返回金额使用 `BigDecimal`（两位小数）。
 
