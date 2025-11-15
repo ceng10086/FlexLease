@@ -216,12 +216,7 @@
   <div v-else class="page-container">
     <a-result status="warning" title="尚未获取厂商身份">
       <template #subTitle>
-        请先重新同步账户或退出后重新登录，即可管理厂商商品。
-      </template>
-      <template #extra>
-        <a-space>
-          <a-button type="primary" :loading="syncingVendor" @click="refreshAccount">重新同步</a-button>
-        </a-space>
+        请先退出当前账号并重新登录后，再管理厂商商品。
       </template>
     </a-result>
   </div>
@@ -252,9 +247,7 @@ import {
 const {
   vendorId: currentVendorId,
   vendorReady,
-  requireVendorId,
-  refreshVendorContext,
-  syncingVendor
+  requireVendorId
 } = useVendorContext();
 
 const loading = ref(false);
@@ -610,13 +603,6 @@ const handleAdjustInventory = async () => {
 };
 
 const planHeader = (plan: RentalPlan) => `${plan.planType} · ${plan.termMonths} 个月`;
-const refreshAccount = async () => {
-  await refreshVendorContext();
-  if (currentVendorId.value) {
-    await loadProducts();
-  }
-};
-
 watch(
   vendorReady,
   (ready) => {

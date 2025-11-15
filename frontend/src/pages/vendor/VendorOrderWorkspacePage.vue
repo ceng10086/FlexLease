@@ -205,12 +205,7 @@
   <div v-else class="page-container">
     <a-result status="warning" title="尚未获取厂商身份">
       <template #subTitle>
-        请先重新同步账户或退出后重新登录，以加载厂商工作台。
-      </template>
-      <template #extra>
-        <a-space>
-          <a-button type="primary" :loading="syncingVendor" @click="refreshAccount">重新同步</a-button>
-        </a-space>
+        请先退出当前账号并重新登录后，再访问厂商工作台。
       </template>
     </a-result>
   </div>
@@ -255,9 +250,7 @@ const vendorStatuses: OrderStatus[] = [
 const {
   vendorId: currentVendorId,
   vendorReady,
-  requireVendorId,
-  refreshVendorContext,
-  syncingVendor
+  requireVendorId
 } = useVendorContext();
 
 const loading = ref(false);
@@ -470,13 +463,6 @@ const handleBuyoutDecision = async (approve: boolean) => {
     message.error('买断审批失败，请稍后重试');
   } finally {
     buyoutDecisionForm.loading = false;
-  }
-};
-
-const refreshAccount = async () => {
-  await refreshVendorContext();
-  if (currentVendorId.value) {
-    await loadOrders();
   }
 };
 

@@ -89,12 +89,7 @@
   <div v-else class="page-container">
     <a-result status="warning" title="尚未获取厂商身份">
       <template #subTitle>
-        请先重新同步账户或退出后重新登录，以查看厂商指标。
-      </template>
-      <template #extra>
-        <a-space>
-          <a-button type="primary" :loading="syncingVendor" @click="refreshAccount">重新同步</a-button>
-        </a-space>
+        请先退出当前账号并重新登录后，再访问厂商指标。
       </template>
     </a-result>
   </div>
@@ -112,9 +107,7 @@ const loading = ref(false);
 const metrics = ref<VendorMetrics | null>(null);
 const {
   vendorId: currentVendorId,
-  vendorReady,
-  refreshVendorContext,
-  syncingVendor
+  vendorReady
 } = useVendorContext();
 
 const formatCurrency = (value: number) =>
@@ -219,13 +212,6 @@ const loadMetrics = async (notify = false) => {
     message.error('加载指标失败，请稍后重试');
   } finally {
     loading.value = false;
-  }
-};
-
-const refreshAccount = async () => {
-  await refreshVendorContext();
-  if (currentVendorId.value) {
-    await loadMetrics();
   }
 };
 

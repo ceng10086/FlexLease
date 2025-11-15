@@ -51,12 +51,7 @@
   <div v-else class="page-container">
     <a-result status="warning" title="尚未获取厂商身份">
       <template #subTitle>
-        请先重新同步账户或退出后重新登录，以查看结算数据。
-      </template>
-      <template #extra>
-        <a-space>
-          <a-button type="primary" :loading="syncingVendor" @click="refreshAccount">重新同步</a-button>
-        </a-space>
+        请先退出当前账号并重新登录后，再查看结算数据。
       </template>
     </a-result>
   </div>
@@ -73,9 +68,7 @@ const loading = ref(false);
 const records = ref<PaymentSettlementResponse[]>([]);
 const {
   vendorId: currentVendorId,
-  vendorReady,
-  refreshVendorContext,
-  syncingVendor
+  vendorReady
 } = useVendorContext();
 
 const filters = reactive<{ from?: Dayjs; to?: Dayjs }>({});
@@ -104,13 +97,6 @@ const loadSettlements = async (notify = false) => {
     message.error('加载结算失败，请稍后重试');
   } finally {
     loading.value = false;
-  }
-};
-
-const refreshAccount = async () => {
-  await refreshVendorContext();
-  if (currentVendorId.value) {
-    await loadSettlements();
   }
 };
 

@@ -18,7 +18,7 @@ export const useVendorContext = () => {
       return vendorId.value;
     }
     if (notify) {
-      message.warning('未获取到厂商身份，请刷新或重新登录后再试');
+      message.warning('未获取到厂商身份，请退出并重新登录后再试');
     }
     return null;
   };
@@ -33,9 +33,9 @@ export const useVendorContext = () => {
       await auth.bootstrap();
       if (notify) {
         if (vendorId.value) {
-          message.success('厂商身份已同步');
+          message.success('账户信息已刷新（如依旧缺少厂商身份，请重新登录）');
         } else {
-          message.warning('仍未获取到厂商身份，请尝试重新登录');
+          message.warning('仍未获取到厂商身份，请退出并重新登录后再试');
         }
       }
       return vendorId.value;

@@ -67,7 +67,7 @@ FlexLease 面向 B2C 场景，为厂商与消费者提供从入驻、商品配�
 - **payment-service**：`PaymentTransactionService` 结合 `IdempotencyService` 限制同一订单/场景只存在一条待支付流水，`flexlease.payment.auto-confirm` 为真时自动将状态切换为 `SUCCEEDED` 并调用 `order-service` `/internal/orders/{id}/payment-success`；退款通过 `PaymentClient.createRefund` 回流，结算接口会统计押金/租金/买断/违约金及退款窗口。
 - **notification-service**：开启 `flexlease.redis.enabled=true` 时通过 `NotificationTemplateProvider` + Spring Cache 缓存模板，`NotificationService` 根据角色自动收敛 `/notifications/logs` 查询范围，`OrderEventListener` 监听 `order.events.notification` 队列对厂商推送“新订单”站内信。
 - **gateway-service / registry-service**：Gateway 依据 `backend/gateway-service/src/main/resources/application.yml` 中的路由表把 `/api/v1/**` 映射到各微服务，Eureka 负责注册发现，所有服务默认以 `prefer-ip-address=true` 注册节点。
-- **frontend**：Vite + Vue 3 + Ant Design Vue。`pages/overview/OverviewPage.vue` 同时拉取 `/analytics/dashboard`、`/analytics/vendor/{id}`、`/notifications/logs` 与最新订单，消费者端通过 `CartPage.vue` + `autoCompleteInitialPayment` 与 `/payments/{orderId}/init` 形成“下单即付”的体验，厂商端依赖 `useVendorContext` 自动刷新 `/auth/me` 返回的 `vendorId`。
+- **frontend**：Vite + Vue 3 + Ant Design Vue。`pages/overview/OverviewPage.vue` 同时拉取 `/analytics/dashboard`、`/analytics/vendor/{id}`、`/notifications/logs` 与最新订单，消费者端通过 `CartPage.vue` + `autoCompleteInitialPayment` 与 `/payments/{orderId}/init` 形成“下单即付”的体验，厂商端通过 `useVendorContext` 读取登录会话中的 `vendorId`（若缺失请退出并重新登录）。
 
 ## 配置要点
 
@@ -84,7 +84,7 @@ FlexLease 面向 B2C 场景，为厂商与消费者提供从入驻、商品配�
 - **厂商**
   - 商品与库存：`VendorProductWorkspace` 绑定 `vendorId`，可配置方案、SKU、媒体并调用 `/inventory/adjust`。
   - 履约操作：`VendorOrderWorkspace` 针对 `/orders/{id}/ship`、续租/退租/买断审批等动作提供抽屉，内置库存出入库补偿。
-  - 指标与结算：`VendorAnalyticsPage`、`VendorSettlementPage` 调用 `/analytics/vendor/{vendorId}`、`/payments/settlements`，配合 `useVendorContext` 组件随时刷新厂商身份。
+  - 指标与结算：`VendorAnalyticsPage`、`VendorSettlementPage` 调用 `/analytics/vendor/{vendorId}`、`/payments/settlements`，依赖登录会话携带的 `vendorId`（缺少时需重新登录）。
 - **消费者**
   - 自助下单：商品目录 → 详情 → 购物车/结算页 → `/orders` & `/payments` 的试算、下单与自动支付流程。
   - 订单售后：详情页直接操作续租/退租/买断/确认收货并触发合同生成、通知推送。
@@ -132,7 +132,7 @@ docker compose up --build
 2. 厂商工作台创建商品/方案/SKU，上传媒体、调整库存并提交审核，管理员在 `/api/v1/admin/products/**` 审核后即可在 Catalog 中看到。
 3. 消费者登录 → 浏览 `/app/catalog` → 进入商品详情 → 加入购物车/直接试算 `/orders/preview` → 创建订单（可附带 `cartItemIds`）→ 支付由 `payment-service` 自动确认。
 4. 在订单详情体验续租/退租/买断、支付回执与电子合同签署，同时打开通知中心验证 `/notifications/logs` 的最新日志。
-5. 切换到厂商角色，在订单履约抽屉中完成发货/审批，接着打开运营指标与结算页面（若缺少 `vendorId`，可用“刷新厂商身份”触发 `useVendorContext` 重拉 `/auth/me`）。
+5. 切换到厂商角色，在订单履约抽屉中完成发货/审批，接着打开运营指标与结算页面（若缺少 `vendorId`，请退出账号后重新登录）。
 6. 切换管理员查看订单监控列表、过滤条件与合同抽屉，并使用强制关闭演练补偿流程；如需纯 API 调试可导入 `docs/postman/cart-api.postman_collection.json`。
 
 ## 测试与质量
