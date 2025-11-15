@@ -56,6 +56,7 @@ FlexLease 面向 B2C 场景，为厂商与消费者提供从入驻、商品配�
   - `platform-common` 内置轻量级 `IdempotencyService`，`/orders`、`/payments` 等写操作支持 `Idempotency-Key` 防重复提交。
   - `OrderMaintenanceScheduler` 周期性取消超时订单、释放库存并推送通知，RabbitMQ `order.events` → `notification-service` 统一消费。
   - `flexlease.payment.auto-confirm` 默认开启以模拟端到端自动支付，置为 `false` 后可通过 `/payments/{id}/confirm`/`/callback` 体验人工确认与失败回调。
+  - 商品库存预占/释放使用基于 `@Version` 的乐观锁 + 可配置自动重试（`flexlease.inventory.concurrency.*`），可在百级并发下保持库存正确性且避免数据库长时间行锁。
 
 ## 微服务实现要点
 
@@ -143,6 +144,7 @@ docker compose up --build
 - `backend/payment-service`：`PaymentTransactionServiceIntegrationTest`（自动确认 + 结算）、`PaymentTransactionServiceManualFlowTest`（手动确认与失败回调）覆盖退款/分账/事件回调。
 - `backend/notification-service`：`NotificationServiceIntegrationTest` 检查模板渲染与 Redis 缓存，`OrderEventListener` 监听 RabbitMQ 并推送厂商提醒。
 - 前端 `tests/dashboard.spec.ts` 使用 Playwright 模拟 `/auth/me` 与 `/analytics/dashboard`，校验 Overview 指标渲染。
+- `./mvnw -pl backend/product-service -am -Dtest=InventoryReservationConcurrencyTest -Dsurefire.failIfNoSpecifiedTests=false test` 可直接触发库存高并发回归，验证乐观锁 + 自动重试链路。
 - `./mvnw clean verify` 在 H2 + Flyway 下执行，CI 挂载 PostgreSQL 验证脚本一致性；`npm run build && npm run test:e2e` 覆盖前端构建与端到端回归。
 - `platform-common` 提供异常枚举、JWT 解析、幂等工具、消息常量等基础能力，保障跨服务契约。
 

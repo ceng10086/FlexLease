@@ -36,6 +36,10 @@ management:
 flexlease:
   storage:
     root: ${FLEXLEASE_STORAGE_ROOT:/app/storage/uploads}
+  inventory:
+    concurrency:
+      max-attempts: ${FLEXLEASE_INVENTORY_MAX_ATTEMPTS:40}
+      backoff: ${FLEXLEASE_INVENTORY_BACKOFF:2ms}
 security:
   jwt:
     secret: ${SECURITY_JWT_SECRET:flexlease-default-secret-please-change}
