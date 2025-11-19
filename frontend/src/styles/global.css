@@ -1,7 +1,7 @@
 :root {
-  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+  font-family: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
   color: #0f172a;
-  background-color: #f5f7fa;
+  background-color: #eef2ff;
 }
 
 html,
@@ -10,7 +10,7 @@ body,
   margin: 0;
   padding: 0;
   min-height: 100vh;
-  background: #f5f7fa;
+  background: radial-gradient(circle at 10% 20%, #e0e7ff, #f1f5f9 80%);
 }
 
 a {
@@ -18,10 +18,12 @@ a {
 }
 
 .page-container {
-  padding: 24px;
+  width: min(1200px, 100%);
+  margin: 0 auto;
+  padding: 24px 32px 48px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 20px;
 }
 
 .page-header {
@@ -29,11 +31,17 @@ a {
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
+  padding: 20px 24px;
+  background: linear-gradient(120deg, rgba(37, 99, 235, 0.12), rgba(99, 102, 241, 0.08));
+  border-radius: 20px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
 }
 
 .page-header__meta {
-  color: #6b7280;
+  color: #475569;
   margin-top: 4px;
+  font-size: 14px;
 }
 
 .card-section {
@@ -46,9 +54,47 @@ a {
   margin: 24px 0;
 }
 
+.page-guidance {
+  border-radius: 12px;
+  border: 1px dashed rgba(37, 99, 235, 0.25);
+  padding: 16px;
+  background: rgba(219, 234, 254, 0.6);
+}
+
+.page-guidance__title {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.page-guidance__content {
+  color: #475569;
+  line-height: 1.6;
+}
+
+.ant-card {
+  border-radius: 18px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.06);
+}
+
+.ant-card-head {
+  border-bottom: 1px solid rgba(148, 163, 184, 0.25);
+  padding: 16px 24px;
+}
+
+.ant-table {
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.ant-table-thead > tr > th {
+  background: #f8fafc !important;
+}
+
 @media (max-width: 768px) {
   .page-container {
-    padding: 16px;
+    padding: 16px 16px 32px;
   }
 
   .page-header {

@@ -19,7 +19,6 @@
           :selectedKeys="selectedKeys"
           :openKeys="openKeys"
           @openChange="handleOpenChange"
-          @select="handleSelect"
         >
           <template v-for="item in menuItems" :key="item.key">
             <a-sub-menu v-if="item.children && item.children.length" :key="item.key">
@@ -30,12 +29,13 @@
               <a-menu-item
                 v-for="child in item.children"
                 :key="child.key"
+                @click="() => navigateTo(child.key)"
               >
                 <component v-if="child.icon && iconMap[child.icon]" :is="iconMap[child.icon]" />
                 <span>{{ child.label }}</span>
               </a-menu-item>
             </a-sub-menu>
-            <a-menu-item v-else :key="item.key">
+            <a-menu-item v-else :key="item.key" @click="() => navigateTo(item.key)">
               <component v-if="item.icon && iconMap[item.icon]" :is="iconMap[item.icon]" />
               <span>{{ item.label }}</span>
             </a-menu-item>
@@ -224,13 +224,6 @@ const handleOpenChange = (keys: string[]) => {
   openKeys.value = keys;
 };
 
-const handleSelect = ({ key }: { key: string }) => {
-  const target = keyPathMap.value.get(key);
-  if (target && target !== route.fullPath) {
-    router.push(target);
-  }
-};
-
 const handleUserMenuClick = ({ key }: { key: string }) => {
   if (key === 'profile') {
     router.push({ name: 'profile' });
@@ -246,6 +239,14 @@ const handleLogout = () => {
 
 const toggleSider = () => {
   collapsed.value = !collapsed.value;
+};
+
+const navigateTo = (key: string) => {
+  const target = keyPathMap.value.get(key);
+  if (!target || target === route.fullPath) {
+    return;
+  }
+  router.push(target).catch(() => undefined);
 };
 
 onMounted(async () => {

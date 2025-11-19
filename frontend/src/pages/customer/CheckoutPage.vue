@@ -8,6 +8,24 @@
       <a-button type="default" @click="goBack">返回</a-button>
     </div>
 
+    <a-card class="checkout-steps-card" :bordered="false">
+      <a-steps :current="1" responsive size="small">
+        <a-step title="选择商品" description="在目录中挑选商品与方案" />
+        <a-step title="确认订单" description="核对租期与费用，提交订单" />
+        <a-step title="完成支付" description="支付押金/租金并等待发货" />
+      </a-steps>
+      <div class="page-guidance checkout-guidance">
+        <div class="page-guidance__title">操作提示</div>
+        <div class="page-guidance__content">
+          <ul>
+            <li>如需调整租期或 SKU，请回到商品详情修改后重新进入此页面。</li>
+            <li>提交订单后平台将自动尝试完成首付款，失败时可前往订单详情补款。</li>
+            <li>请确保收货信息正确，避免因误填导致物流延误。</li>
+          </ul>
+        </div>
+      </div>
+    </a-card>
+
     <a-row :gutter="24">
       <a-col :xs="24" :lg="14">
         <a-card title="租赁信息">
@@ -86,6 +104,7 @@ import {
 import { serializePlanSnapshot } from '../../utils/planSnapshot';
 import { rentalOrderDeposit, rentalOrderRent, rentalOrderTotal } from '../../utils/orderAmounts';
 import { autoCompleteInitialPayment } from '../../utils/autoPayment';
+import { friendlyErrorMessage } from '../../utils/error';
 
 const route = useRoute();
 const router = useRouter();
@@ -129,7 +148,7 @@ const loadProduct = async () => {
     product.value = await fetchCatalogProduct(productId);
   } catch (error) {
     console.error('加载商品失败', error);
-    message.error('加载商品失败，请返回目录重试');
+    message.error(friendlyErrorMessage(error, '加载商品失败，请返回目录重试'));
     router.replace({ name: 'catalog' });
   }
 };
@@ -181,9 +200,9 @@ const handlePreview = async () => {
       leaseEndAt: form.leaseEnd?.toISOString(),
       items: buildOrderItems()
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('订单试算失败', error);
-    message.error(error?.response?.data?.message ?? '订单试算失败');
+    message.error(friendlyErrorMessage(error, '订单试算失败'));
   } finally {
     loading.preview = false;
   }
@@ -211,9 +230,9 @@ const handleCreate = async () => {
     });
     await handleAutoPayment(order);
     router.replace({ name: 'orders' });
-  } catch (error: any) {
+  } catch (error) {
     console.error('创建订单失败', error);
-    message.error(error?.response?.data?.message ?? '创建订单失败');
+    message.error(friendlyErrorMessage(error, '创建订单失败'));
   } finally {
     loading.create = false;
   }
@@ -268,5 +287,20 @@ loadProduct();
 
 .mt-16 {
   margin-top: 16px;
+}
+
+.checkout-steps-card {
+  padding: 20px 24px;
+  border-radius: 24px;
+}
+
+.checkout-guidance ul {
+  padding-left: 18px;
+  margin: 8px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #475569;
+  font-size: 13px;
 }
 </style>

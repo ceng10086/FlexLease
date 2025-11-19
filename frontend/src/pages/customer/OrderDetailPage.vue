@@ -8,6 +8,15 @@
       <a-button type="default" @click="goBack">返回</a-button>
     </div>
 
+    <div class="page-guidance order-guidance">
+      <div class="page-guidance__title">操作提醒</div>
+      <div class="page-guidance__content">
+        - 确认收货后订单进入在租状态，若收货信息异常请勿立即确认；<br>
+        - 续租、退租、买断申请提交后平台会通知厂商处理，可在操作记录中查看结果；<br>
+        - 所有合同与支付记录均可在此页面查看，建议在关键步骤截图留存。
+      </div>
+    </div>
+
     <a-row :gutter="24">
       <a-col :xs="24" :lg="16">
         <a-card title="基础信息">
@@ -83,11 +92,30 @@
             </a-form-item>
             <a-button type="primary" block :loading="paymentForm.loading" @click="handleCreatePayment">生成支付单</a-button>
           </a-form>
-          <a-alert v-if="paymentForm.lastResult" type="success" class="mt-12" :message="`流水号：${paymentForm.lastResult}`" show-icon />
+          <a-alert
+            v-if="paymentForm.lastResult"
+            type="success"
+            class="mt-12"
+            :message="`流水号：${paymentForm.lastResult}`"
+            show-icon
+          />
+          <a-alert
+            type="info"
+            show-icon
+            class="mt-12"
+            message="说明"
+            description="支付单生成后系统会自动模拟支付通知，如需重新补款可重复生成，平台会防止重复扣款。"
+          />
         </a-card>
 
         <a-card title="确认收货" class="mt-16">
-          <a-button type="primary" block :disabled="order.status !== 'AWAITING_SHIPMENT' && order.status !== 'IN_LEASE'" :loading="receiveLoading" @click="handleConfirmReceive">
+          <a-button
+            type="primary"
+            block
+            :disabled="order.status !== 'AWAITING_SHIPMENT' && order.status !== 'IN_LEASE'"
+            :loading="receiveLoading"
+            @click="confirmReceive"
+          >
             确认收到设备
           </a-button>
         </a-card>
@@ -102,13 +130,23 @@
         </a-card>
 
         <a-card title="退租 / 买断" class="mt-16">
+          <a-alert
+            type="warning"
+            show-icon
+            class="mb-12"
+            message="请先与厂商确认回收时间或买断金额，再提交申请，避免重复操作。"
+          />
           <a-form layout="vertical">
             <a-form-item label="退租原因">
               <a-textarea v-model:value="returnForm.reason" :rows="2" placeholder="填写退租原因" />
             </a-form-item>
             <a-space direction="vertical" style="width: 100%">
-              <a-button block :loading="returnForm.loading" @click="handleReturnRequest">申请退租</a-button>
-              <a-button type="primary" block :loading="buyoutForm.loading" @click="handleBuyout">申请买断</a-button>
+              <a-button block :loading="returnForm.loading" @click="confirmReturnRequest">
+                申请退租
+              </a-button>
+              <a-button type="primary" block :loading="buyoutForm.loading" @click="confirmBuyout">
+                申请买断
+              </a-button>
             </a-space>
           </a-form>
         </a-card>
@@ -130,7 +168,7 @@
 <script lang="ts" setup>
 import { reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { message } from 'ant-design-vue';
+import { message, Modal } from 'ant-design-vue';
 import { useAuthStore } from '../../stores/auth';
 import {
   fetchOrder,
@@ -149,6 +187,7 @@ import {
   rentalOrderTotal
 } from '../../utils/orderAmounts';
 import OrderContractDrawer from '../../components/orders/OrderContractDrawer.vue';
+import { friendlyErrorMessage } from '../../utils/error';
 
 const route = useRoute();
 const router = useRouter();
@@ -181,7 +220,7 @@ const loadOrder = async () => {
     paymentForm.amount = order.value ? rentalOrderTotal(order.value) : 0;
   } catch (error) {
     console.error('加载订单失败', error);
-    message.error('加载订单失败，请稍后重试');
+    message.error(friendlyErrorMessage(error, '加载订单失败，请稍后重试'));
     router.replace({ name: 'orders' });
   } finally {
     loading.value = false;
@@ -213,10 +252,20 @@ const handleCreatePayment = async () => {
     message.success('支付单已创建并自动完成支付');
   } catch (error) {
     console.error('创建支付单失败', error);
-    message.error('创建支付单失败，请稍后重试');
+    message.error(friendlyErrorMessage(error, '创建支付单失败，请稍后重试'));
   } finally {
     paymentForm.loading = false;
   }
+};
+
+const confirmReceive = () => {
+  Modal.confirm({
+    title: '确认已经收到设备？',
+    content: '确认后订单将进入在租阶段，如物流信息仍未更新请耐心等待。',
+    okText: '确认收货',
+    cancelText: '暂不',
+    onOk: () => handleConfirmReceive()
+  });
 };
 
 const handleConfirmReceive = async () => {
@@ -230,7 +279,7 @@ const handleConfirmReceive = async () => {
     await loadOrder();
   } catch (error) {
     console.error('确认收货失败', error);
-    message.error('确认收货失败，请稍后重试');
+    message.error(friendlyErrorMessage(error, '确认收货失败，请稍后重试'));
   } finally {
     receiveLoading.value = false;
   }
@@ -247,13 +296,23 @@ const handleExtension = async () => {
       additionalMonths: extensionForm.months,
       remark: '用户发起续租'
     });
-    message.success('续租申请已提交');
+    message.success('续租申请已提交，请等待厂商确认');
     extensionForm.loading = false;
   } catch (error) {
     console.error('续租申请失败', error);
-    message.error('续租申请失败，请稍后重试');
+    message.error(friendlyErrorMessage(error, '续租申请失败，请稍后重试'));
     extensionForm.loading = false;
   }
+};
+
+const confirmReturnRequest = () => {
+  Modal.confirm({
+    title: '提交退租申请',
+    content: '提交后厂商将安排回收，若仍在使用请暂缓操作。',
+    okText: '提交退租',
+    cancelText: '再想想',
+    onOk: () => handleReturnRequest()
+  });
 };
 
 const handleReturnRequest = async () => {
@@ -266,13 +325,23 @@ const handleReturnRequest = async () => {
       userId: auth.user.id,
       reason: returnForm.reason || '用户发起退租'
     });
-    message.success('退租申请已提交');
+    message.success('退租申请已提交，请关注通知更新');
     returnForm.loading = false;
   } catch (error) {
     console.error('退租申请失败', error);
-    message.error('退租申请失败，请稍后重试');
+    message.error(friendlyErrorMessage(error, '退租申请失败，请稍后重试'));
     returnForm.loading = false;
   }
+};
+
+const confirmBuyout = () => {
+  Modal.confirm({
+    title: '确认提交买断申请？',
+    content: '买断申请提交后厂商会回访确认，若需分期支付请在备注中说明。',
+    okText: '提交买断',
+    cancelText: '取消',
+    onOk: () => handleBuyout()
+  });
 };
 
 const handleBuyout = async () => {
@@ -288,7 +357,7 @@ const handleBuyout = async () => {
     message.success('买断申请已提交');
   } catch (error) {
     console.error('买断申请失败', error);
-    message.error('买断申请失败，请稍后重试');
+    message.error(friendlyErrorMessage(error, '买断申请失败，请稍后重试'));
   } finally {
     buyoutForm.loading = false;
   }
@@ -310,6 +379,10 @@ const handleContractSigned = async () => {
   margin-top: 16px;
 }
 
+.mb-12 {
+  margin-bottom: 12px;
+}
+
 .timeline-item {
   display: flex;
   flex-direction: column;
@@ -319,5 +392,9 @@ const handleContractSigned = async () => {
 .contract-hint {
   color: #64748b;
   font-size: 12px;
+}
+
+.order-guidance {
+  margin: 0 0 12px;
 }
 </style>

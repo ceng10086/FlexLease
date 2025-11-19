@@ -8,6 +8,22 @@
       <a-button type="default" @click="loadApplications" :loading="loading">刷新</a-button>
     </div>
 
+    <a-card class="onboarding-steps-card" :bordered="false">
+      <a-steps :current="currentStep" responsive size="small">
+        <a-step title="填写资料" description="完善公司主体信息" />
+        <a-step title="等待审核" description="管理员核验资质" />
+        <a-step title="完成入驻" description="账号激活并同步厂商 ID" />
+      </a-steps>
+      <div class="page-guidance mt-16">
+        <div class="page-guidance__title">流程说明</div>
+        <div class="page-guidance__content">
+          - 审核通过后请重新登录以刷新厂商身份；<br>
+          - 如被驳回，可在原申请上修改资料并再次提交；<br>
+          - 建议上传真实联系方式，便于管理员快速回访确认。
+        </div>
+      </div>
+    </a-card>
+
     <a-row :gutter="16">
       <a-col :xs="24" :lg="10">
         <a-card title="最新申请">
@@ -130,6 +146,7 @@ import {
   submitVendorApplication,
   type VendorApplication
 } from '../../services/vendorService';
+import { friendlyErrorMessage } from '../../utils/error';
 
 const auth = useAuthStore();
 const loading = ref(false);
@@ -162,6 +179,19 @@ const myApplications = computed(() => {
 
 const latestApplication = computed(() => myApplications.value.at(0) ?? null);
 const canSubmit = computed(() => !latestApplication.value || latestApplication.value.status === 'REJECTED');
+const currentStep = computed(() => {
+  const status = latestApplication.value?.status ?? 'DRAFT';
+  if (status === 'APPROVED') {
+    return 2;
+  }
+  if (status === 'SUBMITTED') {
+    return 1;
+  }
+  if (status === 'REJECTED') {
+    return 1;
+  }
+  return 0;
+});
 
 const statusMeta = (status: VendorApplication['status']) => {
   switch (status) {
@@ -182,7 +212,7 @@ const loadApplications = async () => {
     applications.value = await listVendorApplications();
   } catch (error) {
     console.error('加载厂商申请失败', error);
-    message.error('加载申请列表失败，请稍后重试');
+    message.error(friendlyErrorMessage(error, '加载申请列表失败，请稍后重试'));
   } finally {
     loading.value = false;
   }
@@ -219,9 +249,9 @@ const handleSubmit = async () => {
       address: ''
     });
     await loadApplications();
-  } catch (error: any) {
+  } catch (error) {
     console.error('提交厂商申请失败', error);
-    message.error(error?.response?.data?.message ?? '提交失败，请稍后重试');
+    message.error(friendlyErrorMessage(error, '提交失败，请稍后重试'));
   } finally {
     submitting.value = false;
   }
@@ -250,5 +280,11 @@ loadApplications();
 
 .mt-16 {
   margin-top: 16px;
+}
+
+.onboarding-steps-card {
+  padding: 24px;
+  border-radius: 24px;
+  margin-bottom: 16px;
 }
 </style>

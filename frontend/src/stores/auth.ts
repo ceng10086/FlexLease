@@ -12,6 +12,7 @@ import {
   type RegisterPayload,
   type AuthSession
 } from '../services/authService';
+import { friendlyErrorMessage } from '../utils/error';
 
 const TOKEN_KEY = 'flexlease_token';
 const REFRESH_TOKEN_KEY = 'flexlease_refresh_token';
@@ -93,7 +94,7 @@ export const useAuthStore = defineStore('auth', () => {
       user.value = await fetchCurrentUser();
       message.success('登录成功');
     } catch (err) {
-      const msg = err instanceof Error ? err.message : '登录失败';
+      const msg = friendlyErrorMessage(err, '登录失败，请稍后重试');
       error.value = msg;
       message.error(msg);
       throw err;
@@ -114,7 +115,7 @@ export const useAuthStore = defineStore('auth', () => {
       }
       message.success('注册成功，请使用新账号登录');
     } catch (err) {
-      const msg = err instanceof Error ? err.message : '注册失败';
+      const msg = friendlyErrorMessage(err, '注册失败，请稍后重试');
       message.error(msg);
       throw err;
     } finally {
