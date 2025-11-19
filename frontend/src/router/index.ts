@@ -64,6 +64,12 @@ const router = createRouter({
           meta: { navKey: 'orders', roles: ['USER'] }
         },
         {
+          path: 'profile',
+          name: 'profile',
+          component: () => import('../pages/customer/ProfilePage.vue'),
+          meta: { navKey: 'profile', roles: ['USER', 'ADMIN'] }
+        },
+        {
           path: 'orders/:orderId',
           name: 'order-detail',
           component: () => import('../pages/customer/OrderDetailPage.vue'),

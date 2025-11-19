@@ -37,6 +37,13 @@ const NAV_SCHEMA: NavItem[] = [
     roles: ['USER']
   },
   {
+    key: 'profile',
+    label: '个人资料',
+    path: '/app/profile',
+    icon: 'ProfileOutlined',
+    roles: ['USER', 'ADMIN']
+  },
+  {
     key: 'notifications',
     label: '通知中心',
     path: '/app/notifications',

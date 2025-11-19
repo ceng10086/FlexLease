@@ -68,12 +68,12 @@
                   <span class="auth-layout__username">{{ auth.user?.username }}</span>
                 </a-button>
                 <template #overlay>
-                  <a-menu>
+                  <a-menu @click="handleUserMenuClick">
                     <a-menu-item key="profile">
-                      <span>账号：{{ auth.user?.username }}</span>
+                      <span>个人资料</span>
                     </a-menu-item>
                     <a-menu-divider />
-                    <a-menu-item key="logout" @click="handleLogout">退出登录</a-menu-item>
+                    <a-menu-item key="logout">退出登录</a-menu-item>
                   </a-menu>
                 </template>
               </a-dropdown>
@@ -228,6 +228,14 @@ const handleSelect = ({ key }: { key: string }) => {
   const target = keyPathMap.value.get(key);
   if (target && target !== route.fullPath) {
     router.push(target);
+  }
+};
+
+const handleUserMenuClick = ({ key }: { key: string }) => {
+  if (key === 'profile') {
+    router.push({ name: 'profile' });
+  } else if (key === 'logout') {
+    handleLogout();
   }
 };
 
