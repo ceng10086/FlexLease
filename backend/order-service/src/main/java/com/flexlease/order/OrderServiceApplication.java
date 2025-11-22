@@ -4,6 +4,7 @@ import com.flexlease.order.client.NotificationServiceProperties;
 import com.flexlease.order.client.PaymentServiceProperties;
 import com.flexlease.order.client.ProductServiceProperties;
 import com.flexlease.order.config.OrderMaintenanceProperties;
+import com.flexlease.order.client.UserServiceProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -11,7 +12,13 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication(scanBasePackages = "com.flexlease")
 @EnableScheduling
-@EnableConfigurationProperties({PaymentServiceProperties.class, NotificationServiceProperties.class, ProductServiceProperties.class, OrderMaintenanceProperties.class})
+@EnableConfigurationProperties({
+        PaymentServiceProperties.class,
+        NotificationServiceProperties.class,
+        ProductServiceProperties.class,
+        UserServiceProperties.class,
+        OrderMaintenanceProperties.class
+})
 public class OrderServiceApplication {
 
     public static void main(String[] args) {

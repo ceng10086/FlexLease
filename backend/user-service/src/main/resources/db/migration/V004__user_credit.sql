@@ -1,0 +1,5 @@
+ALTER TABLE users.user_profile
+    ADD COLUMN IF NOT EXISTS credit_score INTEGER NOT NULL DEFAULT 60;
+
+ALTER TABLE users.user_profile
+    ADD COLUMN IF NOT EXISTS credit_tier VARCHAR(30) NOT NULL DEFAULT 'STANDARD';

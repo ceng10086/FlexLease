@@ -160,6 +160,8 @@ class UserServiceApplicationTests {
         assertThat(initialNode.at("/data/userId").asText()).isEqualTo(userId.toString());
         assertThat(initialNode.at("/data/gender").asText()).isEqualTo("UNKNOWN");
         assertThat(initialNode.at("/data/fullName").isNull()).isTrue();
+        assertThat(initialNode.at("/data/creditScore").asInt()).isEqualTo(60);
+        assertThat(initialNode.at("/data/creditTier").asText()).isEqualTo("STANDARD");
 
         var updatePayload = java.util.Map.of(
             "fullName", "李四",
@@ -182,6 +184,7 @@ class UserServiceApplicationTests {
         assertThat(updateNode.at("/data/phone").asText()).isEqualTo("13800001111");
         assertThat(updateNode.at("/data/email").asText()).isEqualTo("lisi@example.com");
         assertThat(updateNode.at("/data/address").asText()).isEqualTo("北京市朝阳区望京");
+        assertThat(updateNode.at("/data/creditScore").asInt()).isEqualTo(60);
     }
 
     @Test
@@ -225,6 +228,42 @@ class UserServiceApplicationTests {
                 ))))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.code").value(com.flexlease.common.exception.ErrorCode.FORBIDDEN.code()));
+    }
+
+    @Test
+    void adminCanAdjustCreditAndInternalEndpointReturnsSnapshot() throws Exception {
+        UUID userId = UUID.randomUUID();
+        String userToken = TestJwtTokens.bearerToken(userId, "customer-user", "USER");
+        String adminToken = TestJwtTokens.bearerToken(UUID.randomUUID(), "admin-user", "ADMIN");
+
+        mockMvc.perform(get("/api/v1/customers/profile")
+                        .header(HttpHeaders.AUTHORIZATION, userToken))
+                .andExpect(status().isOk());
+
+        var adjustPayload = java.util.Map.of(
+                "delta", 15,
+                "reason", "按时支付奖励"
+        );
+
+        MvcResult adjustResult = mockMvc.perform(post("/api/v1/admin/users/" + userId + "/credit-adjustments")
+                        .header(HttpHeaders.AUTHORIZATION, adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(adjustPayload)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode adjustNode = readJson(adjustResult);
+        assertThat(adjustNode.at("/data/creditScore").asInt()).isEqualTo(75);
+        assertThat(adjustNode.at("/data/creditTier").asText()).isEqualTo("STANDARD");
+
+        MvcResult internalResult = mockMvc.perform(get("/api/v1/internal/users/" + userId + "/credit")
+                        .header("X-Internal-Token", "flexlease-internal-secret"))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode creditNode = readJson(internalResult);
+        assertThat(creditNode.at("/data/creditScore").asInt()).isEqualTo(75);
+        assertThat(creditNode.at("/data/creditTier").asText()).isEqualTo("STANDARD");
     }
 
     private JsonNode readJson(MvcResult result) throws Exception {

@@ -2,14 +2,18 @@ package com.flexlease.user.service;
 
 import com.flexlease.common.exception.BusinessException;
 import com.flexlease.common.exception.ErrorCode;
+import com.flexlease.common.user.CreditTierRules;
 import com.flexlease.user.domain.UserProfile;
 import com.flexlease.user.domain.UserProfileGender;
 import com.flexlease.user.dto.PagedResponse;
+import com.flexlease.user.dto.UserCreditResponse;
 import com.flexlease.user.dto.UserProfileResponse;
 import com.flexlease.user.dto.UserProfileUpdateRequest;
 import com.flexlease.user.repository.UserProfileRepository;
 import java.util.Locale;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -19,6 +23,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class UserProfileService {
+
+    private static final Logger LOG = LoggerFactory.getLogger(UserProfileService.class);
 
     private final UserProfileRepository userProfileRepository;
 
@@ -46,6 +52,26 @@ public class UserProfileService {
         );
         UserProfile saved = userProfileRepository.save(profile);
         return toResponse(saved);
+    }
+
+    @Transactional
+    public UserProfileResponse adjustCredit(UUID userId, int delta, String reason, UUID operatorId) {
+        UserProfile profile = userProfileRepository.findByUserId(userId)
+                .orElseGet(() -> userProfileRepository.save(UserProfile.create(userId)));
+        profile.applyCreditDelta(delta);
+        UserProfile saved = userProfileRepository.save(profile);
+        LOG.info("Adjusted credit for user {} by {} points, operator={}, reason={}",
+                userId, delta, operatorId, reason);
+        return toResponse(saved);
+    }
+
+    @Transactional
+    public UserCreditResponse loadCredit(UUID userId) {
+        UserProfile profile = userProfileRepository.findByUserId(userId)
+                .orElseGet(() -> userProfileRepository.save(UserProfile.create(userId)));
+        profile.refreshCreditTier();
+        UserProfile saved = userProfileRepository.save(profile);
+        return new UserCreditResponse(saved.getUserId(), saved.getCreditScore(), saved.getCreditTier());
     }
 
     @Transactional(readOnly = true)
@@ -83,6 +109,8 @@ public class UserProfileService {
                 profile.getPhone(),
                 profile.getEmail(),
                 profile.getAddress(),
+                profile.getCreditScore() == null ? CreditTierRules.defaultScore() : profile.getCreditScore(),
+                profile.getCreditTier(),
                 profile.getCreatedAt(),
                 profile.getUpdatedAt()
         );

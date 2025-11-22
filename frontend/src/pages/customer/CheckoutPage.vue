@@ -65,6 +65,31 @@
             <span>应付总额</span>
             <strong>¥{{ formatCurrency(preview?.totalAmount ?? 0) }}</strong>
           </div>
+          <div v-if="preview?.creditSnapshot" class="credit-summary">
+            <div class="credit-summary__header">
+              <span>信用等级</span>
+              <a-tag :color="creditColor(preview.creditSnapshot?.creditTier)">
+                {{ creditLabel(preview.creditSnapshot?.creditTier) }} ·
+                {{ preview.creditSnapshot?.creditScore ?? '--' }} 分
+              </a-tag>
+            </div>
+            <div class="credit-summary__details">
+              <div>
+                <div class="credit-summary__label">押金原价</div>
+                <strong>¥{{ formatCurrency(preview.originalDepositAmount ?? 0) }}</strong>
+              </div>
+              <div>
+                <div class="credit-summary__label">信用调整</div>
+                <span>{{ depositAdjustmentText }}</span>
+              </div>
+            </div>
+            <a-alert
+              v-if="preview.creditSnapshot?.requiresManualReview"
+              type="warning"
+              show-icon
+              message="信用预警：订单提交后需平台人工审核"
+            />
+          </div>
           <a-space direction="vertical" style="width: 100%">
             <a-button
               type="default"
@@ -105,6 +130,7 @@ import { serializePlanSnapshot } from '../../utils/planSnapshot';
 import { rentalOrderDeposit, rentalOrderRent, rentalOrderTotal } from '../../utils/orderAmounts';
 import { autoCompleteInitialPayment } from '../../utils/autoPayment';
 import { friendlyErrorMessage } from '../../utils/error';
+import { creditTierColor, creditTierLabel } from '../../types/credit';
 
 const route = useRoute();
 const router = useRouter();
@@ -136,6 +162,21 @@ const currentSku = computed(() => currentPlan.value?.skus.find((sku) => sku.id =
 const orderReady = computed(() => Boolean(product.value && currentPlan.value && currentSku.value && product.value.vendorId));
 
 const formatCurrency = (value: number) => value.toFixed(2);
+const creditColor = (tier?: OrderPreviewResponse['creditSnapshot']['creditTier'] | null) =>
+  creditTierColor(tier ?? null);
+const creditLabel = (tier?: OrderPreviewResponse['creditSnapshot']['creditTier'] | null) =>
+  creditTierLabel(tier ?? null);
+const depositAdjustmentText = computed(() => {
+  if (!preview.value?.creditSnapshot) {
+    return '按标准押金计算';
+  }
+  const rate = preview.value.creditSnapshot.depositAdjustmentRate ?? 1;
+  if (Math.abs(rate - 1) < 0.001) {
+    return '押金维持原价';
+  }
+  const percent = Math.abs(rate - 1) * 100;
+  return rate < 1 ? `减免 ${percent.toFixed(0)}%` : `上浮 ${percent.toFixed(0)}%`;
+});
 
 const loadProduct = async () => {
   const productId = route.query.productId as string | undefined;
@@ -302,5 +343,35 @@ loadProduct();
   gap: 6px;
   color: #475569;
   font-size: 13px;
+}
+
+.credit-summary {
+  margin-top: 12px;
+  padding: 14px;
+  background: #f8fafc;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.credit-summary__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  color: #475569;
+}
+
+.credit-summary__details {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: #0f172a;
+}
+
+.credit-summary__label {
+  font-size: 12px;
+  color: #94a3b8;
 }
 </style>

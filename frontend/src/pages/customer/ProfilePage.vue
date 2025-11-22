@@ -28,6 +28,17 @@
               {{ profile?.updatedAt ? formatDate(profile.updatedAt) : '—' }}
             </a-descriptions-item>
           </a-descriptions>
+          <div v-if="profile" class="credit-panel">
+            <div class="credit-panel__title">信用档案</div>
+            <div class="credit-panel__body">
+              <a-tag :color="creditColor(profile.creditTier)">
+                {{ creditLabel(profile.creditTier) }} · {{ profile.creditScore }} 分
+              </a-tag>
+              <span class="credit-panel__text">
+                信用良好可享押金减免，异常行为会触发人工审核。
+              </span>
+            </div>
+          </div>
 
           <a-form ref="formRef" layout="vertical" :model="formState" :rules="rules">
             <a-row :gutter="12">
@@ -92,6 +103,7 @@ import {
   type UserProfile,
   type UserProfileUpdatePayload
 } from '../../services/userProfileService';
+import { creditTierColor, creditTierLabel } from '../../types/credit';
 
 const auth = useAuthStore();
 const profile = ref<UserProfile | null>(null);
@@ -123,6 +135,8 @@ const rules: FormRules = {
 };
 
 const formatDate = (value: string) => new Date(value).toLocaleString();
+const creditColor = (tier?: UserProfile['creditTier']) => creditTierColor(tier);
+const creditLabel = (tier?: UserProfile['creditTier']) => creditTierLabel(tier);
 
 const loadProfile = async () => {
   loading.value = true;
@@ -175,5 +189,29 @@ onMounted(() => {
 .form-actions {
   display: flex;
   justify-content: flex-end;
+}
+.credit-panel {
+  margin: 16px 0;
+  padding: 12px;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.credit-panel__title {
+  font-size: 13px;
+  color: #475569;
+  margin-bottom: 4px;
+}
+
+.credit-panel__body {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  color: #0f172a;
+}
+
+.credit-panel__text {
+  color: #475569;
 }
 </style>

@@ -1,5 +1,6 @@
 package com.flexlease.order.domain;
 
+import com.flexlease.common.user.CreditTier;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -48,11 +49,27 @@ public class RentalOrder {
     @Column(name = "deposit_amount", nullable = false)
     private BigDecimal depositAmount;
 
+    @Column(name = "original_deposit_amount", nullable = false)
+    private BigDecimal originalDepositAmount;
+
     @Column(name = "rent_amount", nullable = false)
     private BigDecimal rentAmount;
 
     @Column(name = "buyout_amount")
     private BigDecimal buyoutAmount;
+
+    @Column(name = "credit_score", nullable = false)
+    private Integer creditScore;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "credit_tier", nullable = false, length = 30)
+    private CreditTier creditTier;
+
+    @Column(name = "deposit_adjustment_rate", nullable = false, precision = 5, scale = 2)
+    private BigDecimal depositAdjustmentRate;
+
+    @Column(name = "requires_manual_review", nullable = false)
+    private boolean requiresManualReview;
 
     @Column(name = "payment_transaction_id")
     private UUID paymentTransactionId;
@@ -98,9 +115,14 @@ public class RentalOrder {
                         UUID vendorId,
                         String planType,
                         BigDecimal depositAmount,
+                        BigDecimal originalDepositAmount,
                         BigDecimal rentAmount,
                         BigDecimal buyoutAmount,
                         BigDecimal totalAmount,
+                        Integer creditScore,
+                        CreditTier creditTier,
+                        BigDecimal depositAdjustmentRate,
+                        boolean requiresManualReview,
                         OffsetDateTime leaseStartAt,
                         OffsetDateTime leaseEndAt) {
         this.id = UUID.randomUUID();
@@ -110,9 +132,14 @@ public class RentalOrder {
         this.status = OrderStatus.PENDING_PAYMENT;
         this.planType = planType;
         this.depositAmount = depositAmount;
+        this.originalDepositAmount = originalDepositAmount;
         this.rentAmount = rentAmount;
         this.buyoutAmount = buyoutAmount;
         this.totalAmount = totalAmount;
+        this.creditScore = creditScore;
+        this.creditTier = creditTier;
+        this.depositAdjustmentRate = depositAdjustmentRate;
+        this.requiresManualReview = requiresManualReview;
         this.leaseStartAt = leaseStartAt;
         this.leaseEndAt = leaseEndAt;
         this.extensionCount = 0;
@@ -122,12 +149,18 @@ public class RentalOrder {
                                      UUID vendorId,
                                      String planType,
                                      BigDecimal depositAmount,
+                                     BigDecimal originalDepositAmount,
                                      BigDecimal rentAmount,
                                      BigDecimal buyoutAmount,
                                      BigDecimal totalAmount,
+                                     Integer creditScore,
+                                     CreditTier creditTier,
+                                     BigDecimal depositAdjustmentRate,
+                                     boolean requiresManualReview,
                                      OffsetDateTime leaseStartAt,
                                      OffsetDateTime leaseEndAt) {
-        return new RentalOrder(userId, vendorId, planType, depositAmount, rentAmount, buyoutAmount, totalAmount, leaseStartAt, leaseEndAt);
+        return new RentalOrder(userId, vendorId, planType, depositAmount, originalDepositAmount, rentAmount, buyoutAmount, totalAmount,
+                creditScore, creditTier, depositAdjustmentRate, requiresManualReview, leaseStartAt, leaseEndAt);
     }
 
     @PrePersist
@@ -178,8 +211,28 @@ public class RentalOrder {
         return rentAmount;
     }
 
+    public BigDecimal getOriginalDepositAmount() {
+        return originalDepositAmount;
+    }
+
     public BigDecimal getBuyoutAmount() {
         return buyoutAmount;
+    }
+
+    public Integer getCreditScore() {
+        return creditScore;
+    }
+
+    public CreditTier getCreditTier() {
+        return creditTier;
+    }
+
+    public BigDecimal getDepositAdjustmentRate() {
+        return depositAdjustmentRate;
+    }
+
+    public boolean isRequiresManualReview() {
+        return requiresManualReview;
     }
 
     public UUID getPaymentTransactionId() {

@@ -1,4 +1,5 @@
 import http from './http';
+import type { CreditTier } from '../types/credit';
 
 export type OrderStatus =
   | 'PENDING_PAYMENT'
@@ -39,10 +40,19 @@ export type OrderPreviewPayload = {
   items: OrderItemPayload[];
 };
 
+export type CreditSnapshot = {
+  creditScore: number;
+  creditTier: CreditTier;
+  depositAdjustmentRate: number;
+  requiresManualReview: boolean;
+};
+
 export type OrderPreviewResponse = {
   depositAmount: number;
   rentAmount: number;
   totalAmount: number;
+  originalDepositAmount: number;
+  creditSnapshot: CreditSnapshot;
 };
 
 export type CreateOrderPayload = OrderPreviewPayload & {
@@ -194,8 +204,13 @@ export type RentalOrderDetail = {
   planType?: string | null;
   totalAmount: number;
   depositAmount: number;
+  originalDepositAmount: number;
   rentAmount: number;
   buyoutAmount?: number | null;
+  creditScore: number;
+  creditTier: CreditTier;
+  depositAdjustmentRate: number;
+  requiresManualReview: boolean;
   paymentTransactionId?: string | null;
   leaseStartAt?: string | null;
   leaseEndAt?: string | null;

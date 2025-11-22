@@ -76,6 +76,7 @@ public class RentalOrderService {
     private final OrderEventPublisher orderEventPublisher;
     private final ProductCatalogClient productCatalogClient;
     private final ObjectMapper objectMapper;
+    private final CreditAssessmentService creditAssessmentService;
 
     public RentalOrderService(RentalOrderRepository rentalOrderRepository,
                               OrderExtensionRequestRepository extensionRequestRepository,
@@ -87,7 +88,8 @@ public class RentalOrderService {
                               OrderAssembler assembler,
                               OrderEventPublisher orderEventPublisher,
                               ProductCatalogClient productCatalogClient,
-                              ObjectMapper objectMapper) {
+                              ObjectMapper objectMapper,
+                              CreditAssessmentService creditAssessmentService) {
         this.rentalOrderRepository = rentalOrderRepository;
         this.extensionRequestRepository = extensionRequestRepository;
         this.returnRequestRepository = returnRequestRepository;
@@ -99,6 +101,7 @@ public class RentalOrderService {
         this.orderEventPublisher = orderEventPublisher;
         this.productCatalogClient = productCatalogClient;
         this.objectMapper = objectMapper;
+        this.creditAssessmentService = creditAssessmentService;
     }
 
     @Transactional(Transactional.TxType.SUPPORTS)
@@ -111,7 +114,20 @@ public class RentalOrderService {
         List<OrderItemRequest> items = request.items() == null ? List.of() : request.items();
         List<ResolvedOrderItem> resolvedItems = resolveOrderItems(request.vendorId(), items);
         Totals totals = calculateTotals(resolvedItems);
-        return new OrderPreviewResponse(totals.depositAmount, totals.rentAmount, totals.totalAmount);
+        CreditAppliedTotals adjusted = applyCredit(request.userId(), totals);
+        CreditAssessmentService.CreditDecision decision = adjusted.decision();
+        return new OrderPreviewResponse(
+                adjusted.adjustedDeposit(),
+                adjusted.rentAmount(),
+                adjusted.totalAmount(),
+                adjusted.originalDeposit(),
+                new OrderPreviewResponse.CreditSnapshot(
+                        decision.creditScore(),
+                        decision.creditTier(),
+                        decision.depositAdjustmentRate(),
+                        decision.requiresManualReview()
+                )
+        );
     }
 
     public RentalOrderResponse createOrder(CreateOrderRequest request) {
@@ -150,15 +166,22 @@ public class RentalOrderService {
 
         List<ResolvedOrderItem> resolvedItems = resolveOrderItems(request.vendorId(), orderItems);
         Totals totals = calculateTotals(resolvedItems);
+        CreditAppliedTotals adjusted = applyCredit(request.userId(), totals);
+        CreditAssessmentService.CreditDecision creditDecision = adjusted.decision();
 
         RentalOrder order = RentalOrder.create(
                 request.userId(),
                 request.vendorId(),
                 request.planType(),
-                totals.depositAmount,
-                totals.rentAmount,
-                totals.buyoutAmount,
-                totals.totalAmount,
+                adjusted.adjustedDeposit(),
+                adjusted.originalDeposit(),
+                adjusted.rentAmount(),
+                adjusted.buyoutAmount(),
+                adjusted.totalAmount(),
+                creditDecision.creditScore(),
+                creditDecision.creditTier(),
+                creditDecision.depositAdjustmentRate(),
+                creditDecision.requiresManualReview(),
                 request.leaseStartAt(),
                 request.leaseEndAt()
         );
@@ -729,8 +752,21 @@ public class RentalOrderService {
                 buyout = buyout.add(item.buyoutPrice().multiply(quantity));
             }
         }
-        BigDecimal total = deposit.add(rent);
-        return new Totals(deposit, rent, buyout, total);
+        return new Totals(deposit, rent, buyout);
+    }
+
+    private CreditAppliedTotals applyCredit(UUID userId, Totals totals) {
+        CreditAssessmentService.CreditDecision decision = creditAssessmentService.assess(userId);
+        BigDecimal adjustedDeposit = decision.apply(totals.depositAmount);
+        BigDecimal totalAmount = adjustedDeposit.add(totals.rentAmount);
+        return new CreditAppliedTotals(
+                totals.depositAmount,
+                adjustedDeposit,
+                totals.rentAmount,
+                totals.buyoutAmount,
+                totalAmount,
+                decision
+        );
     }
 
     private PagedResponse<RentalOrderSummaryResponse> toPagedResponse(Page<RentalOrder> page) {
@@ -874,7 +910,15 @@ public class RentalOrderService {
         orderEventPublisher.publish(order, eventType, description, actorId, attributes);
     }
 
-    private record Totals(BigDecimal depositAmount, BigDecimal rentAmount, BigDecimal buyoutAmount, BigDecimal totalAmount) {
+    private record Totals(BigDecimal depositAmount, BigDecimal rentAmount, BigDecimal buyoutAmount) {
+    }
+
+    private record CreditAppliedTotals(BigDecimal originalDeposit,
+                                       BigDecimal adjustedDeposit,
+                                       BigDecimal rentAmount,
+                                       BigDecimal buyoutAmount,
+                                       BigDecimal totalAmount,
+                                       CreditAssessmentService.CreditDecision decision) {
     }
 
     private List<ResolvedOrderItem> resolveOrderItems(UUID expectedVendorId, List<OrderItemRequest> items) {

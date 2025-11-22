@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.flexlease.common.exception.BusinessException;
 import com.flexlease.common.exception.ErrorCode;
 import com.flexlease.common.security.FlexleasePrincipal;
+import com.flexlease.common.user.CreditTier;
 import com.flexlease.order.client.InventoryReservationClient;
 import com.flexlease.order.client.NotificationClient;
 import com.flexlease.order.client.PaymentClient;
@@ -15,6 +16,7 @@ import com.flexlease.order.client.ProductCatalogClient;
 import com.flexlease.order.client.ProductCatalogClient.CatalogProductView;
 import com.flexlease.order.client.ProductCatalogClient.CatalogProductView.RentalPlanView;
 import com.flexlease.order.client.ProductCatalogClient.CatalogProductView.SkuView;
+import com.flexlease.order.client.UserProfileClient;
 import com.flexlease.order.domain.OrderEventType;
 import com.flexlease.order.domain.OrderStatus;
 import com.flexlease.order.dto.AddCartItemRequest;
@@ -42,6 +44,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -62,8 +65,8 @@ class RentalOrderServiceIntegrationTest {
     @Autowired
     private RentalOrderService rentalOrderService;
 
-        @Autowired
-        private OrderContractService orderContractService;
+    @Autowired
+    private OrderContractService orderContractService;
 
     @MockBean
     private PaymentClient paymentClient;
@@ -74,14 +77,26 @@ class RentalOrderServiceIntegrationTest {
     @MockBean
     private InventoryReservationClient inventoryReservationClient;
 
-        @MockBean
-        private ProductCatalogClient productCatalogClient;
+    @MockBean
+    private ProductCatalogClient productCatalogClient;
+
+    @MockBean
+    private UserProfileClient userProfileClient;
 
     @Autowired
     private CartService cartService;
 
     @Autowired
     private OrderMaintenanceScheduler orderMaintenanceScheduler;
+
+    @BeforeEach
+    void setupCreditClient() {
+        Mockito.when(userProfileClient.loadCredit(Mockito.any()))
+                .thenAnswer(invocation -> {
+                    UUID userId = invocation.getArgument(0);
+                    return new UserProfileClient.UserCreditView(userId, 60, CreditTier.STANDARD);
+                });
+    }
 
     @Test
     void shouldCompleteFullOrderLifecycle() {
@@ -118,6 +133,8 @@ class RentalOrderServiceIntegrationTest {
         assertThat(preview.depositAmount()).isEqualByComparingTo("1000.00");
         assertThat(preview.rentAmount()).isEqualByComparingTo("598.00");
         assertThat(preview.totalAmount()).isEqualByComparingTo("1598.00");
+        assertThat(preview.originalDepositAmount()).isEqualByComparingTo("1000.00");
+        assertThat(preview.creditSnapshot().creditTier()).isEqualTo(CreditTier.STANDARD);
 
         RentalOrderResponse created = rentalOrderService.createOrder(new CreateOrderRequest(
                 userId,
@@ -209,6 +226,84 @@ class RentalOrderServiceIntegrationTest {
         org.assertj.core.api.Assertions.assertThatThrownBy(() ->
                 rentalOrderService.applyBuyout(created.id(), new OrderBuyoutApplyRequest(userId, BigDecimal.TEN, "买断")))
                 .isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    void shouldApplyCreditDiscount() {
+        UUID userId = UUID.randomUUID();
+        UUID vendorId = UUID.randomUUID();
+        UUID productId = UUID.randomUUID();
+        UUID skuId = UUID.randomUUID();
+        UUID planId = UUID.randomUUID();
+
+        Mockito.when(userProfileClient.loadCredit(Mockito.eq(userId)))
+                .thenReturn(new UserProfileClient.UserCreditView(userId, 95, CreditTier.EXCELLENT));
+
+        OrderItemRequest itemRequest = new OrderItemRequest(
+                productId,
+                skuId,
+                planId,
+                "信用减免商品",
+                "CREDIT-01",
+                Map.of("termMonths", 6).toString(),
+                1,
+                new BigDecimal("200.00"),
+                new BigDecimal("300.00"),
+                null
+        );
+
+        stubProductCatalog(productId, vendorId, planId, skuId);
+
+        OrderPreviewResponse preview = rentalOrderService.previewOrder(new OrderPreviewRequest(
+                userId,
+                vendorId,
+                "STANDARD",
+                null,
+                null,
+                List.of(itemRequest)
+        ));
+
+        assertThat(preview.originalDepositAmount()).isEqualByComparingTo("500.00");
+        assertThat(preview.depositAmount()).isEqualByComparingTo("350.00");
+        assertThat(preview.creditSnapshot().creditTier()).isEqualTo(CreditTier.EXCELLENT);
+        assertThat(preview.creditSnapshot().depositAdjustmentRate()).isEqualByComparingTo("0.70");
+    }
+
+    @Test
+    void shouldRejectOrderWhenCreditRestricted() {
+        UUID userId = UUID.randomUUID();
+        UUID vendorId = UUID.randomUUID();
+        UUID productId = UUID.randomUUID();
+        UUID skuId = UUID.randomUUID();
+        UUID planId = UUID.randomUUID();
+
+        Mockito.when(userProfileClient.loadCredit(Mockito.eq(userId)))
+                .thenReturn(new UserProfileClient.UserCreditView(userId, 30, CreditTier.RESTRICTED));
+
+        OrderItemRequest itemRequest = new OrderItemRequest(
+                productId,
+                skuId,
+                planId,
+                "信用校验商品",
+                "CREDIT-02",
+                null,
+                1,
+                new BigDecimal("120.00"),
+                new BigDecimal("200.00"),
+                null
+        );
+
+        stubProductCatalog(productId, vendorId, planId, skuId);
+
+        assertThatThrownBy(() -> rentalOrderService.previewOrder(new OrderPreviewRequest(
+                userId,
+                vendorId,
+                "STANDARD",
+                null,
+                null,
+                List.of(itemRequest)
+        ))).isInstanceOf(BusinessException.class)
+                .hasMessageContaining("信用");
     }
 
     @Test

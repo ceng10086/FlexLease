@@ -1,4 +1,5 @@
 import http from './http';
+import type { CreditTier } from '../types/credit';
 
 type ApiResponse<T> = {
   code: number;
@@ -16,6 +17,8 @@ export type UserProfile = {
   phone?: string | null;
   email?: string | null;
   address?: string | null;
+  creditScore: number;
+  creditTier: CreditTier;
   createdAt?: string;
   updatedAt?: string;
 };

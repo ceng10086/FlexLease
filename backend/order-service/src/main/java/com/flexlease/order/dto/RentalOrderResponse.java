@@ -1,5 +1,6 @@
 package com.flexlease.order.dto;
 
+import com.flexlease.common.user.CreditTier;
 import com.flexlease.order.domain.OrderStatus;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -15,8 +16,13 @@ public record RentalOrderResponse(
         String planType,
         BigDecimal totalAmount,
         BigDecimal depositAmount,
+        BigDecimal originalDepositAmount,
         BigDecimal rentAmount,
         BigDecimal buyoutAmount,
+        Integer creditScore,
+        CreditTier creditTier,
+        BigDecimal depositAdjustmentRate,
+        boolean requiresManualReview,
         UUID paymentTransactionId,
         OffsetDateTime leaseStartAt,
         OffsetDateTime leaseEndAt,

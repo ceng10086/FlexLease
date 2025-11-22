@@ -3,6 +3,7 @@ package com.flexlease.user.controller;
 import com.flexlease.common.dto.ApiResponse;
 import com.flexlease.common.exception.BusinessException;
 import com.flexlease.common.exception.ErrorCode;
+import com.flexlease.user.dto.CreditAdjustmentRequest;
 import com.flexlease.user.dto.PagedResponse;
 import com.flexlease.user.dto.UserProfileResponse;
 import com.flexlease.user.dto.UserStatusUpdateRequest;
@@ -12,8 +13,11 @@ import com.flexlease.user.service.UserProfileService;
 import jakarta.validation.Valid;
 import java.util.Locale;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -23,6 +27,8 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/admin/users")
 public class AdminUserController {
+
+    private static final Logger LOG = LoggerFactory.getLogger(AdminUserController.class);
 
     private final UserProfileService userProfileService;
     private final AuthServiceClient authServiceClient;
@@ -53,6 +59,19 @@ public class AdminUserController {
         String status = request.status().toUpperCase(Locale.ROOT);
         authServiceClient.updateAccountStatus(userUuid, status);
         return ApiResponse.success();
+    }
+
+    @PostMapping("/{userId}/credit-adjustments")
+    public ApiResponse<UserProfileResponse> adjustCredit(@PathVariable String userId,
+                                                         @Valid @RequestBody CreditAdjustmentRequest request) {
+        UUID adminId = SecurityUtils.requireUserId();
+        if (!SecurityUtils.hasRole("ADMIN")) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "仅管理员可调整信用分");
+        }
+        UUID userUuid = parseUuid(userId, "userId");
+        int delta = request.delta();
+        LOG.info("Admin {} adjusting credit for user {} by {}", adminId, userUuid, delta);
+        return ApiResponse.success(userProfileService.adjustCredit(userUuid, delta, request.reason(), adminId));
     }
 
     private UUID parseUuid(String raw, String fieldName) {

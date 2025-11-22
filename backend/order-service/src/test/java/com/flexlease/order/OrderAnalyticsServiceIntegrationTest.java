@@ -2,6 +2,7 @@ package com.flexlease.order;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.flexlease.common.user.CreditTier;
 import com.flexlease.order.domain.OrderStatus;
 import com.flexlease.order.domain.RentalOrder;
 import com.flexlease.order.domain.RentalOrderItem;
@@ -105,14 +106,21 @@ class OrderAnalyticsServiceIntegrationTest {
                                     BigDecimal totalAmount,
                                     String planType,
                                     OffsetDateTime leaseStart) {
+        BigDecimal deposit = totalAmount.divide(BigDecimal.valueOf(2));
+        BigDecimal rent = totalAmount.divide(BigDecimal.valueOf(2));
         RentalOrder order = RentalOrder.create(
                 userId,
                 vendorId,
                 planType,
-                totalAmount.divide(BigDecimal.valueOf(2)),
-                totalAmount.divide(BigDecimal.valueOf(2)),
+                deposit,
+                deposit,
+                rent,
                 null,
                 totalAmount,
+                70,
+                CreditTier.STANDARD,
+                BigDecimal.ONE,
+                false,
                 leaseStart,
                 leaseStart.plusMonths(12)
         );
