@@ -242,6 +242,27 @@ export type OrderDispute = {
   updatedAt: string;
 };
 
+export type OrderSurveyStatus = 'PENDING' | 'OPEN' | 'COMPLETED';
+
+export type OrderSurvey = {
+  id: string;
+  disputeId?: string | null;
+  status: OrderSurveyStatus;
+  targetRole: string;
+  targetRef: string;
+  rating?: number | null;
+  comment?: string | null;
+  requestedAt: string;
+  availableAt: string;
+  submittedAt?: string | null;
+};
+
+export type SubmitOrderSurveyPayload = {
+  actorId: string;
+  rating: number;
+  comment?: string;
+};
+
 export type CreateOrderDisputePayload = {
   actorId: string;
   option: DisputeResolutionOption;
@@ -317,6 +338,7 @@ export type RentalOrderDetail = {
   returns: OrderReturn[];
   proofs: OrderProof[];
   disputes: OrderDispute[];
+  surveys: OrderSurvey[];
 };
 
 export const previewOrder = async (
@@ -526,6 +548,18 @@ export const resolveOrderDispute = async (
 ): Promise<OrderDispute> => {
   const response = await http.post<ApiResponse<OrderDispute>>(
     `/admin/orders/${orderId}/disputes/${disputeId}/resolve`,
+    payload
+  );
+  return response.data.data;
+};
+
+export const submitOrderSurvey = async (
+  orderId: string,
+  surveyId: string,
+  payload: SubmitOrderSurveyPayload
+): Promise<OrderSurvey> => {
+  const response = await http.post<ApiResponse<OrderSurvey>>(
+    `/orders/${orderId}/surveys/${surveyId}/submit`,
     payload
   );
   return response.data.data;

@@ -13,6 +13,9 @@ public record DashboardMetricsResponse(
         long pendingReturns,
         Map<OrderStatus, Long> ordersByStatus,
         List<TrendPoint> recentTrend,
-        List<PlanTypeMetric> planBreakdown
+        List<PlanTypeMetric> planBreakdown,
+        CreditMetrics creditMetrics,
+        DisputeMetrics disputeMetrics,
+        SurveyMetrics surveyMetrics
 ) {
 }

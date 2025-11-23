@@ -60,6 +60,131 @@
         </a-card>
       </a-col>
     </a-row>
+    <a-row v-if="isVendor && state.vendorMetrics" :gutter="16" class="mt-16">
+      <a-col :xs="24" :lg="12">
+        <a-card title="我的纠纷态势" :loading="state.loadingVendorMetrics">
+          <template v-if="vendorDisputeMetrics">
+            <div class="metric-grid">
+              <div class="metric-grid__item">
+                <span>协商中</span>
+                <strong>{{ vendorDisputeMetrics.openCount }}</strong>
+              </div>
+              <div class="metric-grid__item">
+                <span>待平台</span>
+                <strong>{{ vendorDisputeMetrics.pendingAdminCount }}</strong>
+              </div>
+              <div class="metric-grid__item">
+                <span>已结案</span>
+                <strong>{{ vendorDisputeMetrics.resolvedCount }}</strong>
+              </div>
+            </div>
+            <p class="metric-note">
+              平均处理时长 {{ formatOneDecimal(Number(vendorDisputeMetrics.averageResolutionHours ?? 0)) }} 小时
+            </p>
+          </template>
+          <a-empty v-else description="暂无纠纷数据" />
+        </a-card>
+      </a-col>
+      <a-col :xs="24" :lg="12">
+        <a-card title="厂商满意度" :loading="state.loadingVendorMetrics">
+          <template v-if="vendorSurveyMetrics">
+            <a-statistic
+              title="平均评分"
+              :value="formatOneDecimal(Number(vendorSurveyMetrics.averageRating ?? 0))"
+              suffix="分"
+            />
+            <div class="metric-grid">
+              <div class="metric-grid__item">
+                <span>待开放</span>
+                <strong>{{ vendorSurveyMetrics.pendingCount }}</strong>
+              </div>
+              <div class="metric-grid__item">
+                <span>待填写</span>
+                <strong>{{ vendorSurveyMetrics.openCount }}</strong>
+              </div>
+              <div class="metric-grid__item">
+                <span>已完成</span>
+                <strong>{{ vendorSurveyMetrics.completedCount }}</strong>
+              </div>
+            </div>
+          </template>
+          <a-empty v-else description="暂无调研数据" />
+        </a-card>
+      </a-col>
+    </a-row>
+    <a-row v-if="canViewPlatformMetrics && state.metrics" :gutter="16" class="mt-16">
+      <a-col :xs="24" :lg="8">
+        <a-card title="信用概览" :loading="state.loadingMetrics">
+          <template v-if="state.metrics.creditMetrics">
+            <a-statistic
+              title="平均信用分"
+              :value="formatOneDecimal(Number(state.metrics.creditMetrics.averageScore ?? 0))"
+            />
+            <div class="credit-tags" v-if="creditTierEntries.length">
+              <a-tag
+                v-for="entry in creditTierEntries"
+                :key="entry.tier"
+                :color="creditTierColor(entry.tier)"
+              >
+                {{ creditTierLabel(entry.tier) }} · {{ entry.count }}
+              </a-tag>
+            </div>
+            <p class="metric-note" v-else>暂无信用分布数据。</p>
+          </template>
+          <a-empty v-else description="暂无信用数据" />
+        </a-card>
+      </a-col>
+      <a-col :xs="24" :lg="8">
+        <a-card title="纠纷态势" :loading="state.loadingMetrics">
+          <template v-if="platformDisputeMetrics">
+            <div class="metric-grid">
+              <div class="metric-grid__item">
+                <span>协商中</span>
+                <strong>{{ platformDisputeMetrics.openCount }}</strong>
+              </div>
+              <div class="metric-grid__item">
+                <span>待平台</span>
+                <strong>{{ platformDisputeMetrics.pendingAdminCount }}</strong>
+              </div>
+              <div class="metric-grid__item">
+                <span>已结案</span>
+                <strong>{{ platformDisputeMetrics.resolvedCount }}</strong>
+              </div>
+            </div>
+            <p class="metric-note">
+              平均处理时长 {{ formatOneDecimal(Number(platformDisputeMetrics.averageResolutionHours ?? 0)) }} 小时
+            </p>
+          </template>
+          <a-empty v-else description="暂无纠纷数据" />
+        </a-card>
+      </a-col>
+      <a-col :xs="24" :lg="8">
+        <a-card title="满意度调研" :loading="state.loadingMetrics">
+          <template v-if="platformSurveyMetrics">
+            <a-statistic
+              title="平均评分"
+              :value="formatOneDecimal(Number(platformSurveyMetrics.averageRating ?? 0))"
+              suffix="分"
+            />
+            <div class="metric-grid">
+              <div class="metric-grid__item">
+                <span>待开放</span>
+                <strong>{{ platformSurveyMetrics.pendingCount }}</strong>
+              </div>
+              <div class="metric-grid__item">
+                <span>待填写</span>
+                <strong>{{ platformSurveyMetrics.openCount }}</strong>
+              </div>
+              <div class="metric-grid__item">
+                <span>已完成</span>
+                <strong>{{ platformSurveyMetrics.completedCount }}</strong>
+              </div>
+            </div>
+          </template>
+          <a-empty v-else description="暂无调研数据" />
+        </a-card>
+      </a-col>
+    </a-row>
 
     <a-row v-if="canViewPlatformMetrics && platformTrend.length" :gutter="16" class="mt-16">
       <a-col :xs="24" :lg="16">
@@ -186,6 +311,7 @@ import { listNotificationLogs, type NotificationLog } from '../../services/notif
 import type { RentalOrderSummary } from '../../services/orderService';
 import TrendChart from '../../components/analytics/TrendChart.vue';
 import PlanBreakdownCard from '../../components/analytics/PlanBreakdownCard.vue';
+import { creditTierLabel, creditTierColor, type CreditTier } from '../../types/credit';
 
 const auth = useAuthStore();
 const router = useRouter();
@@ -208,6 +334,19 @@ const platformTrend = computed(() => state.metrics?.recentTrend ?? []);
 const platformPlanBreakdown = computed(() => state.metrics?.planBreakdown ?? []);
 const vendorTrend = computed(() => state.vendorMetrics?.recentTrend ?? []);
 const vendorPlanBreakdown = computed(() => state.vendorMetrics?.planBreakdown ?? []);
+const creditTierEntries = computed(() => {
+  if (!state.metrics?.creditMetrics?.tierDistribution) {
+    return [] as Array<{ tier: CreditTier; count: number }>;
+  }
+  return Object.entries(state.metrics.creditMetrics.tierDistribution).map(([tier, count]) => ({
+    tier: tier as CreditTier,
+    count: Number(count)
+  }));
+});
+const platformDisputeMetrics = computed(() => state.metrics?.disputeMetrics ?? null);
+const platformSurveyMetrics = computed(() => state.metrics?.surveyMetrics ?? null);
+const vendorDisputeMetrics = computed(() => state.vendorMetrics?.disputeMetrics ?? null);
+const vendorSurveyMetrics = computed(() => state.vendorMetrics?.surveyMetrics ?? null);
 
 const statusEntries = computed(() => {
   if (!state.metrics?.ordersByStatus) {
@@ -245,6 +384,8 @@ const formatSigned = (value: number) => {
   }
   return value.toString();
 };
+
+const formatOneDecimal = (value?: number | null) => Number(value ?? 0).toFixed(1);
 
 const statusPercent = (count: number, total: number) => {
   if (!total) {
@@ -460,5 +601,47 @@ onMounted(async () => {
   margin-left: 8px;
   font-weight: 400;
   color: #94a3b8;
+}
+
+.credit-tags {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.metric-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.metric-grid__item {
+  flex: 1;
+  min-width: 120px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.metric-grid__item span {
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.metric-grid__item strong {
+  font-size: 18px;
+  color: #0f172a;
+}
+
+.metric-note {
+  margin-top: 12px;
+  font-size: 12px;
+  color: #475569;
 }
 </style>

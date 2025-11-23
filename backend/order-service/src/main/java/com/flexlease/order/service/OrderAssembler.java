@@ -5,6 +5,7 @@ import com.flexlease.order.domain.OrderExtensionRequest;
 import com.flexlease.order.domain.OrderEvent;
 import com.flexlease.order.domain.OrderProof;
 import com.flexlease.order.domain.OrderReturnRequest;
+import com.flexlease.order.domain.OrderSatisfactionSurvey;
 import com.flexlease.order.domain.RentalOrder;
 import com.flexlease.order.domain.RentalOrderItem;
 import com.flexlease.order.dto.OrderDisputeResponse;
@@ -12,6 +13,7 @@ import com.flexlease.order.dto.OrderEventResponse;
 import com.flexlease.order.dto.OrderExtensionResponse;
 import com.flexlease.order.dto.OrderProofResponse;
 import com.flexlease.order.dto.OrderReturnResponse;
+import com.flexlease.order.dto.OrderSurveyResponse;
 import com.flexlease.order.dto.RentalOrderItemResponse;
 import com.flexlease.order.dto.RentalOrderResponse;
 import com.flexlease.order.dto.RentalOrderSummaryResponse;
@@ -67,6 +69,10 @@ public class OrderAssembler {
                 order.getDisputes().stream()
                         .sorted(Comparator.comparing(OrderDispute::getCreatedAt))
                         .map(this::toDisputeResponse)
+                        .toList(),
+                order.getSurveys().stream()
+                        .sorted(Comparator.comparing(OrderSatisfactionSurvey::getRequestedAt))
+                        .map(this::toSurveyResponse)
                         .toList()
         );
     }
@@ -180,6 +186,21 @@ public class OrderAssembler {
                 dispute.getAppealCount(),
                 dispute.getCreatedAt(),
                 dispute.getUpdatedAt()
+        );
+    }
+
+    public OrderSurveyResponse toSurveyResponse(OrderSatisfactionSurvey survey) {
+        return new OrderSurveyResponse(
+                survey.getId(),
+                survey.getDispute() == null ? null : survey.getDispute().getId(),
+                survey.getStatus(),
+                survey.getTargetRole(),
+                survey.getTargetRef(),
+                survey.getRating(),
+                survey.getComment(),
+                survey.getRequestedAt(),
+                survey.getAvailableAt(),
+                survey.getSubmittedAt()
         );
     }
 }

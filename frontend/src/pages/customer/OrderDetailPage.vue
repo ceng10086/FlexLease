@@ -173,6 +173,35 @@
             </div>
           </div>
         </a-card>
+
+        <a-card title="满意度调查" class="mt-16">
+          <a-empty v-if="!userSurveys.length" description="暂无调查" />
+          <div v-else class="survey-list">
+            <div class="survey-item" v-for="survey in userSurveys" :key="survey.id">
+              <div class="survey-item__header">
+                <a-tag :color="surveyStatusColor(survey.status)">{{ surveyStatusLabel(survey.status) }}</a-tag>
+                <span>创建时间：{{ formatDate(survey.requestedAt) }}</span>
+              </div>
+              <p class="survey-item__meta">
+                可填写时间：{{ formatDate(survey.availableAt) }}
+              </p>
+              <p v-if="survey.comment" class="survey-item__comment">我的评价：{{ survey.comment }}</p>
+              <div class="survey-item__actions">
+                <a-button
+                  v-if="survey.status === 'OPEN'"
+                  type="primary"
+                  size="small"
+                  @click="openSurveyModal(survey)"
+                >
+                  填写评价
+                </a-button>
+                <span v-else-if="survey.status === 'COMPLETED'">
+                  评分：{{ survey.rating ?? '-' }} 分
+                </span>
+              </div>
+            </div>
+          </div>
+        </a-card>
       </a-col>
 
       <a-col :xs="24" :lg="8">
@@ -323,6 +352,29 @@
         </a-form-item>
       </a-form>
     </a-modal>
+
+    <a-modal
+      v-model:open="surveyModal.open"
+      title="满意度评价"
+      ok-text="提交评价"
+      cancel-text="取消"
+      :confirm-loading="surveyModal.loading"
+      @ok="handleSubmitSurvey"
+      @cancel="handleCloseSurveyModal"
+    >
+      <a-form layout="vertical">
+        <a-form-item label="满意度评分">
+          <a-rate v-model:value="surveyModal.rating" :count="5" />
+        </a-form-item>
+        <a-form-item label="留言建议">
+          <a-textarea
+            v-model:value="surveyModal.comment"
+            :rows="3"
+            placeholder="欢迎写下沟通体验与建议"
+          />
+        </a-form-item>
+      </a-form>
+    </a-modal>
   </div>
   <div v-else class="page-container">
     <a-card :loading="loading">正在加载...</a-card>
@@ -346,12 +398,14 @@ import {
   respondOrderDispute,
   escalateOrderDispute,
   appealOrderDispute,
+  submitOrderSurvey,
   type RentalOrderDetail,
   type OrderEvent,
   type OrderProofType,
   type OrderProof,
   type OrderDispute,
-  type DisputeResolutionOption
+  type DisputeResolutionOption,
+  type OrderSurvey
 } from '../../services/orderService';
 import { initPayment } from '../../services/paymentService';
 import {
@@ -410,6 +464,14 @@ const respondModal = reactive({
   loading: false
 });
 
+const surveyModal = reactive({
+  open: false,
+  surveyId: null as string | null,
+  rating: 5,
+  comment: '',
+  loading: false
+});
+
 const proofTypeOptions: { label: string; value: OrderProofType }[] = [
   { label: '收货/验收', value: 'RECEIVE' },
   { label: '发货凭证', value: 'SHIPMENT' },
@@ -423,6 +485,9 @@ const proofTypeMap = proofTypeOptions.reduce<Record<OrderProofType, string>>((ac
 }, {} as Record<OrderProofType, string>);
 
 const disputes = computed(() => order.value?.disputes ?? []);
+const userSurveys = computed(() =>
+  order.value?.surveys?.filter((item) => item.targetRole === 'USER') ?? []
+);
 const canCreateDispute = computed(() => !!order.value && order.value.userId === auth.user?.id);
 
 const disputeOptions: { label: string; value: DisputeResolutionOption }[] = [
@@ -486,6 +551,32 @@ const statusColor = (status: OrderDispute['status']) => {
       return 'green';
     case 'CLOSED':
       return 'red';
+    default:
+      return 'default';
+  }
+};
+
+const surveyStatusLabel = (status: OrderSurvey['status']) => {
+  switch (status) {
+    case 'PENDING':
+      return '待开放';
+    case 'OPEN':
+      return '待填写';
+    case 'COMPLETED':
+      return '已完成';
+    default:
+      return status;
+  }
+};
+
+const surveyStatusColor = (status: OrderSurvey['status']) => {
+  switch (status) {
+    case 'PENDING':
+      return 'blue';
+    case 'OPEN':
+      return 'orange';
+    case 'COMPLETED':
+      return 'green';
     default:
       return 'default';
   }
@@ -866,6 +957,46 @@ const performAppeal = async (dispute: OrderDispute) => {
   }
 };
 
+const openSurveyModal = (survey: OrderSurvey) => {
+  if (!auth.user?.id) {
+    message.error('请先登录');
+    return;
+  }
+  surveyModal.surveyId = survey.id;
+  surveyModal.rating = survey.rating ?? 5;
+  surveyModal.comment = '';
+  surveyModal.open = true;
+};
+
+const handleSubmitSurvey = async () => {
+  if (!order.value || !surveyModal.surveyId || !auth.user?.id) {
+    return;
+  }
+  surveyModal.loading = true;
+  try {
+    await submitOrderSurvey(order.value.id, surveyModal.surveyId, {
+      actorId: auth.user.id,
+      rating: surveyModal.rating,
+      comment: surveyModal.comment?.trim() || undefined
+    });
+    message.success('感谢反馈，我们已记录您的评价');
+    surveyModal.open = false;
+    surveyModal.comment = '';
+    await loadOrder();
+  } catch (error) {
+    console.error('提交满意度失败', error);
+    message.error(friendlyErrorMessage(error, '提交失败，请稍后重试'));
+  } finally {
+    surveyModal.loading = false;
+  }
+};
+
+const handleCloseSurveyModal = () => {
+  surveyModal.open = false;
+  surveyModal.surveyId = null;
+  surveyModal.comment = '';
+};
+
 loadOrder();
 
 const handleContractSigned = async () => {
@@ -965,6 +1096,45 @@ const handleContractSigned = async () => {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.survey-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.survey-item {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px;
+  background: #f8fafc;
+}
+
+.survey-item__header {
+  display: flex;
+  justify-content: space-between;
+  color: #475569;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.survey-item__meta {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: #475569;
+}
+
+.survey-item__comment {
+  margin: 0 0 8px;
+  color: #0f172a;
+}
+
+.survey-item__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
 }
 
 .dispute-item {

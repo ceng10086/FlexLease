@@ -46,19 +46,22 @@ public class OrderDisputeService {
     private final OrderTimelineService timelineService;
     private final NotificationClient notificationClient;
     private final UserProfileClient userProfileClient;
+    private final OrderSurveyService orderSurveyService;
 
     public OrderDisputeService(RentalOrderRepository rentalOrderRepository,
                                OrderDisputeRepository orderDisputeRepository,
                                OrderAssembler orderAssembler,
                                OrderTimelineService timelineService,
                                NotificationClient notificationClient,
-                               UserProfileClient userProfileClient) {
+                               UserProfileClient userProfileClient,
+                               OrderSurveyService orderSurveyService) {
         this.rentalOrderRepository = rentalOrderRepository;
         this.orderDisputeRepository = orderDisputeRepository;
         this.orderAssembler = orderAssembler;
         this.timelineService = timelineService;
         this.notificationClient = notificationClient;
         this.userProfileClient = userProfileClient;
+        this.orderSurveyService = orderSurveyService;
     }
 
     @Transactional(Transactional.TxType.SUPPORTS)
@@ -131,6 +134,9 @@ public class OrderDisputeService {
                         ? "订单 %s 的纠纷达成一致，请留意后续处理。".formatted(order.getOrderNo())
                         : "订单 %s 对方建议方案 %s，请及时处理。"
                                 .formatted(order.getOrderNo(), request.option().name()));
+        if (request.accept()) {
+            orderSurveyService.scheduleForDispute(order, dispute);
+        }
         return orderAssembler.toDisputeResponse(dispute);
     }
 
@@ -217,6 +223,7 @@ public class OrderDisputeService {
         notifyVendor(order,
                 "纠纷裁决结果",
                 "订单 %s 纠纷裁决：%s".formatted(order.getOrderNo(), summary));
+        orderSurveyService.scheduleForDispute(order, dispute);
         return orderAssembler.toDisputeResponse(dispute);
     }
 

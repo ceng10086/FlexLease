@@ -1,5 +1,6 @@
 package com.flexlease.order.repository;
 
+import com.flexlease.common.user.CreditTier;
 import com.flexlease.order.domain.OrderStatus;
 import com.flexlease.order.domain.RentalOrder;
 import java.math.BigDecimal;
@@ -101,6 +102,29 @@ public interface RentalOrderRepository extends JpaRepository<RentalOrder, UUID> 
             """)
     List<PlanTypeAggregate> aggregatePlanTypeMetricsByVendor(@Param("vendorId") UUID vendorId);
 
+    @Query("select coalesce(avg(o.creditScore), 0) from RentalOrder o")
+    Double averageCreditScore();
+
+    @Query("select coalesce(avg(o.creditScore), 0) from RentalOrder o where o.vendorId = :vendorId")
+    Double averageCreditScoreByVendor(@Param("vendorId") UUID vendorId);
+
+    @Query("""
+            select o.creditTier as creditTier,
+                   count(o) as count
+            from RentalOrder o
+            group by o.creditTier
+            """)
+    List<CreditTierAggregate> aggregateCreditTierMetrics();
+
+    @Query("""
+            select o.creditTier as creditTier,
+                   count(o) as count
+            from RentalOrder o
+            where o.vendorId = :vendorId
+            group by o.creditTier
+            """)
+    List<CreditTierAggregate> aggregateCreditTierMetricsByVendor(@Param("vendorId") UUID vendorId);
+
     interface OrderStatusCount {
         OrderStatus getStatus();
 
@@ -121,5 +145,11 @@ public interface RentalOrderRepository extends JpaRepository<RentalOrder, UUID> 
         long getOrderCount();
 
         BigDecimal getTotalAmount();
+    }
+
+    interface CreditTierAggregate {
+        CreditTier getCreditTier();
+
+        long getCount();
     }
 }

@@ -89,6 +89,10 @@ class OrderAnalyticsServiceIntegrationTest {
         assertThat(response.planBreakdown())
                 .extracting(PlanTypeMetric::planType)
                 .contains("STANDARD", "RENT_TO_OWN", "LEASE_TO_SALE");
+        assertThat(response.creditMetrics()).isNotNull();
+        assertThat(response.creditMetrics().tierDistribution().get(CreditTier.STANDARD)).isEqualTo(4);
+        assertThat(response.disputeMetrics()).isNotNull();
+        assertThat(response.surveyMetrics()).isNotNull();
     }
 
     @Test
@@ -100,6 +104,9 @@ class OrderAnalyticsServiceIntegrationTest {
         assertThat(response.totalGmv()).isEqualByComparingTo("600.00");
         assertThat(response.recentTrend()).hasSize(7);
         assertThat(response.planBreakdown()).isNotEmpty();
+        assertThat(response.creditMetrics()).isNotNull();
+        assertThat(response.disputeMetrics()).isNotNull();
+        assertThat(response.surveyMetrics()).isNotNull();
     }
 
     private RentalOrder createOrder(OrderStatus targetStatus,

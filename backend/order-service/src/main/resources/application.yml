@@ -47,6 +47,10 @@ flexlease:
     maintenance:
       pending-payment-expire-minutes: ${FLEXLEASE_ORDER_MAINTENANCE_PENDING_PAYMENT_EXPIRE_MINUTES:30}
       scan-interval-ms: ${FLEXLEASE_ORDER_MAINTENANCE_SCAN_INTERVAL_MS:60000}
+    survey:
+      reminder-delay-hours: ${FLEXLEASE_ORDER_SURVEY_REMINDER_DELAY_HOURS:24}
+      activation-batch-size: ${FLEXLEASE_ORDER_SURVEY_BATCH_SIZE:20}
+      scan-interval-ms: ${FLEXLEASE_ORDER_SURVEY_SCAN_INTERVAL_MS:600000}
   messaging:
     enabled: ${FLEXLEASE_MESSAGING_ENABLED:true}
 server:

@@ -36,6 +36,7 @@ public record RentalOrderResponse(
         List<OrderExtensionResponse> extensions,
         List<OrderReturnResponse> returns,
         List<OrderProofResponse> proofs,
-        List<OrderDisputeResponse> disputes
+        List<OrderDisputeResponse> disputes,
+        List<OrderSurveyResponse> surveys
 ) {
 }
