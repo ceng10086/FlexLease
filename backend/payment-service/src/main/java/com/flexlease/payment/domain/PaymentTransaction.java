@@ -65,6 +65,9 @@ public class PaymentTransaction {
     @Column(name = "paid_at")
     private OffsetDateTime paidAt;
 
+    @Column(name = "commission_rate")
+    private BigDecimal commissionRate;
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
@@ -173,6 +176,10 @@ public class PaymentTransaction {
         return paidAt;
     }
 
+    public BigDecimal getCommissionRate() {
+        return commissionRate;
+    }
+
     public OffsetDateTime getCreatedAt() {
         return createdAt;
     }
@@ -239,6 +246,10 @@ public class PaymentTransaction {
         if (status != PaymentStatus.PENDING) {
             throw new IllegalStateException("支付流水不是待处理状态");
         }
+    }
+
+    public void setCommissionRate(BigDecimal commissionRate) {
+        this.commissionRate = commissionRate;
     }
 
     private String generateTransactionNo() {

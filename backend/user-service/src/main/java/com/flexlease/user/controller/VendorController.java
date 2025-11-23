@@ -7,6 +7,8 @@ import com.flexlease.common.security.FlexleasePrincipal;
 import com.flexlease.common.security.SecurityUtils;
 import com.flexlease.user.domain.VendorStatus;
 import com.flexlease.user.dto.PagedResponse;
+import com.flexlease.user.dto.VendorCommissionProfileRequest;
+import com.flexlease.user.dto.VendorCommissionProfileResponse;
 import com.flexlease.user.dto.VendorResponse;
 import com.flexlease.user.dto.VendorStatusUpdateRequest;
 import com.flexlease.user.dto.VendorUpdateRequest;
@@ -80,6 +82,15 @@ public class VendorController {
             throw new BusinessException(ErrorCode.FORBIDDEN, "仅管理员可变更厂商状态");
         }
         return ApiResponse.success(vendorService.updateStatus(vendorId, request.status()));
+    }
+
+    @PutMapping("/{vendorId}/commission-profile")
+    public ApiResponse<VendorCommissionProfileResponse> updateCommissionProfile(@PathVariable UUID vendorId,
+                                                                                @Valid @RequestBody VendorCommissionProfileRequest request) {
+        if (!SecurityUtils.hasRole("ADMIN")) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "仅管理员可配置抽成策略");
+        }
+        return ApiResponse.success(vendorService.updateCommissionProfile(vendorId, request));
     }
 
     private VendorStatus parseStatus(String status) {

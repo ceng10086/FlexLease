@@ -3,7 +3,7 @@
     <div class="page-header">
       <div>
         <h2>结算中心</h2>
-        <p class="page-header__meta">查看押金、租金与退款的结算情况，支撑财务对账。</p>
+        <p class="page-header__meta">查看押金、租金、平台抽成与退款的结算情况，支撑财务对账。</p>
       </div>
       <a-button type="primary" @click="loadSettlements(true)" :loading="loading">刷新</a-button>
     </div>
@@ -31,6 +31,9 @@
         </a-table-column>
         <a-table-column title="租金" key="rentAmount">
           <template #default="{ record }">¥{{ formatCurrency(record.rentAmount) }}</template>
+        </a-table-column>
+        <a-table-column title="平台抽成" key="platformCommissionAmount">
+          <template #default="{ record }">¥{{ formatCurrency(record.platformCommissionAmount) }}</template>
         </a-table-column>
         <a-table-column title="退款" key="refundedAmount">
           <template #default="{ record }">¥{{ formatCurrency(record.refundedAmount) }}</template>

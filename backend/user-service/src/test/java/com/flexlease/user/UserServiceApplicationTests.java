@@ -11,6 +11,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flexlease.user.support.TestJwtTokens;
 import java.util.UUID;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import org.springframework.http.HttpHeaders;
 import org.junit.jupiter.api.Test;
@@ -144,6 +145,33 @@ class UserServiceApplicationTests {
         mockMvc.perform(get("/api/v1/vendors/applications/" + applicationId)
                 .header(HttpHeaders.AUTHORIZATION, adminToken))
             .andExpect(status().isOk());
+
+        var commissionPayload = java.util.Map.of(
+                "industryCategory", "3c_devices",
+                "baseRate", 0.10,
+                "creditTier", "EXCELLENT",
+                "slaScore", 95
+        );
+
+        MvcResult commissionResult = mockMvc.perform(put("/api/v1/vendors/" + vendorId + "/commission-profile")
+                        .header(HttpHeaders.AUTHORIZATION, adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(commissionPayload)))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode commissionNode = readJson(commissionResult);
+        assertThat(commissionNode.at("/data/industryCategory").asText()).isEqualTo("3C_DEVICES");
+        assertThat(new BigDecimal(commissionNode.at("/data/baseRate").asText())).isEqualByComparingTo("0.10");
+        assertThat(commissionNode.at("/data/creditTier").asText()).isEqualTo("EXCELLENT");
+        assertThat(commissionNode.at("/data/slaScore").asInt()).isEqualTo(95);
+
+        MvcResult internalCommission = mockMvc.perform(get("/api/v1/internal/vendors/" + vendorId + "/commission-profile")
+                        .header("X-Internal-Token", "flexlease-internal-secret"))
+                .andExpect(status().isOk())
+                .andReturn();
+        JsonNode profileNode = readJson(internalCommission);
+        assertThat(new BigDecimal(profileNode.at("/data/commissionRate").asText())).isEqualByComparingTo("0.0750");
     }
 
     @Test

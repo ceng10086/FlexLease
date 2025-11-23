@@ -1,0 +1,11 @@
+ALTER TABLE users.vendor
+    ADD COLUMN IF NOT EXISTS industry_category VARCHAR(100) NOT NULL DEFAULT 'GENERAL';
+
+ALTER TABLE users.vendor
+    ADD COLUMN IF NOT EXISTS commission_base_rate NUMERIC(5,4) NOT NULL DEFAULT 0.0800;
+
+ALTER TABLE users.vendor
+    ADD COLUMN IF NOT EXISTS commission_credit_tier VARCHAR(30) NOT NULL DEFAULT 'STANDARD';
+
+ALTER TABLE users.vendor
+    ADD COLUMN IF NOT EXISTS commission_sla_score INTEGER NOT NULL DEFAULT 80;

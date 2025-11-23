@@ -11,6 +11,7 @@ public record PaymentSettlementResponse(
         BigDecimal rentAmount,
         BigDecimal buyoutAmount,
         BigDecimal penaltyAmount,
+        BigDecimal platformCommissionAmount,
         BigDecimal refundedAmount,
         BigDecimal netAmount,
         OffsetDateTime lastPaidAt,

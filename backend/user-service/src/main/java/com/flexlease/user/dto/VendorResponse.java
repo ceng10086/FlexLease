@@ -16,6 +16,7 @@ public record VendorResponse(
         String address,
         VendorStatus status,
         OffsetDateTime createdAt,
-        OffsetDateTime updatedAt
+        OffsetDateTime updatedAt,
+        VendorCommissionProfileResponse commissionProfile
 ) {
 }

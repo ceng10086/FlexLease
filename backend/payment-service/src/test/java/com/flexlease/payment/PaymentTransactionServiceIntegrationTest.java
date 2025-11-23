@@ -6,10 +6,12 @@ import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.flexlease.common.exception.BusinessException;
 import com.flexlease.payment.client.NotificationClient;
 import com.flexlease.payment.client.OrderServiceClient;
+import com.flexlease.payment.client.VendorServiceClient;
 import com.flexlease.payment.domain.PaymentChannel;
 import com.flexlease.payment.domain.PaymentScene;
 import com.flexlease.payment.domain.PaymentStatus;
@@ -61,8 +63,12 @@ class PaymentTransactionServiceIntegrationTest {
     @MockBean
     private OrderServiceClient orderServiceClient;
 
+    @MockBean
+    private VendorServiceClient vendorServiceClient;
+
     @Test
     void shouldAutoConfirmAndSettlePayment() {
+        mockCommissionRate(new BigDecimal("0.10"));
         UUID orderId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
         UUID vendorId = UUID.randomUUID();
@@ -89,6 +95,8 @@ class PaymentTransactionServiceIntegrationTest {
         ));
 
         assertThat(created.status()).isEqualTo(PaymentStatus.SUCCEEDED);
+        assertThat(created.commissionRate()).isEqualByComparingTo("0.10");
+        assertThat(created.platformCommissionAmount()).isEqualByComparingTo("20.00");
         verify(orderServiceClient, times(1)).notifyPaymentSucceeded(created.orderId(), created.id());
 
         RefundTransactionResponse refund = paymentTransactionService.createRefund(created.id(), new PaymentRefundRequest(
@@ -106,14 +114,16 @@ class PaymentTransactionServiceIntegrationTest {
         assertThat(settlement.vendorId()).isEqualTo(vendorId);
         assertThat(settlement.totalAmount()).isEqualByComparingTo("1200.00");
         assertThat(settlement.depositAmount()).isEqualByComparingTo("1000.00");
-        assertThat(settlement.rentAmount()).isEqualByComparingTo("200.00");
+        assertThat(settlement.rentAmount()).isEqualByComparingTo("180.00");
+        assertThat(settlement.platformCommissionAmount()).isEqualByComparingTo("20.00");
         assertThat(settlement.refundedAmount()).isEqualByComparingTo("200.00");
-        assertThat(settlement.netAmount()).isEqualByComparingTo("1000.00");
+        assertThat(settlement.netAmount()).isEqualByComparingTo("980.00");
         assertThat(settlement.transactionCount()).isEqualTo(1);
     }
 
     @Test
     void shouldRejectSplitAmountExceedingTotal() {
+        mockCommissionRate(BigDecimal.ZERO);
         UUID orderId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
         UUID vendorId = UUID.randomUUID();
@@ -261,5 +271,10 @@ class PaymentTransactionServiceIntegrationTest {
 
         assertThat(settlement.refundedAmount()).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat(settlement.netAmount()).isEqualByComparingTo("900.00");
+    }
+
+    private void mockCommissionRate(BigDecimal rate) {
+        when(vendorServiceClient.loadCommissionProfile(any()))
+                .thenReturn(new VendorServiceClient.VendorCommissionProfile("GENERAL", rate, "STANDARD", 80, rate));
     }
 }

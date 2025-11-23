@@ -37,6 +37,7 @@ export type PaymentSettlementResponse = {
   rentAmount: number;
   buyoutAmount: number;
   penaltyAmount: number;
+  platformCommissionAmount: number;
   refundedAmount: number;
   netAmount: number;
   lastPaidAt?: string | null;

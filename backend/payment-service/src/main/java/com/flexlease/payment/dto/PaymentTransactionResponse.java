@@ -23,6 +23,8 @@ public record PaymentTransactionResponse(
         OffsetDateTime paidAt,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt,
+        BigDecimal commissionRate,
+        BigDecimal platformCommissionAmount,
         List<PaymentSplitResponse> splits,
         List<RefundTransactionResponse> refunds
 ) {

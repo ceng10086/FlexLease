@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verify;
 
 import com.flexlease.payment.client.NotificationClient;
 import com.flexlease.payment.client.OrderServiceClient;
+import com.flexlease.payment.client.VendorServiceClient;
 import com.flexlease.payment.domain.PaymentChannel;
 import com.flexlease.payment.domain.PaymentScene;
 import com.flexlease.payment.domain.PaymentStatus;
@@ -52,6 +53,9 @@ class PaymentTransactionServiceManualFlowTest {
 
     @MockBean
     private OrderServiceClient orderServiceClient;
+
+    @MockBean
+    private VendorServiceClient vendorServiceClient;
 
     @Test
     void shouldSupportManualConfirmationAndRefundFlow() {

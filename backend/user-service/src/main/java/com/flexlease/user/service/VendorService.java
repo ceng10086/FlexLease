@@ -6,6 +6,8 @@ import com.flexlease.user.domain.Vendor;
 import com.flexlease.user.domain.VendorApplication;
 import com.flexlease.user.domain.VendorStatus;
 import com.flexlease.user.dto.PagedResponse;
+import com.flexlease.user.dto.VendorCommissionProfileRequest;
+import com.flexlease.user.dto.VendorCommissionProfileResponse;
 import com.flexlease.user.dto.VendorResponse;
 import com.flexlease.user.dto.VendorUpdateRequest;
 import com.flexlease.user.repository.VendorRepository;
@@ -107,6 +109,27 @@ public class VendorService {
         }
     }
 
+    @Transactional
+    public VendorCommissionProfileResponse updateCommissionProfile(UUID vendorId,
+                                                                   VendorCommissionProfileRequest request) {
+        Vendor vendor = vendorRepository.findById(vendorId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "厂商不存在"));
+        vendor.updateCommissionProfile(
+                request.industryCategory(),
+                request.baseRate(),
+                request.creditTier(),
+                request.slaScore()
+        );
+        return toCommissionProfile(vendor);
+    }
+
+    @Transactional(readOnly = true)
+    public VendorCommissionProfileResponse loadCommissionProfile(UUID vendorId) {
+        Vendor vendor = vendorRepository.findById(vendorId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "厂商不存在"));
+        return toCommissionProfile(vendor);
+    }
+
     private VendorResponse toResponse(Vendor vendor) {
         return new VendorResponse(
                 vendor.getId(),
@@ -120,7 +143,18 @@ public class VendorService {
                 vendor.getAddress(),
                 vendor.getStatus(),
                 vendor.getCreatedAt(),
-                vendor.getUpdatedAt()
+                vendor.getUpdatedAt(),
+                toCommissionProfile(vendor)
+        );
+    }
+
+    private VendorCommissionProfileResponse toCommissionProfile(Vendor vendor) {
+        return new VendorCommissionProfileResponse(
+                vendor.getIndustryCategory(),
+                vendor.getCommissionBaseRate(),
+                vendor.getCommissionCreditTier(),
+                vendor.getCommissionSlaScore(),
+                vendor.calculateCommissionRate()
         );
     }
 }

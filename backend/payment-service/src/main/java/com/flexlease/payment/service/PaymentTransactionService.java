@@ -8,12 +8,14 @@ import com.flexlease.common.security.FlexleasePrincipal;
 import com.flexlease.common.security.SecurityUtils;
 import com.flexlease.payment.domain.PaymentScene;
 import com.flexlease.payment.domain.PaymentSplit;
+import com.flexlease.payment.domain.PaymentSplitType;
 import com.flexlease.payment.domain.PaymentStatus;
 import com.flexlease.payment.domain.PaymentTransaction;
 import com.flexlease.payment.domain.RefundStatus;
 import com.flexlease.payment.domain.RefundTransaction;
 import com.flexlease.payment.client.NotificationClient;
 import com.flexlease.payment.client.OrderServiceClient;
+import com.flexlease.payment.client.VendorServiceClient;
 import com.flexlease.payment.dto.PaymentCallbackRequest;
 import com.flexlease.payment.dto.PaymentConfirmRequest;
 import com.flexlease.payment.dto.PaymentInitRequest;
@@ -25,7 +27,9 @@ import com.flexlease.payment.dto.RefundTransactionResponse;
 import com.flexlease.payment.repository.PaymentTransactionRepository;
 import jakarta.transaction.Transactional;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -50,17 +54,20 @@ public class PaymentTransactionService {
     private final PaymentAssembler assembler;
     private final NotificationClient notificationClient;
     private final OrderServiceClient orderServiceClient;
+    private final VendorServiceClient vendorServiceClient;
     private final boolean autoConfirmPayments;
 
     public PaymentTransactionService(PaymentTransactionRepository paymentTransactionRepository,
                                      PaymentAssembler assembler,
                                      NotificationClient notificationClient,
                                      OrderServiceClient orderServiceClient,
+                                     VendorServiceClient vendorServiceClient,
                                      @Value("${flexlease.payment.auto-confirm:true}") boolean autoConfirmPayments) {
         this.paymentTransactionRepository = paymentTransactionRepository;
         this.assembler = assembler;
         this.notificationClient = notificationClient;
         this.orderServiceClient = orderServiceClient;
+        this.vendorServiceClient = vendorServiceClient;
         this.autoConfirmPayments = autoConfirmPayments;
     }
 
@@ -71,10 +78,8 @@ public class PaymentTransactionService {
                     throw new BusinessException(ErrorCode.VALIDATION_ERROR, "存在待支付的同类流水");
                 });
 
-        BigDecimal splitSum = request.splits() == null ? BigDecimal.ZERO : request.splits().stream()
-                .map(PaymentSplitRequest::amount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        if (splitSum.compareTo(request.amount()) > 0) {
+        SplitBuildResult splitResult = buildSplits(request.vendorId(), request.splits());
+        if (splitResult.totalAmount().compareTo(request.amount()) > 0) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "分账金额超过支付总额");
         }
 
@@ -88,12 +93,10 @@ public class PaymentTransactionService {
                     request.amount(),
                     request.description()
             );
-            if (request.splits() != null) {
-                request.splits().forEach(splitRequest ->
-                        transaction.addSplit(PaymentSplit.create(splitRequest.splitType(),
-                                splitRequest.amount(),
-                                splitRequest.beneficiary())));
+            if (splitResult.commissionRate() != null) {
+                transaction.setCommissionRate(splitResult.commissionRate());
             }
+            splitResult.splits().forEach(transaction::addSplit);
             PaymentTransaction saved = paymentTransactionRepository.save(transaction);
             autoConfirmIfEnabled(saved);
             return assembler.toResponse(saved);
@@ -262,6 +265,93 @@ public class PaymentTransactionService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "支付流水不存在"));
     }
 
+    private SplitBuildResult buildSplits(UUID vendorId, List<PaymentSplitRequest> rawSplits) {
+        if (rawSplits == null || rawSplits.isEmpty()) {
+            return new SplitBuildResult(List.of(), BigDecimal.ZERO, null);
+        }
+        List<PaymentSplit> sanitized = new ArrayList<>();
+        BigDecimal vendorIncome = BigDecimal.ZERO;
+        String vendorBeneficiary = null;
+        for (PaymentSplitRequest splitRequest : rawSplits) {
+            if (splitRequest == null || splitRequest.splitType() == null) {
+                continue;
+            }
+            BigDecimal amount = splitRequest.amount();
+            if (amount == null || amount.signum() <= 0) {
+                continue;
+            }
+            PaymentSplitType type = splitRequest.splitType();
+            if (type == PaymentSplitType.VENDOR_INCOME) {
+                vendorIncome = vendorIncome.add(amount);
+                if (splitRequest.beneficiary() != null && !splitRequest.beneficiary().isBlank()) {
+                    vendorBeneficiary = splitRequest.beneficiary();
+                }
+                continue;
+            }
+            if (type == PaymentSplitType.PLATFORM_COMMISSION) {
+                continue;
+            }
+            sanitized.add(PaymentSplit.create(type, amount, splitRequest.beneficiary()));
+        }
+        BigDecimal commissionRate = null;
+        if (vendorIncome.compareTo(BigDecimal.ZERO) > 0) {
+            commissionRate = resolveCommissionRate(vendorId);
+            if (commissionRate == null) {
+                commissionRate = BigDecimal.ZERO;
+            }
+            BigDecimal commissionAmount = BigDecimal.ZERO;
+            if (commissionRate.compareTo(BigDecimal.ZERO) > 0) {
+                commissionAmount = vendorIncome.multiply(commissionRate).setScale(2, RoundingMode.HALF_UP);
+                if (commissionAmount.compareTo(vendorIncome) > 0) {
+                    commissionAmount = vendorIncome;
+                }
+            }
+            BigDecimal vendorNet = vendorIncome.subtract(commissionAmount);
+            if (vendorNet.compareTo(BigDecimal.ZERO) > 0) {
+                sanitized.add(PaymentSplit.create(PaymentSplitType.VENDOR_INCOME,
+                        vendorNet,
+                        resolveVendorBeneficiary(vendorBeneficiary, vendorId)));
+            }
+            if (commissionAmount.compareTo(BigDecimal.ZERO) > 0) {
+                sanitized.add(PaymentSplit.create(PaymentSplitType.PLATFORM_COMMISSION,
+                        commissionAmount,
+                        "PLATFORM_COMMISSION"));
+            }
+        } else if (vendorBeneficiary != null) {
+            sanitized.add(PaymentSplit.create(PaymentSplitType.VENDOR_INCOME,
+                    BigDecimal.ZERO,
+                    resolveVendorBeneficiary(vendorBeneficiary, vendorId)));
+        }
+        BigDecimal total = sanitized.stream()
+                .map(PaymentSplit::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        return new SplitBuildResult(sanitized, total, commissionRate);
+    }
+
+    private BigDecimal resolveCommissionRate(UUID vendorId) {
+        if (vendorId == null) {
+            return BigDecimal.ZERO;
+        }
+        try {
+            VendorServiceClient.VendorCommissionProfile profile = vendorServiceClient.loadCommissionProfile(vendorId);
+            if (profile != null && profile.commissionRate() != null) {
+                return profile.commissionRate();
+            }
+        } catch (BusinessException ex) {
+            LOG.warn("加载厂商 {} 抽成配置失败: {}", vendorId, ex.getMessage());
+        } catch (RuntimeException ex) {
+            LOG.warn("调用厂商服务获取抽成配置失败: {}", ex.getMessage());
+        }
+        return BigDecimal.ZERO;
+    }
+
+    private String resolveVendorBeneficiary(String provided, UUID vendorId) {
+        if (provided != null && !provided.isBlank()) {
+            return provided;
+        }
+        return vendorId == null ? "VENDOR_UNKNOWN" : "VENDOR_" + vendorId;
+    }
+
     private void validateInitPermission(FlexleasePrincipal principal, PaymentInitRequest request) {
         if (principal.hasRole("ADMIN") || principal.hasRole("INTERNAL")) {
             return;
@@ -386,6 +476,7 @@ public class PaymentTransactionService {
         private BigDecimal rent = BigDecimal.ZERO;
         private BigDecimal buyout = BigDecimal.ZERO;
         private BigDecimal penalty = BigDecimal.ZERO;
+        private BigDecimal platformCommission = BigDecimal.ZERO;
         private BigDecimal refunded = BigDecimal.ZERO;
         private OffsetDateTime lastPaidAt;
         private long count;
@@ -431,7 +522,8 @@ public class PaymentTransactionService {
             }
 
             deposit = deposit.add(depositPortion);
-            rent = rent.add(rentPortion.add(commissionPortion));
+            rent = rent.add(rentPortion);
+            platformCommission = platformCommission.add(commissionPortion);
             OffsetDateTime paidAt = transaction.getPaidAt() != null ? transaction.getPaidAt() : transaction.getUpdatedAt();
             if (lastPaidAt == null || paidAt.isAfter(lastPaidAt)) {
                 lastPaidAt = paidAt;
@@ -444,8 +536,8 @@ public class PaymentTransactionService {
         }
 
         PaymentSettlementResponse toResponse(UUID vendorId) {
-            BigDecimal netAmount = total.subtract(refunded);
-            return new PaymentSettlementResponse(vendorId, total, deposit, rent, buyout, penalty, refunded, netAmount, lastPaidAt, count);
+            BigDecimal netAmount = total.subtract(platformCommission).subtract(refunded);
+            return new PaymentSettlementResponse(vendorId, total, deposit, rent, buyout, penalty, platformCommission, refunded, netAmount, lastPaidAt, count);
         }
 
         private boolean isWithinRefundWindow(OffsetDateTime refundedAt) {
@@ -460,5 +552,10 @@ public class PaymentTransactionService {
             }
             return true;
         }
+    }
+
+    private record SplitBuildResult(List<PaymentSplit> splits,
+                                    BigDecimal totalAmount,
+                                    BigDecimal commissionRate) {
     }
 }

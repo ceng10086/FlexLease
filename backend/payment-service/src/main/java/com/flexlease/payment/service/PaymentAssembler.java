@@ -1,11 +1,13 @@
 package com.flexlease.payment.service;
 
 import com.flexlease.payment.domain.PaymentSplit;
+import com.flexlease.payment.domain.PaymentSplitType;
 import com.flexlease.payment.domain.PaymentTransaction;
 import com.flexlease.payment.domain.RefundTransaction;
 import com.flexlease.payment.dto.PaymentSplitResponse;
 import com.flexlease.payment.dto.PaymentTransactionResponse;
 import com.flexlease.payment.dto.RefundTransactionResponse;
+import java.math.BigDecimal;
 import java.util.Comparator;
 import java.util.List;
 import org.springframework.stereotype.Component;
@@ -17,6 +19,10 @@ public class PaymentAssembler {
         List<PaymentSplitResponse> splitResponses = transaction.getSplits().stream()
                 .map(this::toSplitResponse)
                 .toList();
+        BigDecimal platformCommission = transaction.getSplits().stream()
+                .filter(split -> split.getSplitType() == PaymentSplitType.PLATFORM_COMMISSION)
+                .map(PaymentSplit::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
         List<RefundTransactionResponse> refundResponses = transaction.getRefunds().stream()
                 .sorted(Comparator.comparing(RefundTransaction::getCreatedAt))
                 .map(this::toRefundResponse)
@@ -36,6 +42,8 @@ public class PaymentAssembler {
                 transaction.getPaidAt(),
                 transaction.getCreatedAt(),
                 transaction.getUpdatedAt(),
+                transaction.getCommissionRate(),
+                platformCommission,
                 splitResponses,
                 refundResponses
         );
