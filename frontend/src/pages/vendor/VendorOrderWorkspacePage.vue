@@ -634,8 +634,18 @@ const disputeActorLabel = (role?: string | null) => {
   return '系统';
 };
 
-const canVendorRespondDispute = (item: OrderDispute) =>
-  item.status === 'OPEN' && item.initiatorRole !== 'VENDOR';
+const canVendorRespondDispute = (item: OrderDispute) => {
+  if (item.status !== 'OPEN') {
+    return false;
+  }
+  if (item.respondentRole === 'VENDOR') {
+    return false;
+  }
+  if (item.initiatorRole === 'VENDOR') {
+    return !!item.respondentRole && item.respondentRole !== 'VENDOR';
+  }
+  return true;
+};
 
 const canVendorEscalateDispute = (item: OrderDispute) => item.status === 'OPEN' || item.status === 'RESOLVED';
 

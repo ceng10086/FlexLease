@@ -105,8 +105,13 @@ public class OrderDisputeService {
         RentalOrder order = loadOrder(orderId);
         OrderDispute dispute = loadDispute(orderId, disputeId);
         OrderActorRole actorRole = resolveActorRole(order, request.actorId());
-        if (actorRole == dispute.getInitiatorRole()) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "发起人不能重复响应");
+        OrderActorRole lastResponder = dispute.getRespondentRole();
+        if (lastResponder == null) {
+            if (actorRole == dispute.getInitiatorRole()) {
+                throw new BusinessException(ErrorCode.FORBIDDEN, "请等待对方回应");
+            }
+        } else if (lastResponder == actorRole) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "请等待对方回应");
         }
         if (dispute.getStatus() != OrderDisputeStatus.OPEN) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "当前纠纷状态不支持直接响应");

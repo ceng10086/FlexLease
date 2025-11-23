@@ -407,7 +407,7 @@ import {
   type DisputeResolutionOption,
   type OrderSurvey
 } from '../../services/orderService';
-import { initPayment } from '../../services/paymentService';
+import { initPayment, type PaymentSplitPayload } from '../../services/paymentService';
 import {
   resolveItemDeposit,
   resolveItemRent,
@@ -589,8 +589,18 @@ const disputeActorLabel = (role?: string | null) => {
   return '系统';
 };
 
-const canRespondDispute = (item: OrderDispute) =>
-  item.status === 'OPEN' && item.initiatorRole !== 'USER';
+const canRespondDispute = (item: OrderDispute) => {
+  if (item.status !== 'OPEN') {
+    return false;
+  }
+  if (item.respondentRole === 'USER') {
+    return false;
+  }
+  if (item.initiatorRole === 'USER') {
+    return !!item.respondentRole && item.respondentRole !== 'USER';
+  }
+  return true;
+};
 
 const canEscalateDispute = (item: OrderDispute) => item.status === 'OPEN' || item.status === 'RESOLVED';
 
@@ -614,6 +624,32 @@ const goBack = () => {
   router.back();
 };
 
+const buildManualPaymentSplits = (scene: string, amount: number): PaymentSplitPayload[] | undefined => {
+  if (!order.value) {
+    return undefined;
+  }
+  const normalized = Math.round(amount * 100) / 100;
+  if (!normalized || normalized <= 0) {
+    return undefined;
+  }
+  if (scene === 'DEPOSIT') {
+    return [
+      {
+        splitType: 'DEPOSIT_RESERVE',
+        amount: normalized,
+        beneficiary: 'PLATFORM_RESERVE'
+      }
+    ];
+  }
+  return [
+    {
+      splitType: 'VENDOR_INCOME',
+      amount: normalized,
+      beneficiary: order.value.vendorId ? `VENDOR_${order.value.vendorId}` : 'VENDOR_UNKNOWN'
+    }
+  ];
+};
+
 const handleCreatePayment = async () => {
   if (!order.value) {
     return;
@@ -622,6 +658,12 @@ const handleCreatePayment = async () => {
     message.error('请先登录');
     return;
   }
+  const normalizedAmount = Math.round((Number(paymentForm.amount) || 0) * 100) / 100;
+  if (!normalizedAmount || normalizedAmount <= 0) {
+    message.warning('请输入有效的支付金额');
+    return;
+  }
+  const splits = buildManualPaymentSplits(paymentForm.scene, normalizedAmount);
   paymentForm.loading = true;
   try {
     const result = await initPayment(order.value.id, {
@@ -629,7 +671,8 @@ const handleCreatePayment = async () => {
       vendorId: order.value.vendorId,
       scene: paymentForm.scene as any,
       channel: 'MOCK',
-      amount: paymentForm.amount
+      amount: normalizedAmount,
+      splits
     });
     paymentForm.lastResult = result.id ?? '';
     message.success('支付单已创建并自动完成支付');

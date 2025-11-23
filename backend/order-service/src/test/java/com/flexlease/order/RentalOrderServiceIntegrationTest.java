@@ -328,6 +328,79 @@ class RentalOrderServiceIntegrationTest {
     }
 
     @Test
+    void shouldAllowInitiatorToRespondAfterCounterparty() {
+        UUID userId = UUID.randomUUID();
+        UUID vendorId = UUID.randomUUID();
+        UUID vendorAccountId = UUID.randomUUID();
+        UUID productId = UUID.randomUUID();
+        UUID skuId = UUID.randomUUID();
+        UUID planId = UUID.randomUUID();
+
+        OrderItemRequest itemRequest = new OrderItemRequest(
+                productId,
+                skuId,
+                planId,
+                "纠纷轮次商品",
+                "SKU-DISPUTE-RESP",
+                null,
+                1,
+                new BigDecimal("120.00"),
+                new BigDecimal("200.00"),
+                null
+        );
+
+        stubProductCatalog(productId, vendorId, planId, skuId);
+        RentalOrderResponse created = rentalOrderService.createOrder(new CreateOrderRequest(
+                userId,
+                vendorId,
+                "STANDARD",
+                null,
+                null,
+                List.of(itemRequest),
+                List.of()
+        ));
+
+        OrderDisputeResponse opened;
+        try (SecurityContextHandle ignored = withPrincipal(userId, "user-dispute", "USER")) {
+            opened = orderDisputeService.create(created.id(), new OrderDisputeCreateRequest(
+                    userId,
+                    DisputeResolutionOption.REDELIVER,
+                    "配件缺失",
+                    null
+            ));
+        }
+
+        try (SecurityContextHandle ignored = withPrincipal(vendorAccountId, vendorId, "vendor-dispute", "VENDOR")) {
+            orderDisputeService.respond(created.id(), opened.id(), new OrderDisputeResponseRequest(
+                    vendorAccountId,
+                    DisputeResolutionOption.PARTIAL_REFUND,
+                    false,
+                    "可提供折扣"
+            ));
+        }
+
+        OrderDisputeResponse userResponse;
+        try (SecurityContextHandle ignored = withPrincipal(userId, "user-dispute", "USER")) {
+            userResponse = orderDisputeService.respond(created.id(), opened.id(), new OrderDisputeResponseRequest(
+                    userId,
+                    DisputeResolutionOption.PARTIAL_REFUND,
+                    true,
+                    "接受折扣"
+            ));
+        }
+        assertThat(userResponse.status()).isEqualTo(OrderDisputeStatus.RESOLVED);
+
+        try (SecurityContextHandle ignored = withPrincipal(userId, "user-dispute", "USER")) {
+            assertThatThrownBy(() -> orderDisputeService.respond(created.id(), opened.id(), new OrderDisputeResponseRequest(
+                    userId,
+                    DisputeResolutionOption.RETURN_WITH_DEPOSIT_DEDUCTION,
+                    true,
+                    "重复提交"
+            ))).isInstanceOf(BusinessException.class);
+        }
+    }
+
+    @Test
     void shouldApplyCreditDiscount() {
         UUID userId = UUID.randomUUID();
         UUID vendorId = UUID.randomUUID();
