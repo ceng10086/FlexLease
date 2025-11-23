@@ -144,6 +144,48 @@
         </div>
 
         <a-divider />
+        <h4>纠纷与仲裁</h4>
+        <a-empty v-if="!disputes.length" description="暂无纠纷" />
+        <div v-else class="dispute-list">
+          <div class="dispute-item" v-for="item in disputes" :key="item.id">
+            <div class="dispute-item__header">
+              <a-tag :color="disputeStatusColor(item.status)">{{ disputeStatusLabel(item.status) }}</a-tag>
+              <span>发起人：{{ disputeActorLabel(item.initiatorRole) }}</span>
+              <span>创建时间：{{ formatDate(item.createdAt) }}</span>
+            </div>
+            <p class="dispute-item__reason">
+              <strong>诉求：</strong>{{ resolutionLabel(item.initiatorOption) }} | {{ item.initiatorReason }}
+            </p>
+            <p v-if="item.respondentOption" class="dispute-item__line">
+              对方方案：{{ resolutionLabel(item.respondentOption) }}
+              <span v-if="item.respondentRemark">（{{ item.respondentRemark }}）</span>
+            </p>
+            <p v-if="item.adminDecisionOption" class="dispute-item__line">
+              平台裁决：{{ resolutionLabel(item.adminDecisionOption) }}
+              <span v-if="item.adminDecisionRemark">（{{ item.adminDecisionRemark }}）</span>
+            </p>
+            <div class="dispute-meta">
+              <span v-if="item.escalatedAt && item.status === 'PENDING_ADMIN'">
+                升级于：{{ formatDate(item.escalatedAt) }}
+              </span>
+              <span v-if="item.userCreditDelta">
+                信用变动：{{ item.userCreditDelta }} 分
+              </span>
+            </div>
+            <div class="dispute-actions">
+              <a-button
+                size="small"
+                type="primary"
+                @click="openAdminDisputeModal(item)"
+                :disabled="item.status === 'CLOSED'"
+              >
+                平台裁决
+              </a-button>
+            </div>
+          </div>
+        </div>
+
+        <a-divider />
         <h4>操作记录</h4>
         <a-empty v-if="!detailDrawer.order.events?.length" description="暂无记录" />
         <a-timeline v-else>
@@ -166,6 +208,39 @@
       :order-id="detailDrawer.order.id"
       :allow-sign="false"
     />
+    <a-modal
+      v-model:open="adminDisputeModal.open"
+      title="纠纷裁决"
+      ok-text="保存裁决"
+      cancel-text="取消"
+      :confirm-loading="adminDisputeModal.loading"
+      @ok="handleAdminResolveDispute"
+      @cancel="handleAdminCloseDisputeModal"
+    >
+      <a-form layout="vertical">
+        <a-form-item label="裁决方案">
+          <a-select v-model:value="adminDisputeModal.decision">
+            <a-select-option value="REDELIVER">重新发货/补发</a-select-option>
+            <a-select-option value="PARTIAL_REFUND">部分退款继续租赁</a-select-option>
+            <a-select-option value="RETURN_WITH_DEPOSIT_DEDUCTION">退租并扣押金</a-select-option>
+            <a-select-option value="DISCOUNTED_BUYOUT">优惠买断</a-select-option>
+            <a-select-option value="CUSTOM">自定义方案</a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item label="信用扣分（可为负数）">
+          <a-input-number
+            v-model:value="adminDisputeModal.creditDelta"
+            :step="1"
+            :min="-50"
+            :max="50"
+            style="width: 100%"
+          />
+        </a-form-item>
+        <a-form-item label="备注">
+          <a-textarea v-model:value="adminDisputeModal.remark" :rows="3" placeholder="说明裁决原因" />
+        </a-form-item>
+      </a-form>
+    </a-modal>
   </div>
 </template>
 
@@ -176,9 +251,12 @@ import {
   listAdminOrders,
   fetchOrder,
   forceCloseOrder,
+  resolveOrderDispute,
   type RentalOrderSummary,
   type OrderStatus,
-  type RentalOrderDetail
+  type RentalOrderDetail,
+  type OrderDispute,
+  type DisputeResolutionOption
 } from '../../services/orderService';
 import {
   resolveItemDeposit,
@@ -229,6 +307,14 @@ const detailDrawer = reactive<{ open: boolean; loading: boolean; order: RentalOr
 
 const forceCloseForm = reactive({ reason: '', loading: false });
 const contractDrawerOpen = ref(false);
+const adminDisputeModal = reactive({
+  open: false,
+  disputeId: null as string | null,
+  decision: 'REDELIVER' as DisputeResolutionOption,
+  creditDelta: 0,
+  remark: '',
+  loading: false
+});
 
 const formatCurrency = (value: number) => value.toFixed(2);
 const formatDate = (value: string) => new Date(value).toLocaleString();
@@ -240,9 +326,57 @@ const canForceClose = computed(() => {
   return !['COMPLETED', 'CANCELLED', 'BUYOUT_COMPLETED'].includes(detailDrawer.order.status);
 });
 
+const disputes = computed(() => detailDrawer.order?.disputes ?? []);
+
 const resolveOrderDeposit = (detail: RentalOrderDetail): number => rentalOrderDeposit(detail);
 const resolveOrderRent = (detail: RentalOrderDetail): number => rentalOrderRent(detail);
 const resolveOrderTotal = (detail: RentalOrderDetail): number => rentalOrderTotal(detail);
+
+const resolutionLabel = (option?: DisputeResolutionOption | null) =>
+  option ? {
+    REDELIVER: '重新发货/补发',
+    PARTIAL_REFUND: '部分退款继续租赁',
+    RETURN_WITH_DEPOSIT_DEDUCTION: '退租并扣押金',
+    DISCOUNTED_BUYOUT: '优惠买断',
+    CUSTOM: '自定义方案'
+  }[option] ?? option : '未填写';
+
+const disputeStatusLabel = (status: OrderDispute['status']) => {
+  switch (status) {
+    case 'OPEN':
+      return '协商中';
+    case 'PENDING_ADMIN':
+      return '待平台处理';
+    case 'RESOLVED':
+      return '双方一致';
+    case 'CLOSED':
+      return '已结案';
+    default:
+      return status;
+  }
+};
+
+const disputeStatusColor = (status: OrderDispute['status']) => {
+  switch (status) {
+    case 'OPEN':
+      return 'orange';
+    case 'PENDING_ADMIN':
+      return 'blue';
+    case 'RESOLVED':
+      return 'green';
+    case 'CLOSED':
+      return 'red';
+    default:
+      return 'default';
+  }
+};
+
+const disputeActorLabel = (role?: string | null) => {
+  if (role === 'USER') return '消费者';
+  if (role === 'VENDOR') return '厂商';
+  if (role === 'ADMIN' || role === 'INTERNAL') return '平台';
+  return '系统';
+};
 
 const loadOrders = async () => {
   loading.value = true;
@@ -317,6 +451,41 @@ const handleForceClose = async () => {
   }
 };
 
+const openAdminDisputeModal = (dispute: OrderDispute) => {
+  adminDisputeModal.disputeId = dispute.id;
+  adminDisputeModal.decision = dispute.adminDecisionOption ?? dispute.initiatorOption;
+  adminDisputeModal.creditDelta = dispute.userCreditDelta ?? 0;
+  adminDisputeModal.remark = dispute.adminDecisionRemark ?? '';
+  adminDisputeModal.open = true;
+};
+
+const handleAdminResolveDispute = async () => {
+  if (!detailDrawer.order || !adminDisputeModal.disputeId) {
+    return;
+  }
+  adminDisputeModal.loading = true;
+  try {
+    await resolveOrderDispute(detailDrawer.order.id, adminDisputeModal.disputeId, {
+      decision: adminDisputeModal.decision,
+      penalizeUserDelta: adminDisputeModal.creditDelta,
+      remark: adminDisputeModal.remark?.trim() || undefined
+    });
+    message.success('纠纷已结案');
+    adminDisputeModal.open = false;
+    await openDetail(detailDrawer.order.id);
+  } catch (error) {
+    console.error('纠纷裁决失败', error);
+    message.error('纠纷裁决失败，请稍后重试');
+  } finally {
+    adminDisputeModal.loading = false;
+  }
+};
+
+const handleAdminCloseDisputeModal = () => {
+  adminDisputeModal.open = false;
+  adminDisputeModal.disputeId = null;
+};
+
 loadOrders();
 
 watch(
@@ -348,6 +517,52 @@ watch(
 
 .info-alert {
   margin-bottom: 16px;
+}
+
+.dispute-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dispute-item {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px;
+  background: #f8fafc;
+}
+
+.dispute-item__header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 12px;
+  color: #475569;
+  align-items: center;
+}
+
+.dispute-item__reason {
+  margin: 8px 0;
+  color: #0f172a;
+}
+
+.dispute-item__line {
+  margin: 4px 0;
+  color: #334155;
+}
+
+.dispute-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.dispute-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
 }
 
 .timeline-item {

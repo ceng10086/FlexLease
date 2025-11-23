@@ -124,6 +124,55 @@
             </a-button>
           </a-form>
         </a-card>
+
+        <a-card title="纠纷与仲裁" class="mt-16">
+          <div class="dispute-header">
+            <span>记录纠纷详情并邀请平台介入，保障押金处理透明。</span>
+            <a-button size="small" type="primary" @click="showDisputeModal" :disabled="!canCreateDispute">
+              发起纠纷
+            </a-button>
+          </div>
+          <a-empty v-if="!disputes.length" description="暂无纠纷记录" />
+          <div v-else class="dispute-list">
+            <div class="dispute-item" v-for="item in disputes" :key="item.id">
+              <div class="dispute-item__header">
+                <a-tag :color="statusColor(item.status)">{{ formatDisputeStatus(item.status) }}</a-tag>
+                <span>发起人：{{ disputeActorLabel(item.initiatorRole) }}</span>
+                <span>创建时间：{{ formatDate(item.createdAt) }}</span>
+              </div>
+              <p class="dispute-item__reason">
+                <strong>诉求：</strong>{{ resolutionLabel(item.initiatorOption) }} | {{ item.initiatorReason }}
+              </p>
+              <p v-if="item.respondentOption" class="dispute-item__line">
+                对方建议：{{ resolutionLabel(item.respondentOption) }}
+                <span v-if="item.respondentRemark">（{{ item.respondentRemark }}）</span>
+              </p>
+              <p v-if="item.adminDecisionOption" class="dispute-item__line">
+                平台裁决：{{ resolutionLabel(item.adminDecisionOption) }}
+                <span v-if="item.adminDecisionRemark">（{{ item.adminDecisionRemark }}）</span>
+              </p>
+              <div class="dispute-meta">
+                <span v-if="item.deadlineAt && item.status === 'OPEN'">
+                  升级截止：{{ formatDate(item.deadlineAt) }}
+                </span>
+                <span v-if="item.userCreditDelta">
+                  信用变动：{{ item.userCreditDelta }} 分
+                </span>
+              </div>
+              <div class="dispute-actions">
+                <a-button size="small" @click="openRespondModal(item)" v-if="canRespondDispute(item)">
+                  回应方案
+                </a-button>
+                <a-button size="small" @click="confirmEscalate(item)" v-if="canEscalateDispute(item)">
+                  申请仲裁
+                </a-button>
+                <a-button size="small" @click="confirmAppeal(item)" v-if="canAppealDispute(item)">
+                  申诉复核
+                </a-button>
+              </div>
+            </div>
+          </div>
+        </a-card>
       </a-col>
 
       <a-col :xs="24" :lg="8">
@@ -223,6 +272,57 @@
       :default-signature="auth.user?.username ?? ''"
       @signed="handleContractSigned"
     />
+    <a-modal
+      v-model:open="disputeModal.open"
+      title="发起纠纷"
+      ok-text="提交纠纷"
+      cancel-text="取消"
+      :confirm-loading="disputeModal.loading"
+      @ok="handleSubmitDispute"
+      @cancel="handleCloseDisputeModal"
+    >
+      <a-form layout="vertical">
+        <a-form-item label="纠纷原因" required>
+          <a-textarea v-model:value="disputeModal.reason" :rows="3" placeholder="描述问题与诉求" />
+        </a-form-item>
+        <a-form-item label="期望方案">
+          <a-select v-model:value="disputeModal.option">
+            <a-select-option v-for="option in disputeOptions" :key="option.value" :value="option.value">
+              {{ option.label }}
+            </a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item label="补充说明">
+          <a-textarea v-model:value="disputeModal.remark" :rows="2" placeholder="可选" />
+        </a-form-item>
+      </a-form>
+    </a-modal>
+
+    <a-modal
+      v-model:open="respondModal.open"
+      title="回应纠纷方案"
+      ok-text="提交回应"
+      cancel-text="取消"
+      :confirm-loading="respondModal.loading"
+      @ok="handleSubmitRespond"
+      @cancel="handleCloseRespondModal"
+    >
+      <a-form layout="vertical">
+        <a-form-item label="处理方案">
+          <a-select v-model:value="respondModal.option">
+            <a-select-option v-for="option in disputeOptions" :key="option.value" :value="option.value">
+              {{ option.label }}
+            </a-select-option>
+          </a-select>
+        </a-form-item>
+        <a-form-item label="我同意对方方案">
+          <a-switch v-model:checked="respondModal.accept" />
+        </a-form-item>
+        <a-form-item label="补充说明">
+          <a-textarea v-model:value="respondModal.remark" :rows="2" placeholder="可选" />
+        </a-form-item>
+      </a-form>
+    </a-modal>
   </div>
   <div v-else class="page-container">
     <a-card :loading="loading">正在加载...</a-card>
@@ -242,10 +342,16 @@ import {
   applyOrderBuyout,
   postOrderMessage,
   uploadOrderProof,
+  createOrderDispute,
+  respondOrderDispute,
+  escalateOrderDispute,
+  appealOrderDispute,
   type RentalOrderDetail,
   type OrderEvent,
   type OrderProofType,
-  type OrderProof
+  type OrderProof,
+  type OrderDispute,
+  type DisputeResolutionOption
 } from '../../services/orderService';
 import { initPayment } from '../../services/paymentService';
 import {
@@ -287,6 +393,23 @@ const proofForm = reactive({
   inputKey: Date.now()
 });
 
+const disputeModal = reactive({
+  open: false,
+  reason: '',
+  option: 'REDELIVER' as DisputeResolutionOption,
+  remark: '',
+  loading: false
+});
+
+const respondModal = reactive({
+  open: false,
+  disputeId: null as string | null,
+  option: 'REDELIVER' as DisputeResolutionOption,
+  accept: true,
+  remark: '',
+  loading: false
+});
+
 const proofTypeOptions: { label: string; value: OrderProofType }[] = [
   { label: '收货/验收', value: 'RECEIVE' },
   { label: '发货凭证', value: 'SHIPMENT' },
@@ -298,6 +421,22 @@ const proofTypeMap = proofTypeOptions.reduce<Record<OrderProofType, string>>((ac
   acc[option.value] = option.label;
   return acc;
 }, {} as Record<OrderProofType, string>);
+
+const disputes = computed(() => order.value?.disputes ?? []);
+const canCreateDispute = computed(() => !!order.value && order.value.userId === auth.user?.id);
+
+const disputeOptions: { label: string; value: DisputeResolutionOption }[] = [
+  { label: '重新发货/补发配件', value: 'REDELIVER' },
+  { label: '部分退款继续租赁', value: 'PARTIAL_REFUND' },
+  { label: '退租并扣押金', value: 'RETURN_WITH_DEPOSIT_DEDUCTION' },
+  { label: '优惠买断', value: 'DISCOUNTED_BUYOUT' },
+  { label: '自定义方案', value: 'CUSTOM' }
+];
+
+const disputeOptionMap = disputeOptions.reduce<Record<DisputeResolutionOption, string>>((acc, option) => {
+  acc[option.value] = option.label;
+  return acc;
+}, {} as Record<DisputeResolutionOption, string>);
 
 const formatCurrency = (value: number) => value.toFixed(2);
 const formatDate = (value: string) => new Date(value).toLocaleString();
@@ -318,6 +457,53 @@ const resolveActorLabel = (event: OrderEvent) => {
   }
   return '系统';
 };
+
+const resolutionLabel = (option?: DisputeResolutionOption | null) =>
+  option ? disputeOptionMap[option] ?? option : '未填写';
+
+const formatDisputeStatus = (status: OrderDispute['status']) => {
+  switch (status) {
+    case 'OPEN':
+      return '协商中';
+    case 'PENDING_ADMIN':
+      return '待平台处理';
+    case 'RESOLVED':
+      return '双方达成一致';
+    case 'CLOSED':
+      return '平台已裁决';
+    default:
+      return status;
+  }
+};
+
+const statusColor = (status: OrderDispute['status']) => {
+  switch (status) {
+    case 'OPEN':
+      return 'orange';
+    case 'PENDING_ADMIN':
+      return 'blue';
+    case 'RESOLVED':
+      return 'green';
+    case 'CLOSED':
+      return 'red';
+    default:
+      return 'default';
+  }
+};
+
+const disputeActorLabel = (role?: string | null) => {
+  if (role === 'USER') return '消费者';
+  if (role === 'VENDOR') return '厂商';
+  if (role === 'ADMIN' || role === 'INTERNAL') return '平台';
+  return '系统';
+};
+
+const canRespondDispute = (item: OrderDispute) =>
+  item.status === 'OPEN' && item.initiatorRole !== 'USER';
+
+const canEscalateDispute = (item: OrderDispute) => item.status === 'OPEN' || item.status === 'RESOLVED';
+
+const canAppealDispute = (item: OrderDispute) => item.status === 'CLOSED' && item.appealCount < 1;
 
 const loadOrder = async () => {
   loading.value = true;
@@ -537,6 +723,149 @@ const handleSendMessage = async () => {
   }
 };
 
+const showDisputeModal = () => {
+  if (!canCreateDispute.value) {
+    message.warning('仅订单本人可发起纠纷');
+    return;
+  }
+  disputeModal.open = true;
+};
+
+const resetDisputeModal = () => {
+  disputeModal.reason = '';
+  disputeModal.remark = '';
+  disputeModal.option = 'REDELIVER';
+};
+
+const handleSubmitDispute = async () => {
+  if (!order.value || !auth.user?.id) {
+    return;
+  }
+  const reason = disputeModal.reason.trim();
+  if (!reason) {
+    message.warning('请填写纠纷原因');
+    return;
+  }
+  disputeModal.loading = true;
+  try {
+    await createOrderDispute(order.value.id, {
+      actorId: auth.user.id,
+      option: disputeModal.option,
+      reason,
+      remark: disputeModal.remark?.trim() || undefined
+    });
+    message.success('纠纷已记录');
+    disputeModal.open = false;
+    resetDisputeModal();
+    await loadOrder();
+  } catch (error) {
+    console.error('创建纠纷失败', error);
+    message.error(friendlyErrorMessage(error, '提交纠纷失败，请稍后重试'));
+  } finally {
+    disputeModal.loading = false;
+  }
+};
+
+const handleCloseDisputeModal = () => {
+  disputeModal.open = false;
+  resetDisputeModal();
+};
+
+const handleCloseRespondModal = () => {
+  respondModal.open = false;
+  respondModal.disputeId = null;
+  respondModal.remark = '';
+};
+
+const openRespondModal = (dispute: OrderDispute) => {
+  if (!auth.user?.id) {
+    message.error('请先登录');
+    return;
+  }
+  respondModal.disputeId = dispute.id;
+  respondModal.option = dispute.respondentOption ?? dispute.initiatorOption;
+  respondModal.accept = true;
+  respondModal.remark = '';
+  respondModal.open = true;
+};
+
+const handleSubmitRespond = async () => {
+  if (!order.value || !auth.user?.id || !respondModal.disputeId) {
+    return;
+  }
+  respondModal.loading = true;
+  try {
+    await respondOrderDispute(order.value.id, respondModal.disputeId, {
+      actorId: auth.user.id,
+      option: respondModal.option,
+      accept: respondModal.accept,
+      remark: respondModal.remark?.trim() || undefined
+    });
+    message.success('已提交回应');
+    handleCloseRespondModal();
+    await loadOrder();
+  } catch (error) {
+    console.error('回应纠纷失败', error);
+    message.error(friendlyErrorMessage(error, '回应失败，请稍后重试'));
+  } finally {
+    respondModal.loading = false;
+  }
+};
+
+const confirmEscalate = (dispute: OrderDispute) => {
+  Modal.confirm({
+    title: '提交平台仲裁？',
+    content: '平台将在 48 小时内介入处理该纠纷。',
+    okText: '提交仲裁',
+    cancelText: '取消',
+    onOk: () => performEscalate(dispute)
+  });
+};
+
+const performEscalate = async (dispute: OrderDispute) => {
+  if (!order.value || !auth.user?.id) {
+    return;
+  }
+  try {
+    await escalateOrderDispute(order.value.id, dispute.id, {
+      actorId: auth.user.id,
+      reason: '用户申请平台仲裁'
+    });
+    message.success('已提交平台仲裁');
+    await loadOrder();
+  } catch (error) {
+    console.error('仲裁请求失败', error);
+    message.error(friendlyErrorMessage(error, '仲裁请求失败，请稍后重试'));
+  }
+};
+
+const confirmAppeal = (dispute: OrderDispute) => {
+  Modal.confirm({
+    title: '确认发起申诉？',
+    content: '每个纠纷仅可申诉一次，请确保已补充全部证据。',
+    okText: '提交申诉',
+    cancelText: '取消',
+    onOk: () => performAppeal(dispute)
+  });
+};
+
+const performAppeal = async (dispute: OrderDispute) => {
+  if (!order.value || !auth.user?.id) {
+    return;
+  }
+  try {
+    await appealOrderDispute(order.value.id, dispute.id, {
+      actorId: auth.user.id,
+      reason: '用户申请复核'
+    });
+    message.success('申诉已提交');
+    await loadOrder();
+  } catch (error) {
+    console.error('申诉失败', error);
+    message.error(friendlyErrorMessage(error, '申诉失败，请稍后重试'));
+  }
+};
+
 loadOrder();
 
 const handleContractSigned = async () => {
@@ -620,5 +949,62 @@ const handleContractSigned = async () => {
   justify-content: space-between;
   font-size: 12px;
   color: #475569;
+}
+
+.dispute-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: #475569;
+  margin-bottom: 12px;
+  gap: 12px;
+}
+
+.dispute-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.dispute-item {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px;
+  background: #f8fafc;
+}
+
+.dispute-item__header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 12px;
+  color: #475569;
+  align-items: center;
+}
+
+.dispute-item__reason {
+  margin: 8px 0;
+  color: #0f172a;
+}
+
+.dispute-item__line {
+  margin: 4px 0;
+  color: #334155;
+}
+
+.dispute-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.dispute-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
 }
 </style>

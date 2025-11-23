@@ -207,6 +207,71 @@ export type OrderProof = {
   uploadedAt: string;
 };
 
+export type DisputeResolutionOption =
+  | 'REDELIVER'
+  | 'PARTIAL_REFUND'
+  | 'RETURN_WITH_DEPOSIT_DEDUCTION'
+  | 'DISCOUNTED_BUYOUT'
+  | 'CUSTOM';
+
+export type OrderDisputeStatus = 'OPEN' | 'PENDING_ADMIN' | 'RESOLVED' | 'CLOSED';
+
+export type OrderDispute = {
+  id: string;
+  status: OrderDisputeStatus;
+  initiatorId: string;
+  initiatorRole: string;
+  initiatorOption: DisputeResolutionOption;
+  initiatorReason: string;
+  initiatorRemark?: string | null;
+  respondentId?: string | null;
+  respondentRole?: string | null;
+  respondentOption?: DisputeResolutionOption | null;
+  respondentRemark?: string | null;
+  respondedAt?: string | null;
+  deadlineAt?: string | null;
+  escalatedBy?: string | null;
+  escalatedAt?: string | null;
+  adminDecisionOption?: DisputeResolutionOption | null;
+  adminDecisionRemark?: string | null;
+  adminDecisionBy?: string | null;
+  adminDecisionAt?: string | null;
+  userCreditDelta?: number | null;
+  appealCount: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreateOrderDisputePayload = {
+  actorId: string;
+  option: DisputeResolutionOption;
+  reason: string;
+  remark?: string;
+};
+
+export type RespondOrderDisputePayload = {
+  actorId: string;
+  option: DisputeResolutionOption;
+  accept: boolean;
+  remark?: string;
+};
+
+export type EscalateOrderDisputePayload = {
+  actorId: string;
+  reason?: string;
+};
+
+export type AppealOrderDisputePayload = {
+  actorId: string;
+  reason?: string;
+};
+
+export type ResolveOrderDisputePayload = {
+  decision: DisputeResolutionOption;
+  penalizeUserDelta?: number | null;
+  remark?: string;
+};
+
 export type OrderContractStatus = 'DRAFT' | 'SIGNED';
 
 export type OrderContract = {
@@ -251,6 +316,7 @@ export type RentalOrderDetail = {
   extensions: OrderExtension[];
   returns: OrderReturn[];
   proofs: OrderProof[];
+  disputes: OrderDispute[];
 };
 
 export const previewOrder = async (
@@ -406,6 +472,62 @@ export const uploadOrderProof = async (
   const response = await http.post<ApiResponse<OrderProof>>(`/orders/${orderId}/proofs`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   });
+  return response.data.data;
+};
+
+export const createOrderDispute = async (
+  orderId: string,
+  payload: CreateOrderDisputePayload
+): Promise<OrderDispute> => {
+  const response = await http.post<ApiResponse<OrderDispute>>(`/orders/${orderId}/disputes`, payload);
+  return response.data.data;
+};
+
+export const respondOrderDispute = async (
+  orderId: string,
+  disputeId: string,
+  payload: RespondOrderDisputePayload
+): Promise<OrderDispute> => {
+  const response = await http.post<ApiResponse<OrderDispute>>(
+    `/orders/${orderId}/disputes/${disputeId}/responses`,
+    payload
+  );
+  return response.data.data;
+};
+
+export const escalateOrderDispute = async (
+  orderId: string,
+  disputeId: string,
+  payload: EscalateOrderDisputePayload
+): Promise<OrderDispute> => {
+  const response = await http.post<ApiResponse<OrderDispute>>(
+    `/orders/${orderId}/disputes/${disputeId}/escalate`,
+    payload
+  );
+  return response.data.data;
+};
+
+export const appealOrderDispute = async (
+  orderId: string,
+  disputeId: string,
+  payload: AppealOrderDisputePayload
+): Promise<OrderDispute> => {
+  const response = await http.post<ApiResponse<OrderDispute>>(
+    `/orders/${orderId}/disputes/${disputeId}/appeal`,
+    payload
+  );
+  return response.data.data;
+};
+
+export const resolveOrderDispute = async (
+  orderId: string,
+  disputeId: string,
+  payload: ResolveOrderDisputePayload
+): Promise<OrderDispute> => {
+  const response = await http.post<ApiResponse<OrderDispute>>(
+    `/admin/orders/${orderId}/disputes/${disputeId}/resolve`,
+    payload
+  );
   return response.data.data;
 };
 

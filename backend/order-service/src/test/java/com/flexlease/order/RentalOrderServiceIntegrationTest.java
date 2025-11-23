@@ -17,11 +17,18 @@ import com.flexlease.order.client.ProductCatalogClient.CatalogProductView;
 import com.flexlease.order.client.ProductCatalogClient.CatalogProductView.RentalPlanView;
 import com.flexlease.order.client.ProductCatalogClient.CatalogProductView.SkuView;
 import com.flexlease.order.client.UserProfileClient;
+import com.flexlease.order.domain.DisputeResolutionOption;
+import com.flexlease.order.domain.OrderDisputeStatus;
 import com.flexlease.order.domain.OrderEventType;
 import com.flexlease.order.domain.OrderStatus;
 import com.flexlease.order.dto.AddCartItemRequest;
 import com.flexlease.order.dto.CartItemResponse;
 import com.flexlease.order.dto.CreateOrderRequest;
+import com.flexlease.order.dto.OrderDisputeCreateRequest;
+import com.flexlease.order.dto.OrderDisputeEscalateRequest;
+import com.flexlease.order.dto.OrderDisputeResolveRequest;
+import com.flexlease.order.dto.OrderDisputeResponse;
+import com.flexlease.order.dto.OrderDisputeResponseRequest;
 import com.flexlease.order.dto.OrderActorRequest;
 import com.flexlease.order.dto.OrderBuyoutApplyRequest;
 import com.flexlease.order.dto.OrderExtensionApplyRequest;
@@ -37,6 +44,7 @@ import com.flexlease.order.dto.OrderShipmentRequest;
 import com.flexlease.order.dto.RentalOrderResponse;
 import com.flexlease.order.service.CartService;
 import com.flexlease.order.service.OrderContractService;
+import com.flexlease.order.service.OrderDisputeService;
 import com.flexlease.order.service.OrderMaintenanceScheduler;
 import com.flexlease.order.service.RentalOrderService;
 import java.math.BigDecimal;
@@ -72,6 +80,9 @@ class RentalOrderServiceIntegrationTest {
     @Autowired
     private OrderContractService orderContractService;
 
+    @Autowired
+    private OrderDisputeService orderDisputeService;
+
     @MockBean
     private PaymentClient paymentClient;
 
@@ -100,6 +111,7 @@ class RentalOrderServiceIntegrationTest {
                     UUID userId = invocation.getArgument(0);
                     return new UserProfileClient.UserCreditView(userId, 60, CreditTier.STANDARD);
                 });
+        Mockito.doNothing().when(userProfileClient).adjustCredit(Mockito.any(), Mockito.anyInt(), Mockito.anyString());
     }
 
     @Test
@@ -238,6 +250,81 @@ class RentalOrderServiceIntegrationTest {
         org.assertj.core.api.Assertions.assertThatThrownBy(() ->
                 rentalOrderService.applyBuyout(created.id(), new OrderBuyoutApplyRequest(userId, BigDecimal.TEN, "买断")))
                 .isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    void shouldHandleDisputeLifecycle() {
+        UUID userId = UUID.randomUUID();
+        UUID vendorId = UUID.randomUUID();
+        UUID vendorAccountId = UUID.randomUUID();
+        UUID productId = UUID.randomUUID();
+        UUID skuId = UUID.randomUUID();
+        UUID planId = UUID.randomUUID();
+
+        OrderItemRequest itemRequest = new OrderItemRequest(
+                productId,
+                skuId,
+                planId,
+                "纠纷测试商品",
+                "SKU-DISPUTE",
+                null,
+                1,
+                new BigDecimal("199.00"),
+                new BigDecimal("399.00"),
+                null
+        );
+
+        stubProductCatalog(productId, vendorId, planId, skuId);
+        RentalOrderResponse created = rentalOrderService.createOrder(new CreateOrderRequest(
+                userId,
+                vendorId,
+                "STANDARD",
+                null,
+                null,
+                List.of(itemRequest),
+                List.of()
+        ));
+
+        OrderDisputeResponse opened;
+        try (SecurityContextHandle ignored = withPrincipal(userId, "dispute-user", "USER")) {
+            opened = orderDisputeService.create(created.id(), new OrderDisputeCreateRequest(
+                    userId,
+                    DisputeResolutionOption.PARTIAL_REFUND,
+                    "设备存在划痕",
+                    "请求折扣"
+            ));
+        }
+        assertThat(opened.status()).isEqualTo(OrderDisputeStatus.OPEN);
+
+        try (SecurityContextHandle ignored = withPrincipal(vendorAccountId, vendorId, "dispute-vendor", "VENDOR")) {
+            orderDisputeService.respond(created.id(), opened.id(), new OrderDisputeResponseRequest(
+                    vendorAccountId,
+                    DisputeResolutionOption.REDELIVER,
+                    false,
+                    "优先考虑换新"
+            ));
+        }
+
+        try (SecurityContextHandle ignored = withPrincipal(userId, "dispute-user", "USER")) {
+            orderDisputeService.escalate(created.id(), opened.id(), new OrderDisputeEscalateRequest(
+                    userId,
+                    "希望平台仲裁"
+            ));
+        }
+
+        OrderDisputeResponse resolved;
+        UUID adminId = UUID.randomUUID();
+        try (SecurityContextHandle ignored = withPrincipal(adminId, "admin", "ADMIN")) {
+            resolved = orderDisputeService.resolve(created.id(), opened.id(), new OrderDisputeResolveRequest(
+                    DisputeResolutionOption.PARTIAL_REFUND,
+                    -12,
+                    "确认用户责任"
+            ));
+        }
+
+        assertThat(resolved.status()).isEqualTo(OrderDisputeStatus.CLOSED);
+        assertThat(resolved.userCreditDelta()).isEqualTo(-12);
+        Mockito.verify(userProfileClient).adjustCredit(Mockito.eq(userId), Mockito.eq(-12), Mockito.anyString());
     }
 
     @Test

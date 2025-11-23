@@ -110,6 +110,9 @@ public class RentalOrder {
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<OrderProof> proofs = new ArrayList<>();
 
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<OrderDispute> disputes = new ArrayList<>();
+
     protected RentalOrder() {
         // JPA
     }
@@ -290,6 +293,10 @@ public class RentalOrder {
         return proofs;
     }
 
+    public List<OrderDispute> getDisputes() {
+        return disputes;
+    }
+
     public void addItem(RentalOrderItem item) {
         item.setOrder(this);
         items.add(item);
@@ -313,6 +320,11 @@ public class RentalOrder {
     public void addProof(OrderProof proof) {
         proof.setOrder(this);
         proofs.add(proof);
+    }
+
+    public void addDispute(OrderDispute dispute) {
+        dispute.setOrder(this);
+        disputes.add(dispute);
     }
 
     public void markPaid() {

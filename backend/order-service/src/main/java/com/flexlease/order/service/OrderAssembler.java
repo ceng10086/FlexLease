@@ -1,11 +1,13 @@
 package com.flexlease.order.service;
 
+import com.flexlease.order.domain.OrderDispute;
 import com.flexlease.order.domain.OrderExtensionRequest;
 import com.flexlease.order.domain.OrderEvent;
 import com.flexlease.order.domain.OrderProof;
 import com.flexlease.order.domain.OrderReturnRequest;
 import com.flexlease.order.domain.RentalOrder;
 import com.flexlease.order.domain.RentalOrderItem;
+import com.flexlease.order.dto.OrderDisputeResponse;
 import com.flexlease.order.dto.OrderEventResponse;
 import com.flexlease.order.dto.OrderExtensionResponse;
 import com.flexlease.order.dto.OrderProofResponse;
@@ -61,6 +63,10 @@ public class OrderAssembler {
                 order.getProofs().stream()
                         .sorted(Comparator.comparing(OrderProof::getUploadedAt))
                         .map(this::toProofResponse)
+                        .toList(),
+                order.getDisputes().stream()
+                        .sorted(Comparator.comparing(OrderDispute::getCreatedAt))
+                        .map(this::toDisputeResponse)
                         .toList()
         );
     }
@@ -146,6 +152,34 @@ public class OrderAssembler {
                 proof.getUploadedBy(),
                 proof.getActorRole(),
                 proof.getUploadedAt()
+        );
+    }
+
+    public OrderDisputeResponse toDisputeResponse(OrderDispute dispute) {
+        return new OrderDisputeResponse(
+                dispute.getId(),
+                dispute.getStatus(),
+                dispute.getInitiatorId(),
+                dispute.getInitiatorRole(),
+                dispute.getInitiatorOption(),
+                dispute.getInitiatorReason(),
+                dispute.getInitiatorRemark(),
+                dispute.getRespondentId(),
+                dispute.getRespondentRole(),
+                dispute.getRespondentOption(),
+                dispute.getRespondentRemark(),
+                dispute.getRespondedAt(),
+                dispute.getDeadlineAt(),
+                dispute.getEscalatedBy(),
+                dispute.getEscalatedAt(),
+                dispute.getAdminDecisionOption(),
+                dispute.getAdminDecisionRemark(),
+                dispute.getAdminDecisionBy(),
+                dispute.getAdminDecisionAt(),
+                dispute.getUserCreditDelta(),
+                dispute.getAppealCount(),
+                dispute.getCreatedAt(),
+                dispute.getUpdatedAt()
         );
     }
 }

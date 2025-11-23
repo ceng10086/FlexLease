@@ -4,13 +4,17 @@ import com.flexlease.common.dto.ApiResponse;
 import com.flexlease.common.exception.BusinessException;
 import com.flexlease.common.exception.ErrorCode;
 import com.flexlease.common.security.SecurityUtils;
+import com.flexlease.user.dto.CreditAdjustmentRequest;
 import com.flexlease.user.dto.UserCreditResponse;
 import com.flexlease.user.service.UserProfileService;
 import java.util.UUID;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/v1/internal/users")
@@ -29,6 +33,17 @@ public class InternalUserController {
         }
         UUID userUuid = parseUuid(userId);
         return ApiResponse.success(userProfileService.loadCredit(userUuid));
+    }
+
+    @PostMapping("/{userId}/credit-adjustments")
+    public ApiResponse<UserCreditResponse> adjustCredit(@PathVariable String userId,
+                                                        @Valid @RequestBody CreditAdjustmentRequest request) {
+        if (!SecurityUtils.hasRole("INTERNAL")) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "仅内部服务可调整信用分");
+        }
+        UUID userUuid = parseUuid(userId);
+        var profile = userProfileService.adjustCredit(userUuid, request.delta(), request.reason(), null);
+        return ApiResponse.success(new UserCreditResponse(profile.userId(), profile.creditScore(), profile.creditTier()));
     }
 
     private UUID parseUuid(String raw) {
