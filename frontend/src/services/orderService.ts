@@ -134,6 +134,18 @@ export type OrderForceClosePayload = {
   reason?: string;
 };
 
+export type OrderMessagePayload = {
+  actorId: string;
+  message: string;
+};
+
+export type UploadOrderProofPayload = {
+  actorId: string;
+  proofType: OrderProofType;
+  description?: string;
+  file: File;
+};
+
 export type RentalOrderItem = {
   id: string;
   productId: string;
@@ -153,6 +165,7 @@ export type OrderEvent = {
   eventType: string;
   description: string;
   createdBy?: string | null;
+  actorRole?: string | null;
   createdAt: string;
 };
 
@@ -178,6 +191,20 @@ export type OrderReturn = {
   decisionBy?: string | null;
   decisionAt?: string | null;
   remark?: string | null;
+};
+
+export type OrderProofType = 'SHIPMENT' | 'RECEIVE' | 'RETURN' | 'INSPECTION' | 'OTHER';
+
+export type OrderProof = {
+  id: string;
+  proofType: OrderProofType;
+  description?: string | null;
+  fileUrl: string;
+  contentType?: string | null;
+  fileSize: number;
+  uploadedBy: string;
+  actorRole?: string | null;
+  uploadedAt: string;
 };
 
 export type OrderContractStatus = 'DRAFT' | 'SIGNED';
@@ -223,6 +250,7 @@ export type RentalOrderDetail = {
   events: OrderEvent[];
   extensions: OrderExtension[];
   returns: OrderReturn[];
+  proofs: OrderProof[];
 };
 
 export const previewOrder = async (
@@ -353,6 +381,31 @@ export const forceCloseOrder = async (
   payload: OrderForceClosePayload
 ) : Promise<RentalOrderDetail> => {
   const response = await http.post<ApiResponse<RentalOrderDetail>>(`/admin/orders/${orderId}/force-close`, payload);
+  return response.data.data;
+};
+
+export const postOrderMessage = async (
+  orderId: string,
+  payload: OrderMessagePayload
+): Promise<RentalOrderDetail> => {
+  const response = await http.post<ApiResponse<RentalOrderDetail>>(`/orders/${orderId}/messages`, payload);
+  return response.data.data;
+};
+
+export const uploadOrderProof = async (
+  orderId: string,
+  payload: UploadOrderProofPayload
+): Promise<OrderProof> => {
+  const formData = new FormData();
+  formData.append('actorId', payload.actorId);
+  formData.append('proofType', payload.proofType);
+  if (payload.description) {
+    formData.append('description', payload.description);
+  }
+  formData.append('file', payload.file);
+  const response = await http.post<ApiResponse<OrderProof>>(`/orders/${orderId}/proofs`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  });
   return response.data.data;
 };
 

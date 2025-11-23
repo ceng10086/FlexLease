@@ -188,6 +188,66 @@
               </div>
             </a-timeline-item>
           </a-timeline>
+
+          <a-divider />
+          <h5>取证资料</h5>
+          <div v-if="!proofList.length">
+            <a-empty description="暂无取证资料" />
+          </div>
+          <div v-else class="proof-grid">
+            <div class="proof-item" v-for="item in proofList" :key="item.id">
+              <div class="proof-item__meta">
+                <strong>{{ proofTypeLabel(item.proofType) }}</strong>
+                <span>{{ formatDate(item.uploadedAt) }}</span>
+              </div>
+              <p class="proof-item__desc">{{ item.description || '未填写说明' }}</p>
+              <a :href="item.fileUrl" target="_blank" rel="noopener">查看文件</a>
+            </div>
+          </div>
+          <a-form layout="vertical" class="mt-12">
+            <a-form-item label="取证类型">
+              <a-select v-model:value="proofForm.type">
+                <a-select-option v-for="option in proofTypeOptions" :key="option.value" :value="option.value">
+                  {{ option.label }}
+                </a-select-option>
+              </a-select>
+            </a-form-item>
+            <a-form-item label="补充说明">
+              <a-textarea v-model:value="proofForm.description" :rows="2" placeholder="例如：发货前包装、序列号等" />
+            </a-form-item>
+            <a-form-item label="上传文件">
+              <input
+                type="file"
+                :key="proofForm.inputKey"
+                @change="handleProofFileChange"
+              />
+              <div class="proof-file-hint" v-if="proofForm.file">{{ proofForm.file.name }}</div>
+            </a-form-item>
+            <a-button type="primary" :loading="proofForm.uploading" @click="handleProofUpload">
+              上传凭证
+            </a-button>
+          </a-form>
+
+          <a-divider />
+          <h5>沟通记录</h5>
+          <a-empty v-if="!conversationEvents.length" description="暂无留言" />
+          <div v-else class="conversation-list">
+            <div class="conversation-item" v-for="item in conversationEvents" :key="item.id">
+              <div class="conversation-item__meta">
+                <strong>{{ resolveActorLabel(item) }}</strong>
+                <span>{{ formatDate(item.createdAt) }}</span>
+              </div>
+              <p>{{ item.description }}</p>
+            </div>
+          </div>
+          <a-form layout="vertical">
+            <a-form-item label="快速回复">
+              <a-textarea v-model:value="conversationForm.message" :rows="3" placeholder="输入想回复用户的内容" />
+            </a-form-item>
+            <a-button type="primary" :loading="conversationForm.loading" @click="handleSendMessage">
+              发送回复
+            </a-button>
+          </a-form>
         </template>
         <template v-else>
           <a-empty description="未找到订单详情" />
@@ -222,9 +282,13 @@ import {
   decideOrderReturn,
   decideOrderExtension,
   decideOrderBuyout,
+  postOrderMessage,
+  uploadOrderProof,
   type OrderStatus,
   type RentalOrderSummary,
-  type RentalOrderDetail
+  type RentalOrderDetail,
+  type OrderEvent,
+  type OrderProofType
 } from '../../services/orderService';
 import {
   resolveItemDeposit,
@@ -234,6 +298,7 @@ import {
   rentalOrderTotal
 } from '../../utils/orderAmounts';
 import OrderContractDrawer from '../../components/orders/OrderContractDrawer.vue';
+import { useAuthStore } from '../../stores/auth';
 
 const vendorStatuses: OrderStatus[] = [
   'PENDING_PAYMENT',
@@ -252,6 +317,7 @@ const {
   vendorReady,
   requireVendorId
 } = useVendorContext();
+const auth = useAuthStore();
 
 const loading = ref(false);
 const orders = ref<RentalOrderSummary[]>([]);
@@ -271,6 +337,25 @@ const returnForm = reactive({ remark: '', loading: false });
 const extensionDecisionForm = reactive({ remark: '', loading: false });
 const buyoutDecisionForm = reactive({ remark: '', loading: false });
 const contractDrawerOpen = ref(false);
+const conversationForm = reactive({ message: '', loading: false });
+const proofForm = reactive({
+  type: 'SHIPMENT' as OrderProofType,
+  description: '',
+  file: null as File | null,
+  uploading: false,
+  inputKey: Date.now()
+});
+const proofTypeOptions: { label: string; value: OrderProofType }[] = [
+  { label: '发货凭证', value: 'SHIPMENT' },
+  { label: '收货验收', value: 'RECEIVE' },
+  { label: '退租寄回', value: 'RETURN' },
+  { label: '巡检记录', value: 'INSPECTION' },
+  { label: '其他', value: 'OTHER' }
+];
+const proofTypeMap = proofTypeOptions.reduce<Record<OrderProofType, string>>((acc, option) => {
+  acc[option.value] = option.label;
+  return acc;
+}, {} as Record<OrderProofType, string>);
 
 const formatCurrency = (value: number) => value.toFixed(2);
 const formatDate = (value: string) => new Date(value).toLocaleString();
@@ -283,6 +368,23 @@ const canHandleReturn = computed(() => {
   const status = detail.order?.status;
   return status === 'RETURN_REQUESTED' || status === 'RETURN_IN_PROGRESS';
 });
+const conversationEvents = computed(() =>
+  detail.order?.events?.filter((item) => item.eventType === 'COMMUNICATION_NOTE') ?? []
+);
+const proofList = computed(() => detail.order?.proofs ?? []);
+const proofTypeLabel = (type: OrderProofType) => proofTypeMap[type] ?? type;
+const resolveActorLabel = (event: OrderEvent) => {
+  if (event.actorRole === 'USER') {
+    return event.createdBy === auth.user?.id ? '我' : '用户';
+  }
+  if (event.actorRole === 'VENDOR') {
+    return event.createdBy === auth.user?.id ? '我' : '厂商';
+  }
+  if (event.actorRole === 'ADMIN' || event.actorRole === 'INTERNAL') {
+    return '平台';
+  }
+  return '系统';
+};
 
 const loadOrders = async () => {
   const vendorId = requireVendorId();
@@ -466,6 +568,74 @@ const handleBuyoutDecision = async (approve: boolean) => {
   }
 };
 
+const handleProofFileChange = (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  proofForm.file = target.files && target.files.length > 0 ? target.files[0] : null;
+};
+
+const handleProofUpload = async () => {
+  if (!detail.order) {
+    return;
+  }
+  if (!auth.user?.id) {
+    message.error('请先登录');
+    return;
+  }
+  if (!proofForm.file) {
+    message.warning('请选择需要上传的文件');
+    return;
+  }
+  proofForm.uploading = true;
+  try {
+    await uploadOrderProof(detail.order.id, {
+      actorId: auth.user.id,
+      proofType: proofForm.type,
+      description: proofForm.description || undefined,
+      file: proofForm.file
+    });
+    message.success('取证资料已上传');
+    proofForm.description = '';
+    proofForm.file = null;
+    proofForm.inputKey = Date.now();
+    await refreshDetail();
+  } catch (error) {
+    console.error('上传取证资料失败', error);
+    message.error('上传取证资料失败，请稍后重试');
+  } finally {
+    proofForm.uploading = false;
+  }
+};
+
+const handleSendMessage = async () => {
+  if (!detail.order) {
+    return;
+  }
+  if (!auth.user?.id) {
+    message.error('请先登录');
+    return;
+  }
+  const content = conversationForm.message.trim();
+  if (!content) {
+    message.warning('请输入需要发送的内容');
+    return;
+  }
+  conversationForm.loading = true;
+  try {
+    await postOrderMessage(detail.order.id, {
+      actorId: auth.user.id,
+      message: content
+    });
+    conversationForm.message = '';
+    await refreshDetail();
+    message.success('留言已发送');
+  } catch (error) {
+    console.error('发送留言失败', error);
+    message.error('发送留言失败，请稍后重试');
+  } finally {
+    conversationForm.loading = false;
+  }
+};
+
 watch(
   vendorReady,
   (ready) => {
@@ -521,5 +691,55 @@ watch(
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.proof-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin: 12px 0;
+}
+
+.proof-item {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px;
+  background: #f8fafc;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.proof-item__meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #475569;
+}
+
+.proof-item__desc {
+  margin: 0;
+  color: #0f172a;
+  min-height: 36px;
+}
+
+.proof-file-hint {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #475569;
+}
+
+.conversation-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 12px 0;
+}
+
+.conversation-item__meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #475569;
 }
 </style>

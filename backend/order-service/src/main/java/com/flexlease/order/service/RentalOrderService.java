@@ -18,7 +18,7 @@ import com.flexlease.order.client.PaymentTransactionView;
 import com.flexlease.order.client.ProductCatalogClient;
 import com.flexlease.order.domain.CartItem;
 import com.flexlease.order.domain.ExtensionRequestStatus;
-import com.flexlease.order.domain.OrderEvent;
+import com.flexlease.order.domain.OrderActorRole;
 import com.flexlease.order.domain.OrderEventType;
 import com.flexlease.order.domain.OrderExtensionRequest;
 import com.flexlease.order.domain.OrderReturnRequest;
@@ -34,6 +34,7 @@ import com.flexlease.order.dto.OrderCancelRequest;
 import com.flexlease.order.dto.OrderExtensionApplyRequest;
 import com.flexlease.order.dto.OrderExtensionDecisionRequest;
 import com.flexlease.order.dto.OrderItemRequest;
+import com.flexlease.order.dto.OrderMessageRequest;
 import com.flexlease.order.dto.OrderPaymentRequest;
 import com.flexlease.order.dto.OrderPreviewRequest;
 import com.flexlease.order.dto.OrderPreviewResponse;
@@ -73,7 +74,7 @@ public class RentalOrderService {
     private final InventoryReservationClient inventoryReservationClient;
     private final CartService cartService;
     private final OrderAssembler assembler;
-    private final OrderEventPublisher orderEventPublisher;
+    private final OrderTimelineService timelineService;
     private final ProductCatalogClient productCatalogClient;
     private final ObjectMapper objectMapper;
     private final CreditAssessmentService creditAssessmentService;
@@ -86,7 +87,7 @@ public class RentalOrderService {
                               InventoryReservationClient inventoryReservationClient,
                               CartService cartService,
                               OrderAssembler assembler,
-                              OrderEventPublisher orderEventPublisher,
+                              OrderTimelineService timelineService,
                               ProductCatalogClient productCatalogClient,
                               ObjectMapper objectMapper,
                               CreditAssessmentService creditAssessmentService) {
@@ -98,7 +99,7 @@ public class RentalOrderService {
         this.inventoryReservationClient = inventoryReservationClient;
         this.cartService = cartService;
         this.assembler = assembler;
-        this.orderEventPublisher = orderEventPublisher;
+        this.timelineService = timelineService;
         this.productCatalogClient = productCatalogClient;
         this.objectMapper = objectMapper;
         this.creditAssessmentService = creditAssessmentService;
@@ -351,6 +352,26 @@ public class RentalOrderService {
         order.confirmReceive();
         recordEvent(order, OrderEventType.ORDER_RECEIVED, "用户确认收货", request.actorId());
         notifyVendor(order, "买家确认收货", "订单 %s 已确认收货，租期正式开始计算。".formatted(order.getOrderNo()));
+        return assembler.toOrderResponse(order);
+    }
+
+    public RentalOrderResponse postConversationMessage(UUID orderId, OrderMessageRequest request) {
+        RentalOrder order = getOrderForUpdate(orderId);
+        if (request.actorId() == null) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "缺少操作人");
+        }
+        String message = request.message() == null ? "" : request.message().trim();
+        if (message.isEmpty()) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "留言内容不能为空");
+        }
+        OrderActorRole actorRole = resolveActorRole(order, request.actorId());
+        recordEvent(order, OrderEventType.COMMUNICATION_NOTE, message, request.actorId(), Map.of(), actorRole);
+        String snippet = message.length() > 120 ? message.substring(0, 120) + "..." : message;
+        if (actorRole == OrderActorRole.USER) {
+            notifyVendor(order, "收到用户留言", "订单 %s 有新的留言：%s".formatted(order.getOrderNo(), snippet));
+        } else if (actorRole == OrderActorRole.VENDOR) {
+            notifyUser(order, "厂商回复", "订单 %s 有新的厂商回复：%s".formatted(order.getOrderNo(), snippet));
+        }
         return assembler.toOrderResponse(order);
     }
 
@@ -650,6 +671,34 @@ public class RentalOrderService {
         }
     }
 
+    private OrderActorRole resolveActorRole(RentalOrder order, UUID actorId) {
+        FlexleasePrincipal principal = SecurityUtils.requirePrincipal();
+        UUID currentUserId = principal.userId();
+        if (currentUserId == null || !currentUserId.equals(actorId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "请求用户与当前登录用户不一致");
+        }
+        if (principal.hasRole("ADMIN")) {
+            return OrderActorRole.ADMIN;
+        }
+        if (principal.hasRole("INTERNAL")) {
+            return OrderActorRole.INTERNAL;
+        }
+        if (principal.hasRole("VENDOR")) {
+            UUID vendorId = principal.vendorId();
+            if (vendorId == null || !vendorId.equals(order.getVendorId())) {
+                throw new BusinessException(ErrorCode.FORBIDDEN, "无权操作该订单");
+            }
+            return OrderActorRole.VENDOR;
+        }
+        if (principal.hasRole("USER")) {
+            if (!order.getUserId().equals(actorId)) {
+                throw new BusinessException(ErrorCode.FORBIDDEN, "无权操作该订单");
+            }
+            return OrderActorRole.USER;
+        }
+        throw new BusinessException(ErrorCode.FORBIDDEN, "缺少执行该操作的权限");
+    }
+
     private UUID parseTransactionId(String reference) {
         try {
             return UUID.fromString(reference);
@@ -898,7 +947,7 @@ public class RentalOrderService {
                              OrderEventType eventType,
                              String description,
                              UUID actorId) {
-        recordEvent(order, eventType, description, actorId, Map.of());
+        recordEvent(order, eventType, description, actorId, Map.of(), null);
     }
 
     private void recordEvent(RentalOrder order,
@@ -906,8 +955,16 @@ public class RentalOrderService {
                              String description,
                              UUID actorId,
                              Map<String, Object> attributes) {
-        order.addEvent(OrderEvent.record(eventType, description, actorId));
-        orderEventPublisher.publish(order, eventType, description, actorId, attributes);
+        recordEvent(order, eventType, description, actorId, attributes, null);
+    }
+
+    private void recordEvent(RentalOrder order,
+                             OrderEventType eventType,
+                             String description,
+                             UUID actorId,
+                             Map<String, Object> attributes,
+                             OrderActorRole actorRole) {
+        timelineService.append(order, eventType, description, actorId, attributes, actorRole);
     }
 
     private record Totals(BigDecimal depositAmount, BigDecimal rentAmount, BigDecimal buyoutAmount) {

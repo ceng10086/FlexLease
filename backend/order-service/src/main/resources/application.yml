@@ -41,6 +41,8 @@ flexlease:
     base-url: ${FLEXLEASE_PRODUCT_SERVICE_BASE_URL:http://localhost:9003/api/v1}
   user-service:
     base-url: ${FLEXLEASE_USER_SERVICE_BASE_URL:http://localhost:9002/api/v1}
+  proof-storage:
+    root: ${FLEXLEASE_ORDER_PROOF_ROOT:storage/order-proofs}
   order:
     maintenance:
       pending-payment-expire-minutes: ${FLEXLEASE_ORDER_MAINTENANCE_PENDING_PAYMENT_EXPIRE_MINUTES:30}

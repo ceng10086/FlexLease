@@ -35,6 +35,10 @@ public class OrderEvent {
     @Column(name = "created_by")
     private UUID createdBy;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "actor_role", length = 20)
+    private OrderActorRole actorRole;
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
@@ -42,16 +46,21 @@ public class OrderEvent {
         // JPA
     }
 
-    private OrderEvent(OrderEventType eventType, String description, UUID createdBy) {
+    private OrderEvent(OrderEventType eventType, String description, UUID createdBy, OrderActorRole actorRole) {
         this.id = UUID.randomUUID();
         this.eventType = eventType;
         this.description = description;
         this.createdBy = createdBy;
+        this.actorRole = actorRole;
         this.createdAt = OffsetDateTime.now();
     }
 
     public static OrderEvent record(OrderEventType type, String description, UUID createdBy) {
-        return new OrderEvent(type, description, createdBy);
+        return new OrderEvent(type, description, createdBy, null);
+    }
+
+    public static OrderEvent record(OrderEventType type, String description, UUID createdBy, OrderActorRole actorRole) {
+        return new OrderEvent(type, description, createdBy, actorRole);
     }
 
     @PrePersist
@@ -81,6 +90,10 @@ public class OrderEvent {
 
     public UUID getCreatedBy() {
         return createdBy;
+    }
+
+    public OrderActorRole getActorRole() {
+        return actorRole;
     }
 
     public OffsetDateTime getCreatedAt() {

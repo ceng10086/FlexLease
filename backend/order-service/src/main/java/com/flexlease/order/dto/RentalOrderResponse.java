@@ -34,6 +34,7 @@ public record RentalOrderResponse(
         List<RentalOrderItemResponse> items,
         List<OrderEventResponse> events,
         List<OrderExtensionResponse> extensions,
-        List<OrderReturnResponse> returns
+        List<OrderReturnResponse> returns,
+        List<OrderProofResponse> proofs
 ) {
 }

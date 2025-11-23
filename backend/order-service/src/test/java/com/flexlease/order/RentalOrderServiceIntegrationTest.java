@@ -27,6 +27,7 @@ import com.flexlease.order.dto.OrderBuyoutApplyRequest;
 import com.flexlease.order.dto.OrderExtensionApplyRequest;
 import com.flexlease.order.dto.OrderExtensionDecisionRequest;
 import com.flexlease.order.dto.OrderItemRequest;
+import com.flexlease.order.dto.OrderMessageRequest;
 import com.flexlease.order.dto.OrderPaymentRequest;
 import com.flexlease.order.dto.OrderPreviewRequest;
 import com.flexlease.order.dto.OrderPreviewResponse;
@@ -55,7 +56,10 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.TestPropertySource;
 
 @SpringBootTest
-@TestPropertySource(properties = "flexlease.order.maintenance.pending-payment-expire-minutes=0")
+@TestPropertySource(properties = {
+        "flexlease.order.maintenance.pending-payment-expire-minutes=0",
+        "flexlease.proof-storage.root=target/test-order-proofs"
+})
 class RentalOrderServiceIntegrationTest {
 
     static {
@@ -146,6 +150,14 @@ class RentalOrderServiceIntegrationTest {
                 List.of()
         ));
         assertThat(created.status()).isEqualTo(OrderStatus.PENDING_PAYMENT);
+
+        try (SecurityContextHandle ignored = withPrincipal(userId, "customer", "USER")) {
+            RentalOrderResponse withMessage = rentalOrderService.postConversationMessage(created.id(),
+                    new OrderMessageRequest(userId, "请尽快安排发货"));
+            assertThat(withMessage.events())
+                    .anyMatch(event -> event.eventType() == OrderEventType.COMMUNICATION_NOTE
+                            && "请尽快安排发货".equals(event.description()));
+        }
 
         UUID transactionId = UUID.randomUUID();
         PaymentTransactionView transactionView = new PaymentTransactionView(

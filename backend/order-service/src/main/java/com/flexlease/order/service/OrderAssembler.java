@@ -2,11 +2,13 @@ package com.flexlease.order.service;
 
 import com.flexlease.order.domain.OrderExtensionRequest;
 import com.flexlease.order.domain.OrderEvent;
+import com.flexlease.order.domain.OrderProof;
 import com.flexlease.order.domain.OrderReturnRequest;
 import com.flexlease.order.domain.RentalOrder;
 import com.flexlease.order.domain.RentalOrderItem;
 import com.flexlease.order.dto.OrderEventResponse;
 import com.flexlease.order.dto.OrderExtensionResponse;
+import com.flexlease.order.dto.OrderProofResponse;
 import com.flexlease.order.dto.OrderReturnResponse;
 import com.flexlease.order.dto.RentalOrderItemResponse;
 import com.flexlease.order.dto.RentalOrderResponse;
@@ -55,6 +57,10 @@ public class OrderAssembler {
                 order.getReturnRequests().stream()
                         .sorted(Comparator.comparing(OrderReturnRequest::getRequestedAt))
                         .map(this::toReturnResponse)
+                        .toList(),
+                order.getProofs().stream()
+                        .sorted(Comparator.comparing(OrderProof::getUploadedAt))
+                        .map(this::toProofResponse)
                         .toList()
         );
     }
@@ -96,6 +102,7 @@ public class OrderAssembler {
                 event.getEventType(),
                 event.getDescription(),
                 event.getCreatedBy(),
+                event.getActorRole(),
                 event.getCreatedAt()
         );
     }
@@ -125,6 +132,20 @@ public class OrderAssembler {
                 request.getDecisionBy(),
                 request.getDecisionAt(),
                 request.getRemark()
+        );
+    }
+
+    public OrderProofResponse toProofResponse(OrderProof proof) {
+        return new OrderProofResponse(
+                proof.getId(),
+                proof.getProofType(),
+                proof.getDescription(),
+                proof.getFileUrl(),
+                proof.getContentType(),
+                proof.getFileSize(),
+                proof.getUploadedBy(),
+                proof.getActorRole(),
+                proof.getUploadedAt()
         );
     }
 }

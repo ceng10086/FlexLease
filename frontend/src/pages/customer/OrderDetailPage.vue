@@ -60,6 +60,70 @@
             </a-timeline-item>
           </a-timeline>
         </a-card>
+
+        <a-card title="取证资料" class="mt-16">
+          <template v-if="!proofList.length">
+            <a-empty description="暂未上传取证资料" />
+          </template>
+          <template v-else>
+            <div class="proof-grid">
+              <div class="proof-item" v-for="item in proofList" :key="item.id">
+                <div class="proof-item__meta">
+                  <strong>{{ proofTypeLabel(item.proofType) }}</strong>
+                  <span>{{ formatDate(item.uploadedAt) }}</span>
+                </div>
+                <p class="proof-item__desc">{{ item.description || '未填写说明' }}</p>
+                <a :href="item.fileUrl" target="_blank" rel="noopener">查看文件</a>
+              </div>
+            </div>
+          </template>
+          <a-divider />
+          <a-form layout="vertical">
+            <a-form-item label="取证类型">
+              <a-select v-model:value="proofForm.type">
+                <a-select-option v-for="option in proofTypeOptions" :key="option.value" :value="option.value">
+                  {{ option.label }}
+                </a-select-option>
+              </a-select>
+            </a-form-item>
+            <a-form-item label="补充说明">
+              <a-textarea v-model:value="proofForm.description" :rows="2" placeholder="例如：包装外观、快递单号" />
+            </a-form-item>
+            <a-form-item label="上传文件">
+              <input
+                type="file"
+                :key="proofForm.inputKey"
+                @change="handleProofFileChange"
+              />
+              <div class="proof-file-hint" v-if="proofForm.file">{{ proofForm.file.name }}</div>
+            </a-form-item>
+            <a-button type="primary" block :loading="proofForm.uploading" @click="handleProofUpload">
+              上传取证资料
+            </a-button>
+          </a-form>
+        </a-card>
+
+        <a-card title="沟通记录" class="mt-16">
+          <a-empty v-if="!conversationEvents.length" description="暂无留言" />
+          <div v-else class="conversation-list">
+            <div class="conversation-item" v-for="item in conversationEvents" :key="item.id">
+              <div class="conversation-item__meta">
+                <strong>{{ resolveActorLabel(item) }}</strong>
+                <span>{{ formatDate(item.createdAt) }}</span>
+              </div>
+              <p>{{ item.description }}</p>
+            </div>
+          </div>
+          <a-divider />
+          <a-form layout="vertical">
+            <a-form-item label="我要留言">
+              <a-textarea v-model:value="conversationForm.message" :rows="3" placeholder="例如：想了解物流进度" />
+            </a-form-item>
+            <a-button type="primary" block :loading="conversationForm.loading" @click="handleSendMessage">
+              发送留言
+            </a-button>
+          </a-form>
+        </a-card>
       </a-col>
 
       <a-col :xs="24" :lg="8">
@@ -166,7 +230,7 @@
 </template>
 
 <script lang="ts" setup>
-import { reactive, ref } from 'vue';
+import { computed, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { message, Modal } from 'ant-design-vue';
 import { useAuthStore } from '../../stores/auth';
@@ -176,7 +240,12 @@ import {
   applyOrderExtension,
   applyOrderReturn,
   applyOrderBuyout,
-  type RentalOrderDetail
+  postOrderMessage,
+  uploadOrderProof,
+  type RentalOrderDetail,
+  type OrderEvent,
+  type OrderProofType,
+  type OrderProof
 } from '../../services/orderService';
 import { initPayment } from '../../services/paymentService';
 import {
@@ -209,9 +278,46 @@ const extensionForm = reactive({ months: 3, loading: false });
 const returnForm = reactive({ reason: '', loading: false });
 const buyoutForm = reactive({ loading: false });
 const contractDrawerOpen = ref(false);
+const conversationForm = reactive({ message: '', loading: false });
+const proofForm = reactive({
+  type: 'RECEIVE' as OrderProofType,
+  description: '',
+  file: null as File | null,
+  uploading: false,
+  inputKey: Date.now()
+});
+
+const proofTypeOptions: { label: string; value: OrderProofType }[] = [
+  { label: '收货/验收', value: 'RECEIVE' },
+  { label: '发货凭证', value: 'SHIPMENT' },
+  { label: '退租寄回', value: 'RETURN' },
+  { label: '巡检记录', value: 'INSPECTION' },
+  { label: '其他', value: 'OTHER' }
+];
+const proofTypeMap = proofTypeOptions.reduce<Record<OrderProofType, string>>((acc, option) => {
+  acc[option.value] = option.label;
+  return acc;
+}, {} as Record<OrderProofType, string>);
 
 const formatCurrency = (value: number) => value.toFixed(2);
 const formatDate = (value: string) => new Date(value).toLocaleString();
+const proofTypeLabel = (type: OrderProofType) => proofTypeMap[type] ?? type;
+const conversationEvents = computed(() =>
+  order.value?.events?.filter((item) => item.eventType === 'COMMUNICATION_NOTE') ?? []
+);
+const proofList = computed(() => order.value?.proofs ?? []);
+const resolveActorLabel = (event: OrderEvent) => {
+  if (event.actorRole === 'USER') {
+    return event.createdBy === auth.user?.id ? '我' : '用户';
+  }
+  if (event.actorRole === 'VENDOR') {
+    return '厂商';
+  }
+  if (event.actorRole === 'ADMIN' || event.actorRole === 'INTERNAL') {
+    return '平台';
+  }
+  return '系统';
+};
 
 const loadOrder = async () => {
   loading.value = true;
@@ -363,6 +469,74 @@ const handleBuyout = async () => {
   }
 };
 
+const handleProofFileChange = (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  proofForm.file = target.files && target.files.length > 0 ? target.files[0] : null;
+};
+
+const handleProofUpload = async () => {
+  if (!order.value) {
+    return;
+  }
+  if (!auth.user?.id) {
+    message.error('请先登录');
+    return;
+  }
+  if (!proofForm.file) {
+    message.warning('请先选择需要上传的文件');
+    return;
+  }
+  proofForm.uploading = true;
+  try {
+    await uploadOrderProof(order.value.id, {
+      actorId: auth.user.id,
+      proofType: proofForm.type,
+      description: proofForm.description || undefined,
+      file: proofForm.file
+    });
+    message.success('取证资料已上传');
+    proofForm.description = '';
+    proofForm.file = null;
+    proofForm.inputKey = Date.now();
+    await loadOrder();
+  } catch (error) {
+    console.error('上传取证资料失败', error);
+    message.error(friendlyErrorMessage(error, '上传取证资料失败，请稍后重试'));
+  } finally {
+    proofForm.uploading = false;
+  }
+};
+
+const handleSendMessage = async () => {
+  if (!order.value) {
+    return;
+  }
+  if (!auth.user?.id) {
+    message.error('请先登录');
+    return;
+  }
+  const content = conversationForm.message.trim();
+  if (!content) {
+    message.warning('请输入留言内容');
+    return;
+  }
+  conversationForm.loading = true;
+  try {
+    await postOrderMessage(order.value.id, {
+      actorId: auth.user.id,
+      message: content
+    });
+    conversationForm.message = '';
+    await loadOrder();
+    message.success('留言已发送');
+  } catch (error) {
+    console.error('发送留言失败', error);
+    message.error(friendlyErrorMessage(error, '发送留言失败，请稍后重试'));
+  } finally {
+    conversationForm.loading = false;
+  }
+};
+
 loadOrder();
 
 const handleContractSigned = async () => {
@@ -396,5 +570,55 @@ const handleContractSigned = async () => {
 
 .order-guidance {
   margin: 0 0 12px;
+}
+
+.proof-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.proof-item {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px;
+  background: #f8fafc;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.proof-item__meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #475569;
+}
+
+.proof-item__desc {
+  margin: 0;
+  color: #0f172a;
+  min-height: 36px;
+}
+
+.proof-file-hint {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #475569;
+}
+
+.conversation-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.conversation-item__meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #475569;
 }
 </style>
