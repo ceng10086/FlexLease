@@ -13,6 +13,7 @@ public record PaymentTransactionView(
         UUID orderId,
         UUID userId,
         UUID vendorId,
+    PaymentScene scene,
         PaymentStatus status,
         BigDecimal amount,
         OffsetDateTime paidAt,

@@ -10,6 +10,7 @@ import com.flexlease.common.user.CreditTier;
 import com.flexlease.order.client.InventoryReservationClient;
 import com.flexlease.order.client.NotificationClient;
 import com.flexlease.order.client.PaymentClient;
+import com.flexlease.order.client.PaymentScene;
 import com.flexlease.order.client.PaymentStatus;
 import com.flexlease.order.client.PaymentTransactionView;
 import com.flexlease.order.client.ProductCatalogClient;
@@ -178,6 +179,7 @@ class RentalOrderServiceIntegrationTest {
                 created.id(),
                 userId,
                 vendorId,
+                PaymentScene.DEPOSIT,
                 PaymentStatus.SUCCEEDED,
                 preview.totalAmount(),
                 null,
@@ -572,6 +574,7 @@ class RentalOrderServiceIntegrationTest {
                 created.id(),
                 userId,
                 vendorId,
+                PaymentScene.DEPOSIT,
                 PaymentStatus.SUCCEEDED,
                 created.totalAmount(),
                 null,
@@ -633,6 +636,7 @@ class RentalOrderServiceIntegrationTest {
                 created.id(),
                 userId,
                 vendorId,
+                PaymentScene.DEPOSIT,
                 PaymentStatus.PENDING,
                 created.totalAmount(),
                 null,
@@ -741,6 +745,7 @@ class RentalOrderServiceIntegrationTest {
                 created.id(),
                 userId,
                 vendorId,
+                PaymentScene.DEPOSIT,
                 PaymentStatus.SUCCEEDED,
                 created.totalAmount(),
                 OffsetDateTime.now(),
@@ -767,6 +772,79 @@ class RentalOrderServiceIntegrationTest {
         assertThat(paymentEventsAfterDuplicate).isEqualTo(1);
         Mockito.verify(notificationClient, Mockito.never()).send(Mockito.any());
         Mockito.verify(paymentClient, Mockito.never()).loadTransaction(transactionId);
+    }
+
+    @Test
+    void shouldRecordSupplementalPaymentsAfterOrderSettled() {
+        UUID userId = UUID.randomUUID();
+        UUID vendorId = UUID.randomUUID();
+        UUID productId = UUID.randomUUID();
+        UUID skuId = UUID.randomUUID();
+        UUID planId = UUID.randomUUID();
+
+        stubProductCatalog(productId, vendorId, planId, skuId);
+
+        RentalOrderResponse created;
+        try (SecurityContextHandle ignored = withPrincipal(userId, "auto-pay-user", "USER")) {
+            created = rentalOrderService.createOrder(new CreateOrderRequest(
+                    userId,
+                    vendorId,
+                    "STANDARD",
+                    null,
+                    null,
+                    List.of(new OrderItemRequest(
+                            productId,
+                            skuId,
+                            planId,
+                            "补款测试商品",
+                            "SKU-TOPUP",
+                            null,
+                            1,
+                            new BigDecimal("120.00"),
+                            new BigDecimal("380.00"),
+                            null
+                    )),
+                    List.of()
+            ));
+        }
+
+        UUID initialTransactionId = UUID.randomUUID();
+        PaymentTransactionView initialTransaction = new PaymentTransactionView(
+                initialTransactionId,
+                "INIT-" + initialTransactionId.toString().substring(0, 6),
+                created.id(),
+                userId,
+                vendorId,
+                PaymentScene.DEPOSIT,
+                PaymentStatus.SUCCEEDED,
+                created.totalAmount(),
+                OffsetDateTime.now(),
+                List.of()
+        );
+        Mockito.when(paymentClient.loadTransaction(initialTransactionId)).thenReturn(initialTransaction);
+
+        RentalOrderResponse paid = rentalOrderService.handlePaymentSuccess(created.id(), initialTransactionId);
+        assertThat(paid.status()).isEqualTo(OrderStatus.AWAITING_SHIPMENT);
+
+        UUID supplementalTransactionId = UUID.randomUUID();
+        PaymentTransactionView supplementalTransaction = new PaymentTransactionView(
+                supplementalTransactionId,
+                "BUYOUT-" + supplementalTransactionId.toString().substring(0, 6),
+                created.id(),
+                userId,
+                vendorId,
+                PaymentScene.BUYOUT,
+                PaymentStatus.SUCCEEDED,
+                new BigDecimal("299.00"),
+                OffsetDateTime.now(),
+                List.of()
+        );
+        Mockito.when(paymentClient.loadTransaction(supplementalTransactionId)).thenReturn(supplementalTransaction);
+
+        RentalOrderResponse afterSupplement = rentalOrderService.handlePaymentSuccess(created.id(), supplementalTransactionId);
+        assertThat(afterSupplement.paymentTransactionId()).isEqualTo(initialTransactionId);
+        assertThat(afterSupplement.events()).anyMatch(event ->
+                event.eventType() == OrderEventType.ADDITIONAL_PAYMENT_RECORDED && event.description().contains("买断款"));
     }
 
     @Test

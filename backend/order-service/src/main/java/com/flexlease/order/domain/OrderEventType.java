@@ -3,6 +3,7 @@ package com.flexlease.order.domain;
 public enum OrderEventType {
     ORDER_CREATED,
     PAYMENT_CONFIRMED,
+    ADDITIONAL_PAYMENT_RECORDED,
     ORDER_CANCELLED,
     ORDER_SHIPPED,
     ORDER_RECEIVED,

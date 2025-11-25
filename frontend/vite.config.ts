@@ -84,12 +84,22 @@ export default defineConfig((configEnv: ConfigEnv) => {
       target: 'http://localhost:9003',
       changeOrigin: true,
       secure: false
+    },
+    '/proofs': {
+      target: 'http://localhost:9004',
+      changeOrigin: true,
+      secure: false
     }
   } as const;
 
   const proxyConfig = env.VITE_API_PROXY
     ? {
         '/api': {
+          target: env.VITE_API_PROXY,
+          changeOrigin: true,
+          secure: false
+        },
+        '/proofs': {
           target: env.VITE_API_PROXY,
           changeOrigin: true,
           secure: false

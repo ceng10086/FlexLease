@@ -1,3 +1,4 @@
+import type { CreditTier } from '../types/credit';
 import http from './http';
 
 export type OrderStatusBreakdown = Record<string, number>;
@@ -14,6 +15,25 @@ export type PlanBreakdownEntry = {
   gmv: number;
 };
 
+export type CreditMetrics = {
+  averageScore: number;
+  tierDistribution: Record<CreditTier, number>;
+};
+
+export type DisputeMetrics = {
+  openCount: number;
+  pendingAdminCount: number;
+  resolvedCount: number;
+  averageResolutionHours: number;
+};
+
+export type SurveyMetrics = {
+  pendingCount: number;
+  openCount: number;
+  completedCount: number;
+  averageRating: number;
+};
+
 export type DashboardMetrics = {
   totalOrders: number;
   activeOrders: number;
@@ -23,6 +43,9 @@ export type DashboardMetrics = {
   ordersByStatus: OrderStatusBreakdown;
   recentTrend: TrendPoint[];
   planBreakdown: PlanBreakdownEntry[];
+  creditMetrics: CreditMetrics;
+  disputeMetrics: DisputeMetrics;
+  surveyMetrics: SurveyMetrics;
 };
 
 export type VendorMetrics = DashboardMetrics & {

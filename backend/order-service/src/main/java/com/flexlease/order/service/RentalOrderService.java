@@ -13,6 +13,7 @@ import com.flexlease.order.client.InventoryReservationClient;
 import com.flexlease.order.client.InventoryReservationClient.InventoryCommand;
 import com.flexlease.order.client.NotificationClient;
 import com.flexlease.order.client.PaymentClient;
+import com.flexlease.order.client.PaymentScene;
 import com.flexlease.order.client.PaymentStatus;
 import com.flexlease.order.client.PaymentTransactionView;
 import com.flexlease.order.client.ProductCatalogClient;
@@ -277,16 +278,18 @@ public class RentalOrderService {
         }
         RentalOrder order = getOrderForUpdate(orderId);
         UUID currentTransaction = order.getPaymentTransactionId();
-        if (currentTransaction != null) {
-            if (currentTransaction.equals(transactionId)) {
-                LOG.debug("Order {} already linked to transaction {}, ignoring duplicate payment callback", order.getOrderNo(), transactionId);
-                return assembler.toOrderResponse(order);
-            }
-            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "订单已关联其他支付流水");
+        if (currentTransaction != null && currentTransaction.equals(transactionId)) {
+            LOG.debug("Order {} already linked to transaction {}, ignoring duplicate payment callback", order.getOrderNo(), transactionId);
+            return assembler.toOrderResponse(order);
         }
         PaymentTransactionView transaction = paymentClient.loadTransaction(transactionId);
-        ensurePaymentMatches(order, transaction);
-        finalizePayment(order, transaction, transaction.userId(), transaction.transactionNo(), transaction.amount());
+        if (currentTransaction == null) {
+            ensurePaymentMatches(order, transaction);
+            finalizePayment(order, transaction, transaction.userId(), transaction.transactionNo(), transaction.amount());
+        } else {
+            ensureSupplementalPayment(order, transaction);
+            recordSupplementalPayment(order, transaction);
+        }
         return assembler.toOrderResponse(order);
     }
 
@@ -720,6 +723,20 @@ public class RentalOrderService {
     }
 
     private void ensurePaymentMatches(RentalOrder order, PaymentTransactionView transaction) {
+        ensurePaymentBelongsToOrder(order, transaction);
+        if (transaction.amount().compareTo(order.getTotalAmount()) != 0) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "支付金额与订单应付不一致");
+        }
+    }
+
+    private void ensureSupplementalPayment(RentalOrder order, PaymentTransactionView transaction) {
+        ensurePaymentBelongsToOrder(order, transaction);
+        if (order.getStatus() == OrderStatus.CANCELLED || order.getStatus() == OrderStatus.EXCEPTION_CLOSED) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "订单已关闭，无法记录补款");
+        }
+    }
+
+    private void ensurePaymentBelongsToOrder(RentalOrder order, PaymentTransactionView transaction) {
         if (transaction.orderId() == null || !transaction.orderId().equals(order.getId())) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "支付流水与订单不匹配");
         }
@@ -732,11 +749,8 @@ public class RentalOrderService {
         if (transaction.status() != PaymentStatus.SUCCEEDED) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "支付尚未完成");
         }
-        if (transaction.amount() == null) {
-            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "支付金额为空");
-        }
-        if (transaction.amount().compareTo(order.getTotalAmount()) != 0) {
-            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "支付金额与订单应付不一致");
+        if (transaction.amount() == null || transaction.amount().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "支付金额无效");
         }
     }
 
@@ -782,11 +796,59 @@ public class RentalOrderService {
         return true;
     }
 
+    private void recordSupplementalPayment(RentalOrder order, PaymentTransactionView transaction) {
+        BigDecimal amount = transaction.amount() != null ? transaction.amount() : BigDecimal.ZERO;
+        String sceneLabel = paymentSceneLabel(transaction.scene());
+        Map<String, Object> attributes = new HashMap<>();
+        attributes.put("transactionId", transaction.id().toString());
+        attributes.put("amount", amount);
+        if (transaction.scene() != null) {
+            attributes.put("scene", transaction.scene().name());
+        }
+        if (transaction.transactionNo() != null && !transaction.transactionNo().isBlank()) {
+            attributes.put("paymentReference", transaction.transactionNo());
+        }
+        recordEvent(order,
+                OrderEventType.ADDITIONAL_PAYMENT_RECORDED,
+                "%s支付完成: ¥%s".formatted(sceneLabel, amount),
+                transaction.userId(),
+                attributes,
+                resolvePaymentActorRole(order, transaction));
+        notifyVendor(order,
+                "收到%s补款".formatted(sceneLabel),
+                "订单 %s 收到 %s 补款 ¥%s。".formatted(order.getOrderNo(), sceneLabel, amount));
+        notifyUser(order,
+                "%s补款成功".formatted(sceneLabel),
+                "订单 %s 的 %s 支付 ¥%s 已完成。".formatted(order.getOrderNo(), sceneLabel, amount));
+    }
+
     private String buildPaymentMessage(PaymentTransactionView transaction) {
         String reference = transaction.transactionNo() != null
                 ? transaction.transactionNo()
                 : transaction.id().toString();
         return "支付成功: 交易号 " + reference + ", 金额 " + transaction.amount();
+    }
+
+    private String paymentSceneLabel(PaymentScene scene) {
+        if (scene == null) {
+            return "补款";
+        }
+        return switch (scene) {
+            case DEPOSIT -> "押金";
+            case RENT -> "租金";
+            case BUYOUT -> "买断款";
+            case PENALTY -> "违约金";
+        };
+    }
+
+    private OrderActorRole resolvePaymentActorRole(RentalOrder order, PaymentTransactionView transaction) {
+        if (transaction.userId() != null && transaction.userId().equals(order.getUserId())) {
+            return OrderActorRole.USER;
+        }
+        if (transaction.vendorId() != null && transaction.vendorId().equals(order.getVendorId())) {
+            return OrderActorRole.VENDOR;
+        }
+        return OrderActorRole.INTERNAL;
     }
 
     private Totals calculateTotals(List<ResolvedOrderItem> items) {
