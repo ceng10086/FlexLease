@@ -491,9 +491,7 @@ export const uploadOrderProof = async (
     formData.append('description', payload.description);
   }
   formData.append('file', payload.file);
-  const response = await http.post<ApiResponse<OrderProof>>(`/orders/${orderId}/proofs`, formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
-  });
+  const response = await http.post<ApiResponse<OrderProof>>(`/orders/${orderId}/proofs`, formData);
   return response.data.data;
 };
 

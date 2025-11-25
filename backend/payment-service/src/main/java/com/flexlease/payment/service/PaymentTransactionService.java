@@ -493,7 +493,7 @@ public class PaymentTransactionService {
             total = total.add(transactionAmount);
 
             BigDecimal depositPortion = BigDecimal.ZERO;
-            BigDecimal rentPortion = BigDecimal.ZERO;
+            BigDecimal vendorPortion = BigDecimal.ZERO;
             BigDecimal commissionPortion = BigDecimal.ZERO;
 
             if (transaction.getSplits() != null && !transaction.getSplits().isEmpty()) {
@@ -504,26 +504,33 @@ public class PaymentTransactionService {
                     }
                     switch (split.getSplitType()) {
                         case DEPOSIT_RESERVE -> depositPortion = depositPortion.add(amount);
-                        case VENDOR_INCOME -> rentPortion = rentPortion.add(amount);
+                        case VENDOR_INCOME -> vendorPortion = vendorPortion.add(amount);
                         case PLATFORM_COMMISSION -> commissionPortion = commissionPortion.add(amount);
                     }
                 }
             }
 
-            BigDecimal allocated = depositPortion.add(rentPortion).add(commissionPortion);
+            BigDecimal allocated = depositPortion.add(vendorPortion).add(commissionPortion);
             if (allocated.compareTo(transactionAmount) < 0) {
                 BigDecimal remainder = transactionAmount.subtract(allocated);
                 switch (transaction.getScene()) {
                     case DEPOSIT -> depositPortion = depositPortion.add(remainder);
-                    case RENT -> rentPortion = rentPortion.add(remainder);
-                    case BUYOUT -> buyout = buyout.add(remainder);
-                    case PENALTY -> penalty = penalty.add(remainder);
+                    case RENT, BUYOUT, PENALTY -> vendorPortion = vendorPortion.add(remainder);
                 }
             }
 
             deposit = deposit.add(depositPortion);
-            rent = rent.add(rentPortion);
             platformCommission = platformCommission.add(commissionPortion);
+
+            switch (transaction.getScene()) {
+                case RENT -> rent = rent.add(vendorPortion);
+                case BUYOUT -> buyout = buyout.add(vendorPortion);
+                case PENALTY -> penalty = penalty.add(vendorPortion);
+                case DEPOSIT -> {
+                    // normally vendor portion should be zero for pure押金，但若存在则归入租金统计以便对账
+                    rent = rent.add(vendorPortion);
+                }
+            }
             OffsetDateTime paidAt = transaction.getPaidAt() != null ? transaction.getPaidAt() : transaction.getUpdatedAt();
             if (lastPaidAt == null || paidAt.isAfter(lastPaidAt)) {
                 lastPaidAt = paidAt;
