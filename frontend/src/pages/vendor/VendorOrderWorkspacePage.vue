@@ -80,12 +80,15 @@
                 <a-button
                   type="primary"
                   :loading="shipForm.loading"
-                  :disabled="!canShip"
+                  :disabled="!canSubmitShipment"
                   @click="handleShip"
                 >
                   提交发货
                 </a-button>
                 <p class="form-hint" v-if="!canShip">仅待发货订单可填写物流。</p>
+                <p class="form-hint" v-else-if="!hasShipmentProof">
+                  请先在下方“取证资料”中上传发货凭证，系统将自动解锁提交按钮。
+                </p>
               </a-form>
             </div>
             <div class="action-box">
@@ -581,6 +584,8 @@ const conversationEvents = computed(() =>
 );
 const proofList = computed(() => detail.order?.proofs ?? []);
 const proofTypeLabel = (type: OrderProofType) => proofTypeMap[type] ?? type;
+const hasShipmentProof = computed(() => proofList.value.some((item) => item.proofType === 'SHIPMENT'));
+const canSubmitShipment = computed(() => canShip.value && hasShipmentProof.value);
 const resolveActorLabel = (event: OrderEvent) => {
   if (event.actorRole === 'USER') {
     return event.createdBy === auth.user?.id ? '我' : '用户';
@@ -739,6 +744,10 @@ const handleShip = async () => {
   }
   if (!canShip.value) {
     message.warning('当前状态无需发货');
+    return;
+  }
+  if (!hasShipmentProof.value) {
+    message.warning('请先上传发货凭证后再提交物流信息');
     return;
   }
   const vendorId = requireVendorId(true);

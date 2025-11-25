@@ -23,6 +23,7 @@ import com.flexlease.order.domain.OrderActorRole;
 import com.flexlease.order.domain.OrderEventType;
 import com.flexlease.order.domain.OrderExtensionRequest;
 import com.flexlease.order.domain.OrderReturnRequest;
+import com.flexlease.order.domain.OrderProofType;
 import com.flexlease.order.domain.OrderStatus;
 import com.flexlease.order.domain.RentalOrder;
 import com.flexlease.order.domain.RentalOrderItem;
@@ -308,6 +309,11 @@ public class RentalOrderService {
     public RentalOrderResponse shipOrder(UUID orderId, OrderShipmentRequest request) {
         RentalOrder order = getOrderForUpdate(orderId);
         ensureVendor(order, request.vendorId());
+        boolean hasShipmentProof = order.getProofs().stream()
+                .anyMatch(proof -> proof.getProofType() == OrderProofType.SHIPMENT);
+        if (!hasShipmentProof) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "请先上传发货凭证后再提交物流信息");
+        }
         List<InventoryCommand> commands = buildInventoryCommands(order);
         boolean outboundDone = false;
         boolean releaseDone = false;
@@ -352,6 +358,11 @@ public class RentalOrderService {
     public RentalOrderResponse confirmReceive(UUID orderId, OrderActorRequest request) {
         RentalOrder order = getOrderForUpdate(orderId);
         ensureUser(order, request.actorId());
+        boolean hasReceiveProof = order.getProofs().stream()
+                .anyMatch(proof -> proof.getProofType() == OrderProofType.RECEIVE);
+        if (!hasReceiveProof) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "请先上传收货凭证后再确认收货");
+        }
         order.confirmReceive();
         recordEvent(order, OrderEventType.ORDER_RECEIVED, "用户确认收货", request.actorId());
         notifyVendor(order, "买家确认收货", "订单 %s 已确认收货，租期正式开始计算。".formatted(order.getOrderNo()));

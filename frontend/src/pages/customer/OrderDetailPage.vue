@@ -254,12 +254,15 @@
           <a-button
             type="primary"
             block
-            :disabled="order.status !== 'AWAITING_SHIPMENT' && order.status !== 'IN_LEASE'"
+            :disabled="!canConfirmReceive"
             :loading="receiveLoading"
             @click="confirmReceive"
           >
             确认收到设备
           </a-button>
+          <p class="form-hint" v-if="!hasReceiveProof">
+            请先在“取证资料”卡片上传收货凭证（开箱视频/签收照片），系统会自动解锁确认按钮。
+          </p>
         </a-card>
 
         <a-card title="续租" class="mt-16">
@@ -489,6 +492,16 @@ const userSurveys = computed(() =>
   order.value?.surveys?.filter((item) => item.targetRole === 'USER') ?? []
 );
 const canCreateDispute = computed(() => !!order.value && order.value.userId === auth.user?.id);
+const proofList = computed(() => order.value?.proofs ?? []);
+const hasReceiveProof = computed(() => proofList.value.some((item) => item.proofType === 'RECEIVE'));
+const canConfirmReceive = computed(() => {
+  if (!order.value) {
+    return false;
+  }
+  const status = order.value.status;
+  const statusAllowed = status === 'AWAITING_SHIPMENT' || status === 'IN_LEASE';
+  return statusAllowed && hasReceiveProof.value;
+});
 
 const disputeOptions: { label: string; value: DisputeResolutionOption }[] = [
   { label: '重新发货/补发配件', value: 'REDELIVER' },
@@ -509,7 +522,6 @@ const proofTypeLabel = (type: OrderProofType) => proofTypeMap[type] ?? type;
 const conversationEvents = computed(() =>
   order.value?.events?.filter((item) => item.eventType === 'COMMUNICATION_NOTE') ?? []
 );
-const proofList = computed(() => order.value?.proofs ?? []);
 const resolveActorLabel = (event: OrderEvent) => {
   if (event.actorRole === 'USER') {
     return event.createdBy === auth.user?.id ? '我' : '用户';
@@ -685,6 +697,10 @@ const handleCreatePayment = async () => {
 };
 
 const confirmReceive = () => {
+  if (!hasReceiveProof.value) {
+    message.warning('请先上传收货凭证后再确认收货');
+    return;
+  }
   Modal.confirm({
     title: '确认已经收到设备？',
     content: '确认后订单将进入在租阶段，如物流信息仍未更新请耐心等待。',

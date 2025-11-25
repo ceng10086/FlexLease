@@ -21,6 +21,7 @@ import com.flexlease.order.client.UserProfileClient;
 import com.flexlease.order.domain.DisputeResolutionOption;
 import com.flexlease.order.domain.OrderDisputeStatus;
 import com.flexlease.order.domain.OrderEventType;
+import com.flexlease.order.domain.OrderProofType;
 import com.flexlease.order.domain.OrderStatus;
 import com.flexlease.order.dto.AddCartItemRequest;
 import com.flexlease.order.dto.CartItemResponse;
@@ -47,6 +48,7 @@ import com.flexlease.order.service.CartService;
 import com.flexlease.order.service.OrderContractService;
 import com.flexlease.order.service.OrderDisputeService;
 import com.flexlease.order.service.OrderMaintenanceScheduler;
+import com.flexlease.order.service.OrderProofService;
 import com.flexlease.order.service.RentalOrderService;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -63,6 +65,7 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.mock.web.MockMultipartFile;
 
 @SpringBootTest
 @TestPropertySource(properties = {
@@ -83,6 +86,9 @@ class RentalOrderServiceIntegrationTest {
 
     @Autowired
     private OrderDisputeService orderDisputeService;
+
+        @Autowired
+        private OrderProofService orderProofService;
 
     @MockBean
     private PaymentClient paymentClient;
@@ -119,6 +125,7 @@ class RentalOrderServiceIntegrationTest {
     void shouldCompleteFullOrderLifecycle() {
         UUID userId = UUID.randomUUID();
         UUID vendorId = UUID.randomUUID();
+                UUID vendorAccountId = UUID.randomUUID();
         UUID productId = UUID.randomUUID();
         UUID skuId = UUID.randomUUID();
         UUID planId = UUID.randomUUID();
@@ -192,13 +199,33 @@ class RentalOrderServiceIntegrationTest {
         assertThat(paid.status()).isEqualTo(OrderStatus.AWAITING_SHIPMENT);
         assertThat(paid.paymentTransactionId()).isEqualTo(transactionId);
 
+        try (SecurityContextHandle ignored = withPrincipal(vendorAccountId, vendorId, "vendor-%s".formatted(vendorId), "VENDOR")) {
+            MockMultipartFile shipmentFile = new MockMultipartFile(
+                    "file",
+                    "shipment.jpg",
+                    "image/jpeg",
+                    new byte[]{1, 2, 3}
+            );
+            orderProofService.upload(created.id(), vendorAccountId, OrderProofType.SHIPMENT, "发货取证", shipmentFile);
+        }
+
         RentalOrderResponse shipped;
-        try (SecurityContextHandle ignored = withPrincipal(UUID.randomUUID(), vendorId, "vendor-%s".formatted(vendorId), "VENDOR")) {
+        try (SecurityContextHandle ignored = withPrincipal(vendorAccountId, vendorId, "vendor-%s".formatted(vendorId), "VENDOR")) {
             shipped = rentalOrderService.shipOrder(created.id(),
                     new OrderShipmentRequest(vendorId, "SF", "SF123456789"));
         }
         assertThat(shipped.status()).isEqualTo(OrderStatus.IN_LEASE);
         assertThat(shipped.shippingCarrier()).isEqualTo("SF");
+
+        try (SecurityContextHandle ignored = withPrincipal(userId, "customer", "USER")) {
+            MockMultipartFile receiveFile = new MockMultipartFile(
+                    "file",
+                    "receive.jpg",
+                    "image/jpeg",
+                    new byte[]{4, 5, 6}
+            );
+            orderProofService.upload(created.id(), userId, OrderProofType.RECEIVE, "收货取证", receiveFile);
+        }
 
         RentalOrderResponse received = rentalOrderService.confirmReceive(created.id(),
                 new OrderActorRequest(userId));
@@ -210,7 +237,7 @@ class RentalOrderServiceIntegrationTest {
         assertThat(extensionRequested.extensions()).hasSize(1);
 
         RentalOrderResponse extensionApproved;
-        try (SecurityContextHandle ignored = withPrincipal(UUID.randomUUID(), vendorId, "vendor-%s".formatted(vendorId), "VENDOR")) {
+        try (SecurityContextHandle ignored = withPrincipal(vendorAccountId, vendorId, "vendor-%s".formatted(vendorId), "VENDOR")) {
             extensionApproved = rentalOrderService.decideExtension(created.id(),
                     new OrderExtensionDecisionRequest(vendorId, true, "同意续租"));
         }
@@ -226,7 +253,7 @@ class RentalOrderServiceIntegrationTest {
         assertThat(returnRequested.status()).isEqualTo(OrderStatus.RETURN_REQUESTED);
 
         RentalOrderResponse returnApproved;
-        try (SecurityContextHandle ignored = withPrincipal(UUID.randomUUID(), vendorId, "vendor-%s".formatted(vendorId), "VENDOR")) {
+        try (SecurityContextHandle ignored = withPrincipal(vendorAccountId, vendorId, "vendor-%s".formatted(vendorId), "VENDOR")) {
             returnApproved = rentalOrderService.decideReturn(created.id(),
                     new OrderReturnDecisionRequest(vendorId, true, "已验收"));
         }
