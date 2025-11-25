@@ -40,7 +40,8 @@ public class NotificationController {
 
     @GetMapping("/logs")
     public ApiResponse<List<NotificationLogResponse>> logs(@RequestParam(required = false) String status,
-                                                           @RequestParam(required = false) String recipient) {
+                                                           @RequestParam(required = false) String recipient,
+                                                           @RequestParam(required = false) String contextType) {
         NotificationStatus statusEnum = null;
         if (status != null && !status.isBlank()) {
             try {
@@ -52,7 +53,7 @@ public class NotificationController {
         FlexleasePrincipal principal = SecurityUtils.requirePrincipal();
         String normalizedRecipient = recipient != null && !recipient.isBlank() ? recipient : null;
         if (principal.hasRole("ADMIN") || principal.hasRole("INTERNAL")) {
-            return ApiResponse.success(notificationService.listLogs(statusEnum, normalizedRecipient));
+            return ApiResponse.success(notificationService.listLogs(statusEnum, normalizedRecipient, contextType));
         }
 
         if (principal.hasRole("VENDOR")) {
@@ -63,7 +64,7 @@ public class NotificationController {
             if (normalizedRecipient != null && !normalizedRecipient.equals(vendorRecipient)) {
                 throw new BusinessException(ErrorCode.FORBIDDEN, "禁止查看其他厂商的通知");
             }
-            return ApiResponse.success(notificationService.listLogs(statusEnum, vendorRecipient));
+            return ApiResponse.success(notificationService.listLogs(statusEnum, vendorRecipient, contextType));
         }
 
         if (principal.userId() == null) {
@@ -73,7 +74,7 @@ public class NotificationController {
         if (normalizedRecipient != null && !normalizedRecipient.equals(userRecipient)) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "禁止查看其他用户的通知");
         }
-        return ApiResponse.success(notificationService.listLogs(statusEnum, userRecipient));
+        return ApiResponse.success(notificationService.listLogs(statusEnum, userRecipient, contextType));
     }
 
     @GetMapping("/templates")

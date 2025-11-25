@@ -10,8 +10,20 @@ public record NotificationSendRequest(
         @NotBlank @Size(max = 100) String recipient,
         @Size(max = 200) String subject,
         String content,
-        Map<String, Object> variables
+        Map<String, Object> variables,
+        @Size(max = 50) String contextType,
+        @Size(max = 100) String contextReference
 ) {
+
+    public NotificationSendRequest(String templateCode,
+                                    NotificationChannel channel,
+                                    @NotBlank @Size(max = 100) String recipient,
+                                    @Size(max = 200) String subject,
+                                    String content,
+                                    Map<String, Object> variables) {
+        this(templateCode, channel, recipient, subject, content, variables, null, null);
+    }
+
     public boolean hasTemplate() {
         return templateCode != null && !templateCode.isBlank();
     }

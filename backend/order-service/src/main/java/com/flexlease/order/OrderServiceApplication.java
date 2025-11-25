@@ -5,6 +5,7 @@ import com.flexlease.order.client.PaymentServiceProperties;
 import com.flexlease.order.client.ProductServiceProperties;
 import com.flexlease.order.config.OrderMaintenanceProperties;
 import com.flexlease.order.config.OrderSurveyProperties;
+import com.flexlease.order.config.ProofPolicyProperties;
 import com.flexlease.order.config.ProofStorageProperties;
 import com.flexlease.order.client.UserServiceProperties;
 import org.springframework.boot.SpringApplication;
@@ -21,6 +22,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
         UserServiceProperties.class,
         OrderMaintenanceProperties.class,
         ProofStorageProperties.class,
+        ProofPolicyProperties.class,
         OrderSurveyProperties.class
 })
 public class OrderServiceApplication {

@@ -14,6 +14,8 @@ public record NotificationLogResponse(
         String content,
         NotificationStatus status,
         String errorMessage,
+        String contextType,
+        String contextReference,
         OffsetDateTime sentAt,
         OffsetDateTime createdAt
 ) {

@@ -131,6 +131,36 @@ class NotificationServiceIntegrationTest {
         }
     }
 
+    @Test
+    void adminCanFilterByContextType() {
+        UUID disputeRecipient = UUID.randomUUID();
+        UUID disputeId = UUID.randomUUID();
+        notificationService.sendNotification(new NotificationSendRequest(
+                null,
+                NotificationChannel.IN_APP,
+                disputeRecipient.toString(),
+                "纠纷提醒",
+                "请尽快处理纠纷",
+                Map.of(),
+                "DISPUTE",
+                disputeId.toString()
+        ));
+        notificationService.sendNotification(new NotificationSendRequest(
+                null,
+                NotificationChannel.IN_APP,
+                disputeRecipient.toString(),
+                "普通提醒",
+                "系统通知",
+                Map.of()
+        ));
+
+        try (SecurityContextHandle ignored = withPrincipal(UUID.randomUUID(), null, "admin-user", Set.of("ADMIN"))) {
+            var logs = notificationService.listLogs(null, null, "dispute");
+            assertThat(logs).isNotEmpty();
+            assertThat(logs).allMatch(log -> "DISPUTE".equals(log.contextType()));
+        }
+    }
+
     private SecurityContextHandle withPrincipal(UUID userId, UUID vendorId, String username, Set<String> roles) {
         FlexleasePrincipal principal = new FlexleasePrincipal(userId, vendorId, username, roles);
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(principal, null));

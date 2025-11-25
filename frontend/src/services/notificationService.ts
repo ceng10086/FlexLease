@@ -16,6 +16,8 @@ export type NotificationSendPayload = {
   subject?: string;
   content?: string;
   variables?: Record<string, unknown>;
+  contextType?: string;
+  contextReference?: string;
 };
 
 export type NotificationLog = {
@@ -27,6 +29,8 @@ export type NotificationLog = {
   content: string;
   status: NotificationStatus;
   errorMessage?: string | null;
+  contextType?: string | null;
+  contextReference?: string | null;
   sentAt?: string | null;
   createdAt: string;
 };
@@ -35,6 +39,7 @@ export type NotificationLogQuery = {
   status?: NotificationStatus;
   channel?: NotificationChannel;
   recipient?: string;
+  contextType?: string;
 };
 
 export type NotificationTemplate = {

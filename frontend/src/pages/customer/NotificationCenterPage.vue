@@ -34,6 +34,21 @@
             <a-select-option value="EMAIL">邮件</a-select-option>
             <a-select-option value="SMS">短信</a-select-option>
           </a-select>
+          <a-select
+            v-model:value="filters.contextType"
+            allow-clear
+            placeholder="全部业务"
+            style="width: 150px"
+            @change="loadNotifications"
+          >
+            <a-select-option
+              v-for="option in contextOptions"
+              :key="option.value"
+              :value="option.value"
+            >
+              {{ option.label }}
+            </a-select-option>
+          </a-select>
           <a-input-search
             v-model:value="filters.keyword"
             placeholder="搜索标题/内容/收件人"
@@ -75,6 +90,7 @@
               <div class="notification-item__status">
                 <a-tag :color="statusColor(item.status)">{{ statusLabel(item.status) }}</a-tag>
                 <a-tag>{{ channelLabel(item.channel) }}</a-tag>
+                <a-tag v-if="item.contextType" color="orange">{{ contextLabel(item.contextType) }}</a-tag>
               </div>
             </div>
             <div class="notification-item__meta">
@@ -114,6 +130,7 @@ const lastLoadedAt = ref<string | null>(null);
 const filters = reactive<{
   status?: NotificationStatus;
   channel?: NotificationChannel;
+  contextType?: string;
   keyword: string;
 }>({
   keyword: ''
@@ -129,6 +146,10 @@ const channelCards = [
   { key: 'IN_APP' as NotificationChannel, label: '站内信', color: 'blue' },
   { key: 'EMAIL' as NotificationChannel, label: '邮件', color: 'green' },
   { key: 'SMS' as NotificationChannel, label: '短信', color: 'purple' }
+];
+
+const contextOptions = [
+  { value: 'DISPUTE', label: '纠纷通知' }
 ];
 
 const statusColor = (status: NotificationStatus) => {
@@ -164,19 +185,32 @@ const channelLabel = (channel: NotificationChannel) => {
   }
 };
 
+const contextLabel = (context?: string | null) => {
+  if (!context) {
+    return '通用通知';
+  }
+  switch (context) {
+    case 'DISPUTE':
+      return '纠纷通知';
+    default:
+      return context;
+  }
+};
+
 const filteredNotifications = computed(() => {
   const keyword = filters.keyword.trim().toLowerCase();
   return notifications.value.filter((item) => {
     const matchStatus = filters.status ? item.status === filters.status : true;
     const matchChannel = filters.channel ? item.channel === filters.channel : true;
+    const matchContext = filters.contextType ? item.contextType === filters.contextType : true;
     if (!keyword) {
-      return matchStatus && matchChannel;
+      return matchStatus && matchChannel && matchContext;
     }
     const haystack = [item.subject, item.content, item.recipient, item.templateCode]
       .filter(Boolean)
       .map((value) => String(value).toLowerCase());
     const matchKeyword = haystack.some((value) => value.includes(keyword));
-    return matchStatus && matchChannel && matchKeyword;
+    return matchStatus && matchChannel && matchContext && matchKeyword;
   });
 });
 
@@ -208,7 +242,7 @@ const emptyDescription = computed(() => {
   if (filters.keyword) {
     return '没有匹配的通知，换个关键词试试';
   }
-  if (filters.status || filters.channel) {
+  if (filters.status || filters.channel || filters.contextType) {
     return '当前筛选条件下暂无通知';
   }
   return '暂无通知记录';
@@ -222,7 +256,8 @@ const loadNotifications = async () => {
   try {
     notifications.value = await listNotificationLogs({
       status: filters.status,
-      channel: filters.channel
+      channel: filters.channel,
+      contextType: filters.contextType
     });
     lastLoadedAt.value = new Date().toISOString();
   } catch (error) {

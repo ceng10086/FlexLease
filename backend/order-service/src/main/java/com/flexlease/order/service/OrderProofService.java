@@ -18,8 +18,10 @@ import com.flexlease.order.storage.ProofStorageService;
 import com.flexlease.order.storage.ProofStorageService.StoredFile;
 import jakarta.transaction.Transactional;
 import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -28,6 +30,19 @@ import org.springframework.web.multipart.MultipartFile;
 @Service
 @Transactional
 public class OrderProofService {
+
+    private static final Set<OrderProofType> USER_ALLOWED_TYPES = EnumSet.of(
+        OrderProofType.RECEIVE,
+        OrderProofType.RETURN,
+        OrderProofType.INSPECTION,
+        OrderProofType.OTHER
+    );
+
+    private static final Set<OrderProofType> VENDOR_ALLOWED_TYPES = EnumSet.of(
+        OrderProofType.SHIPMENT,
+        OrderProofType.INSPECTION,
+        OrderProofType.OTHER
+    );
 
     private final RentalOrderRepository rentalOrderRepository;
     private final ProofStorageService proofStorageService;
@@ -70,6 +85,7 @@ public class OrderProofService {
         }
         RentalOrder order = loadOrder(orderId);
         OrderActorRole actorRole = resolveActorRole(order, actorId);
+        ensureProofTypeAllowed(actorRole, proofType);
         StoredFile stored = proofStorageService.store(file);
         try {
             OrderProof proof = OrderProof.create(
@@ -94,6 +110,15 @@ public class OrderProofService {
         } catch (RuntimeException ex) {
             proofStorageService.delete(stored.storedName());
             throw ex;
+        }
+    }
+
+    private void ensureProofTypeAllowed(OrderActorRole role, OrderProofType type) {
+        if (role == OrderActorRole.USER && !USER_ALLOWED_TYPES.contains(type)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "当前角色无权上传该类型的取证资料");
+        }
+        if (role == OrderActorRole.VENDOR && !VENDOR_ALLOWED_TYPES.contains(type)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "厂商无权上传该类型的取证资料");
         }
     }
 

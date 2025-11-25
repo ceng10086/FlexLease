@@ -86,8 +86,8 @@
                   提交发货
                 </a-button>
                 <p class="form-hint" v-if="!canShip">仅待发货订单可填写物流。</p>
-                <p class="form-hint" v-else-if="!hasShipmentProof">
-                  请先在下方“取证资料”中上传发货凭证，系统将自动解锁提交按钮。
+                <p class="form-hint" v-else-if="!meetsShipmentProofRequirement">
+                  {{ shipmentRequirementHint }}
                 </p>
               </a-form>
             </div>
@@ -214,6 +214,9 @@
                   {{ option.label }}
                 </a-select-option>
               </a-select>
+              <div class="proof-file-hint" v-if="proofForm.type === 'SHIPMENT'">
+                {{ shipmentRequirementHint }}
+              </div>
             </a-form-item>
             <a-form-item label="补充说明">
               <a-textarea v-model:value="proofForm.description" :rows="2" placeholder="例如：发货前包装、序列号等" />
@@ -516,6 +519,8 @@ const proofForm = reactive({
   uploading: false,
   inputKey: Date.now()
 });
+const SHIPMENT_PHOTO_REQUIRED = 3;
+const SHIPMENT_VIDEO_REQUIRED = 1;
 const vendorDisputeModal = reactive({
   open: false,
   reason: '',
@@ -538,17 +543,21 @@ const surveyModal = reactive({
   comment: '',
   loading: false
 });
+const proofLabelMap: Record<OrderProofType, string> = {
+  SHIPMENT: '发货凭证',
+  RECEIVE: '收货验收',
+  RETURN: '退租寄回',
+  INSPECTION: '巡检记录',
+  OTHER: '其他'
+};
+
 const proofTypeOptions: { label: string; value: OrderProofType }[] = [
-  { label: '发货凭证', value: 'SHIPMENT' },
-  { label: '收货验收', value: 'RECEIVE' },
-  { label: '退租寄回', value: 'RETURN' },
-  { label: '巡检记录', value: 'INSPECTION' },
-  { label: '其他', value: 'OTHER' }
+  { label: proofLabelMap.SHIPMENT, value: 'SHIPMENT' },
+  { label: proofLabelMap.INSPECTION, value: 'INSPECTION' },
+  { label: proofLabelMap.OTHER, value: 'OTHER' }
 ];
-const proofTypeMap = proofTypeOptions.reduce<Record<OrderProofType, string>>((acc, option) => {
-  acc[option.value] = option.label;
-  return acc;
-}, {} as Record<OrderProofType, string>);
+
+const proofTypeMap: Record<OrderProofType, string> = proofLabelMap;
 
 const disputes = computed(() => detail.order?.disputes ?? []);
 const vendorSurveys = computed(() =>
@@ -584,8 +593,48 @@ const conversationEvents = computed(() =>
 );
 const proofList = computed(() => detail.order?.proofs ?? []);
 const proofTypeLabel = (type: OrderProofType) => proofTypeMap[type] ?? type;
-const hasShipmentProof = computed(() => proofList.value.some((item) => item.proofType === 'SHIPMENT'));
-const canSubmitShipment = computed(() => canShip.value && hasShipmentProof.value);
+
+const normalizeString = (value?: string | null) => value?.toLowerCase() ?? '';
+const isImageProof = (proof: OrderProof) => {
+  const contentType = normalizeString(proof.contentType);
+  if (contentType.startsWith('image/')) {
+    return true;
+  }
+  const fileUrl = normalizeString(proof.fileUrl);
+  return fileUrl.endsWith('.jpg') || fileUrl.endsWith('.jpeg') || fileUrl.endsWith('.png');
+};
+const isVideoProof = (proof: OrderProof) => {
+  const contentType = normalizeString(proof.contentType);
+  if (contentType.startsWith('video/')) {
+    return true;
+  }
+  const fileUrl = normalizeString(proof.fileUrl);
+  return fileUrl.endsWith('.mp4') || fileUrl.endsWith('.mov') || fileUrl.endsWith('.m4v');
+};
+
+const shipmentProofStats = computed(() => {
+  const shipments = proofList.value.filter(
+    (item) => item.proofType === 'SHIPMENT' && item.actorRole === 'VENDOR'
+  );
+  return {
+    photos: shipments.filter(isImageProof).length,
+    videos: shipments.filter(isVideoProof).length
+  };
+});
+
+const meetsShipmentProofRequirement = computed(() =>
+  shipmentProofStats.value.photos >= SHIPMENT_PHOTO_REQUIRED &&
+  shipmentProofStats.value.videos >= SHIPMENT_VIDEO_REQUIRED
+);
+
+const canSubmitShipment = computed(() => canShip.value && meetsShipmentProofRequirement.value);
+const shipmentRequirementHint = computed(() => {
+  if (SHIPMENT_PHOTO_REQUIRED === 0 && SHIPMENT_VIDEO_REQUIRED === 0) {
+    return '无需额外凭证即可发货。';
+  }
+  const stats = shipmentProofStats.value;
+  return `需至少上传${SHIPMENT_PHOTO_REQUIRED}张照片和${SHIPMENT_VIDEO_REQUIRED}段视频（当前 ${stats.photos}/${SHIPMENT_PHOTO_REQUIRED} 张、${stats.videos}/${SHIPMENT_VIDEO_REQUIRED} 段）`;
+});
 const resolveActorLabel = (event: OrderEvent) => {
   if (event.actorRole === 'USER') {
     return event.createdBy === auth.user?.id ? '我' : '用户';
@@ -746,8 +795,8 @@ const handleShip = async () => {
     message.warning('当前状态无需发货');
     return;
   }
-  if (!hasShipmentProof.value) {
-    message.warning('请先上传发货凭证后再提交物流信息');
+  if (!meetsShipmentProofRequirement.value) {
+    message.warning(shipmentRequirementHint.value);
     return;
   }
   const vendorId = requireVendorId(true);

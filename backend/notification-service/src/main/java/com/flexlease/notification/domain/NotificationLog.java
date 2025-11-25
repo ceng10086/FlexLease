@@ -38,6 +38,12 @@ public class NotificationLog {
     @Column(name = "payload")
     private String payload;
 
+    @Column(name = "context_type", length = 50)
+    private String contextType;
+
+    @Column(name = "context_ref", length = 100)
+    private String contextReference;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     private NotificationStatus status;
@@ -60,7 +66,9 @@ public class NotificationLog {
                              String recipient,
                              String subject,
                              String content,
-                             String payload) {
+                             String payload,
+                             String contextType,
+                             String contextReference) {
         this.id = UUID.randomUUID();
         this.templateCode = templateCode;
         this.channel = channel;
@@ -68,6 +76,8 @@ public class NotificationLog {
         this.subject = subject;
         this.content = content;
         this.payload = payload;
+        this.contextType = contextType;
+        this.contextReference = contextReference;
         this.status = NotificationStatus.PENDING;
     }
 
@@ -76,8 +86,10 @@ public class NotificationLog {
                                          String recipient,
                                          String subject,
                                          String content,
-                                         String payload) {
-        return new NotificationLog(templateCode, channel, recipient, subject, content, payload);
+                                         String payload,
+                                         String contextType,
+                                         String contextReference) {
+        return new NotificationLog(templateCode, channel, recipient, subject, content, payload, contextType, contextReference);
     }
 
     @PrePersist
@@ -127,6 +139,14 @@ public class NotificationLog {
 
     public String getPayload() {
         return payload;
+    }
+
+    public String getContextType() {
+        return contextType;
+    }
+
+    public String getContextReference() {
+        return contextReference;
     }
 
     public NotificationStatus getStatus() {

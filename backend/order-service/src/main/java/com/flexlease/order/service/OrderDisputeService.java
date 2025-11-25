@@ -39,6 +39,7 @@ import org.springframework.util.StringUtils;
 public class OrderDisputeService {
 
     private static final Logger LOG = LoggerFactory.getLogger(OrderDisputeService.class);
+    private static final String DISPUTE_CONTEXT = "DISPUTE";
 
     private final RentalOrderRepository rentalOrderRepository;
     private final OrderDisputeRepository orderDisputeRepository;
@@ -95,7 +96,8 @@ public class OrderDisputeService {
                 attributes,
                 actorRole);
         notifyCounterparty(order,
-                actorRole,
+            dispute,
+            actorRole,
                 "订单纠纷已创建",
                 "订单 %s 发起纠纷：%s".formatted(order.getOrderNo(), request.reason()));
         return orderAssembler.toDisputeResponse(dispute);
@@ -133,7 +135,8 @@ public class OrderDisputeService {
                 attributes,
                 actorRole);
         notifyCounterparty(order,
-                actorRole,
+            dispute,
+            actorRole,
                 request.accept() ? "纠纷达成一致" : "对方更新纠纷建议",
                 request.accept()
                         ? "订单 %s 的纠纷达成一致，请留意后续处理。".formatted(order.getOrderNo())
@@ -161,11 +164,13 @@ public class OrderDisputeService {
                 Map.of("reason", reason),
                 actorRole);
         notifyUser(order,
-                "纠纷进入仲裁",
-                "订单 %s 已提交平台仲裁，平台将尽快处理。".formatted(order.getOrderNo()));
+            dispute,
+            "纠纷进入仲裁",
+            "订单 %s 已提交平台仲裁，平台将尽快处理。".formatted(order.getOrderNo()));
         notifyVendor(order,
-                "纠纷进入仲裁",
-                "订单 %s 已提交平台仲裁，请配合完成取证。".formatted(order.getOrderNo()));
+            dispute,
+            "纠纷进入仲裁",
+            "订单 %s 已提交平台仲裁，请配合完成取证。".formatted(order.getOrderNo()));
         return orderAssembler.toDisputeResponse(dispute);
     }
 
@@ -185,11 +190,13 @@ public class OrderDisputeService {
                 Map.of("reason", reason, "appealCount", dispute.getAppealCount()),
                 actorRole);
         notifyUser(order,
-                "纠纷发起申诉",
-                "订单 %s 已发起申诉，平台将复核。".formatted(order.getOrderNo()));
+            dispute,
+            "纠纷发起申诉",
+            "订单 %s 已发起申诉，平台将复核。".formatted(order.getOrderNo()));
         notifyVendor(order,
-                "纠纷发起申诉",
-                "订单 %s 已进入申诉复核阶段，请关注消息。".formatted(order.getOrderNo()));
+            dispute,
+            "纠纷发起申诉",
+            "订单 %s 已进入申诉复核阶段，请关注消息。".formatted(order.getOrderNo()));
         return orderAssembler.toDisputeResponse(dispute);
     }
 
@@ -223,11 +230,13 @@ public class OrderDisputeService {
         }
         String summary = buildDecisionMessage(request);
         notifyUser(order,
-                "纠纷裁决结果",
-                "订单 %s 纠纷裁决：%s".formatted(order.getOrderNo(), summary));
+            dispute,
+            "纠纷裁决结果",
+            "订单 %s 纠纷裁决：%s".formatted(order.getOrderNo(), summary));
         notifyVendor(order,
-                "纠纷裁决结果",
-                "订单 %s 纠纷裁决：%s".formatted(order.getOrderNo(), summary));
+            dispute,
+            "纠纷裁决结果",
+            "订单 %s 纠纷裁决：%s".formatted(order.getOrderNo(), summary));
         orderSurveyService.scheduleForDispute(order, dispute);
         return orderAssembler.toDisputeResponse(dispute);
     }
@@ -301,27 +310,30 @@ public class OrderDisputeService {
     }
 
     private void notifyCounterparty(RentalOrder order,
+                                    OrderDispute dispute,
                                     OrderActorRole actorRole,
                                     String subject,
                                     String content) {
         if (actorRole == OrderActorRole.USER) {
-            notifyVendor(order, subject, content);
+            notifyVendor(order, dispute, subject, content);
         } else if (actorRole == OrderActorRole.VENDOR) {
-            notifyUser(order, subject, content);
+            notifyUser(order, dispute, subject, content);
         } else {
-            notifyUser(order, subject, content);
-            notifyVendor(order, subject, content);
+            notifyUser(order, dispute, subject, content);
+            notifyVendor(order, dispute, subject, content);
         }
     }
 
-    private void notifyUser(RentalOrder order, String subject, String content) {
+    private void notifyUser(RentalOrder order, OrderDispute dispute, String subject, String content) {
         NotificationSendRequest request = new NotificationSendRequest(
                 null,
                 NotificationChannel.IN_APP,
                 order.getUserId().toString(),
                 subject,
                 content,
-                Map.of("orderNo", order.getOrderNo())
+                Map.of("orderNo", order.getOrderNo()),
+                dispute != null ? DISPUTE_CONTEXT : null,
+                dispute != null ? dispute.getId().toString() : null
         );
         try {
             notificationClient.send(request);
@@ -330,14 +342,16 @@ public class OrderDisputeService {
         }
     }
 
-    private void notifyVendor(RentalOrder order, String subject, String content) {
+    private void notifyVendor(RentalOrder order, OrderDispute dispute, String subject, String content) {
         NotificationSendRequest request = new NotificationSendRequest(
                 null,
                 NotificationChannel.IN_APP,
                 order.getVendorId().toString(),
                 subject,
                 content,
-                Map.of("orderNo", order.getOrderNo())
+                Map.of("orderNo", order.getOrderNo()),
+                dispute != null ? DISPUTE_CONTEXT : null,
+                dispute != null ? dispute.getId().toString() : null
         );
         try {
             notificationClient.send(request);

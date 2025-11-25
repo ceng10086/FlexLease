@@ -18,9 +18,11 @@ import com.flexlease.notification.repository.NotificationTemplateRepository;
 import jakarta.transaction.Transactional;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -68,7 +70,9 @@ public class NotificationService {
                 request.recipient(),
                 subject,
                 content,
-                payload
+            payload,
+            normalizeContextType(request.contextType()),
+            normalizeContextReference(request.contextReference())
         );
 
         try {
@@ -86,9 +90,14 @@ public class NotificationService {
 
     @Transactional(Transactional.TxType.SUPPORTS)
     public List<NotificationLogResponse> listLogs(NotificationStatus status, String recipient) {
+        return listLogs(status, recipient, null);
+    }
+
+    public List<NotificationLogResponse> listLogs(NotificationStatus status, String recipient, String contextType) {
         FlexleasePrincipal principal = SecurityUtils.requirePrincipal();
         boolean hasGlobalAccess = principal.hasRole("ADMIN") || principal.hasRole("INTERNAL");
         String normalizedRecipient = recipient != null && !recipient.isBlank() ? recipient : null;
+        String normalizedContextType = normalizeContextType(contextType);
 
         if (!hasGlobalAccess) {
             if (principal.hasRole("VENDOR")) {
@@ -114,16 +123,7 @@ public class NotificationService {
             }
         }
 
-        List<NotificationLog> logs;
-        if (normalizedRecipient != null) {
-            logs = status == null
-                    ? logRepository.findTop50ByRecipientOrderByCreatedAtDesc(normalizedRecipient)
-                    : logRepository.findTop50ByRecipientAndStatusOrderByCreatedAtDesc(normalizedRecipient, status);
-        } else {
-            logs = status == null
-                    ? logRepository.findTop50ByOrderByCreatedAtDesc()
-                    : logRepository.findTop50ByStatusOrderByCreatedAtDesc(status);
-        }
+        List<NotificationLog> logs = logRepository.findLatest(normalizedRecipient, status, normalizedContextType, PageRequest.of(0, 50));
         return logs.stream().map(this::toResponse).toList();
     }
 
@@ -210,8 +210,24 @@ public class NotificationService {
                 log.getContent(),
                 log.getStatus(),
                 log.getErrorMessage(),
+                log.getContextType(),
+                log.getContextReference(),
                 log.getSentAt(),
                 log.getCreatedAt()
         );
+    }
+
+    private String normalizeContextType(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        return raw.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private String normalizeContextReference(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        return raw.trim();
     }
 }

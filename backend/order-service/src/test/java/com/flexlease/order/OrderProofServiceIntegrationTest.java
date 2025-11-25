@@ -1,7 +1,9 @@
 package com.flexlease.order;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.flexlease.common.exception.BusinessException;
 import com.flexlease.common.security.FlexleasePrincipal;
 import com.flexlease.common.user.CreditTier;
 import com.flexlease.order.client.InventoryReservationClient;
@@ -122,6 +124,57 @@ class OrderProofServiceIntegrationTest {
             assertThat(orderProofService.list(created.id())).hasSize(1);
         }
     }
+
+        @Test
+        void userCannotUploadShipmentProof() {
+        UUID userId = UUID.randomUUID();
+        UUID vendorId = UUID.randomUUID();
+        UUID productId = UUID.randomUUID();
+        UUID skuId = UUID.randomUUID();
+        UUID planId = UUID.randomUUID();
+
+        stubCatalog(productId, vendorId, planId, skuId);
+
+        CreateOrderRequest createOrderRequest = new CreateOrderRequest(
+            userId,
+            vendorId,
+            "STANDARD",
+            null,
+            null,
+            List.of(new OrderItemRequest(
+                productId,
+                skuId,
+                planId,
+                "凭证限制测试",
+                "SKU-PROOF",
+                null,
+                1,
+                new BigDecimal("188.00"),
+                new BigDecimal("288.00"),
+                null
+            )),
+            List.of()
+        );
+        var created = rentalOrderService.createOrder(createOrderRequest);
+
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "proof.jpg",
+            "image/jpeg",
+            "demo".getBytes()
+        );
+
+        try (var ignored = withPrincipal(userId, null, "user", "USER")) {
+            assertThatThrownBy(() -> orderProofService.upload(
+                created.id(),
+                userId,
+                OrderProofType.SHIPMENT,
+                "违规测试",
+                file
+            )).isInstanceOf(BusinessException.class)
+                .hasMessageContaining("无权上传该类型");
+        }
+        }
 
     private void stubCatalog(UUID productId, UUID vendorId, UUID planId, UUID skuId) {
         SkuView sku = new SkuView(skuId, "SKU-" + skuId.toString().substring(0, 4));

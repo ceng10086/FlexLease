@@ -48,11 +48,14 @@ import com.flexlease.order.dto.RentalOrderResponse;
 import com.flexlease.order.dto.RentalOrderSummaryResponse;
 import com.flexlease.order.repository.OrderExtensionRequestRepository;
 import com.flexlease.order.repository.OrderReturnRequestRepository;
+import com.flexlease.order.config.ProofPolicyProperties;
+import com.flexlease.order.domain.OrderProof;
 import com.flexlease.order.repository.RentalOrderRepository;
 import jakarta.transaction.Transactional;
 import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -80,6 +83,7 @@ public class RentalOrderService {
     private final ProductCatalogClient productCatalogClient;
     private final ObjectMapper objectMapper;
     private final CreditAssessmentService creditAssessmentService;
+    private final ProofPolicyProperties proofPolicyProperties;
 
     public RentalOrderService(RentalOrderRepository rentalOrderRepository,
                               OrderExtensionRequestRepository extensionRequestRepository,
@@ -92,7 +96,8 @@ public class RentalOrderService {
                               OrderTimelineService timelineService,
                               ProductCatalogClient productCatalogClient,
                               ObjectMapper objectMapper,
-                              CreditAssessmentService creditAssessmentService) {
+                              CreditAssessmentService creditAssessmentService,
+                              ProofPolicyProperties proofPolicyProperties) {
         this.rentalOrderRepository = rentalOrderRepository;
         this.extensionRequestRepository = extensionRequestRepository;
         this.returnRequestRepository = returnRequestRepository;
@@ -105,6 +110,7 @@ public class RentalOrderService {
         this.productCatalogClient = productCatalogClient;
         this.objectMapper = objectMapper;
         this.creditAssessmentService = creditAssessmentService;
+        this.proofPolicyProperties = proofPolicyProperties;
     }
 
     @Transactional(Transactional.TxType.SUPPORTS)
@@ -309,11 +315,7 @@ public class RentalOrderService {
     public RentalOrderResponse shipOrder(UUID orderId, OrderShipmentRequest request) {
         RentalOrder order = getOrderForUpdate(orderId);
         ensureVendor(order, request.vendorId());
-        boolean hasShipmentProof = order.getProofs().stream()
-                .anyMatch(proof -> proof.getProofType() == OrderProofType.SHIPMENT);
-        if (!hasShipmentProof) {
-            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "请先上传发货凭证后再提交物流信息");
-        }
+        ensureShipmentProofBundle(order);
         List<InventoryCommand> commands = buildInventoryCommands(order);
         boolean outboundDone = false;
         boolean releaseDone = false;
@@ -359,7 +361,8 @@ public class RentalOrderService {
         RentalOrder order = getOrderForUpdate(orderId);
         ensureUser(order, request.actorId());
         boolean hasReceiveProof = order.getProofs().stream()
-                .anyMatch(proof -> proof.getProofType() == OrderProofType.RECEIVE);
+            .anyMatch(proof -> proof.getProofType() == OrderProofType.RECEIVE
+                && proof.getActorRole() == OrderActorRole.USER);
         if (!hasReceiveProof) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "请先上传收货凭证后再确认收货");
         }
@@ -1249,5 +1252,57 @@ public class RentalOrderService {
             BigDecimal unitDepositAmount,
             BigDecimal buyoutPrice
     ) {
+    }
+
+    private void ensureShipmentProofBundle(RentalOrder order) {
+        int minPhotos = Math.max(0, proofPolicyProperties.getShipmentPhotoRequired());
+        int minVideos = Math.max(0, proofPolicyProperties.getShipmentVideoRequired());
+        if (minPhotos == 0 && minVideos == 0) {
+            return;
+        }
+        long photoCount = order.getProofs().stream()
+                .filter(proof -> proof.getProofType() == OrderProofType.SHIPMENT)
+                .filter(proof -> proof.getActorRole() == OrderActorRole.VENDOR)
+                .filter(this::isImageProof)
+                .count();
+        long videoCount = order.getProofs().stream()
+                .filter(proof -> proof.getProofType() == OrderProofType.SHIPMENT)
+                .filter(proof -> proof.getActorRole() == OrderActorRole.VENDOR)
+                .filter(this::isVideoProof)
+                .count();
+        if (photoCount < minPhotos || videoCount < minVideos) {
+            String message = "发货凭证不足，需至少上传 %d 张照片和 %d 段视频".formatted(minPhotos, minVideos);
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, message);
+        }
+    }
+
+    private boolean isImageProof(OrderProof proof) {
+        String contentType = normalizeContentType(proof.getContentType());
+        if (contentType != null && contentType.startsWith("image/")) {
+            return true;
+        }
+        String fileName = normalizeFileName(proof.getFileName());
+        return fileName != null && (fileName.endsWith(".jpg")
+                || fileName.endsWith(".jpeg")
+                || fileName.endsWith(".png"));
+    }
+
+    private boolean isVideoProof(OrderProof proof) {
+        String contentType = normalizeContentType(proof.getContentType());
+        if (contentType != null && contentType.startsWith("video/")) {
+            return true;
+        }
+        String fileName = normalizeFileName(proof.getFileName());
+        return fileName != null && (fileName.endsWith(".mp4")
+                || fileName.endsWith(".mov")
+                || fileName.endsWith(".m4v"));
+    }
+
+    private String normalizeContentType(String raw) {
+        return raw == null ? null : raw.toLowerCase(Locale.ROOT);
+    }
+
+    private String normalizeFileName(String raw) {
+        return raw == null ? null : raw.toLowerCase(Locale.ROOT);
     }
 }

@@ -199,15 +199,7 @@ class RentalOrderServiceIntegrationTest {
         assertThat(paid.status()).isEqualTo(OrderStatus.AWAITING_SHIPMENT);
         assertThat(paid.paymentTransactionId()).isEqualTo(transactionId);
 
-        try (SecurityContextHandle ignored = withPrincipal(vendorAccountId, vendorId, "vendor-%s".formatted(vendorId), "VENDOR")) {
-            MockMultipartFile shipmentFile = new MockMultipartFile(
-                    "file",
-                    "shipment.jpg",
-                    "image/jpeg",
-                    new byte[]{1, 2, 3}
-            );
-            orderProofService.upload(created.id(), vendorAccountId, OrderProofType.SHIPMENT, "发货取证", shipmentFile);
-        }
+        uploadShipmentProofBundle(created.id(), vendorAccountId, vendorId);
 
         RentalOrderResponse shipped;
         try (SecurityContextHandle ignored = withPrincipal(vendorAccountId, vendorId, "vendor-%s".formatted(vendorId), "VENDOR")) {
@@ -1015,6 +1007,27 @@ class RentalOrderServiceIntegrationTest {
         CatalogProductView catalogProductView = new CatalogProductView(productId, vendorId, null, List.of(planView));
         Mockito.when(productCatalogClient.getProduct(productId)).thenReturn(catalogProductView);
     }
+
+        private void uploadShipmentProofBundle(UUID orderId, UUID vendorAccountId, UUID vendorId) {
+                try (SecurityContextHandle ignored = withPrincipal(vendorAccountId, vendorId, "vendor-" + vendorId, "VENDOR")) {
+                        for (int i = 0; i < 3; i++) {
+                                MockMultipartFile photo = new MockMultipartFile(
+                                                "file",
+                                                "shipment-%d.jpg".formatted(i + 1),
+                                                "image/jpeg",
+                                                new byte[]{(byte) (i + 1)}
+                                );
+                                orderProofService.upload(orderId, vendorAccountId, OrderProofType.SHIPMENT, "发货照片" + (i + 1), photo);
+                        }
+                        MockMultipartFile video = new MockMultipartFile(
+                                        "file",
+                                        "evidence.mp4",
+                                        "video/mp4",
+                                        new byte[]{9, 9, 9}
+                        );
+                        orderProofService.upload(orderId, vendorAccountId, OrderProofType.SHIPMENT, "开机演示", video);
+                }
+        }
 
         private SecurityContextHandle withPrincipal(UUID userId, String username, String... roles) {
                 return withPrincipal(userId, null, username, roles);

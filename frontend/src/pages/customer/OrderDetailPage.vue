@@ -475,17 +475,22 @@ const surveyModal = reactive({
   loading: false
 });
 
+const proofLabelMap: Record<OrderProofType, string> = {
+  SHIPMENT: '发货凭证',
+  RECEIVE: '收货/验收',
+  RETURN: '退租寄回',
+  INSPECTION: '巡检记录',
+  OTHER: '其他'
+};
+
 const proofTypeOptions: { label: string; value: OrderProofType }[] = [
-  { label: '收货/验收', value: 'RECEIVE' },
-  { label: '发货凭证', value: 'SHIPMENT' },
-  { label: '退租寄回', value: 'RETURN' },
-  { label: '巡检记录', value: 'INSPECTION' },
-  { label: '其他', value: 'OTHER' }
+  { label: proofLabelMap.RECEIVE, value: 'RECEIVE' },
+  { label: proofLabelMap.RETURN, value: 'RETURN' },
+  { label: proofLabelMap.INSPECTION, value: 'INSPECTION' },
+  { label: proofLabelMap.OTHER, value: 'OTHER' }
 ];
-const proofTypeMap = proofTypeOptions.reduce<Record<OrderProofType, string>>((acc, option) => {
-  acc[option.value] = option.label;
-  return acc;
-}, {} as Record<OrderProofType, string>);
+
+const proofTypeMap: Record<OrderProofType, string> = proofLabelMap;
 
 const disputes = computed(() => order.value?.disputes ?? []);
 const userSurveys = computed(() =>
@@ -493,7 +498,9 @@ const userSurveys = computed(() =>
 );
 const canCreateDispute = computed(() => !!order.value && order.value.userId === auth.user?.id);
 const proofList = computed(() => order.value?.proofs ?? []);
-const hasReceiveProof = computed(() => proofList.value.some((item) => item.proofType === 'RECEIVE'));
+const hasReceiveProof = computed(() =>
+  proofList.value.some((item) => item.proofType === 'RECEIVE' && item.actorRole === 'USER')
+);
 const canConfirmReceive = computed(() => {
   if (!order.value) {
     return false;
