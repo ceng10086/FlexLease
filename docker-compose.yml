@@ -139,6 +139,7 @@ services:
       FLEXLEASE_PAYMENT_SERVICE_BASE_URL: http://payment-service:9005/api/v1
       FLEXLEASE_NOTIFICATION_SERVICE_BASE_URL: http://notification-service:9006/api/v1
       FLEXLEASE_PRODUCT_SERVICE_BASE_URL: http://product-service:9003/api/v1
+      FLEXLEASE_USER_SERVICE_BASE_URL: http://user-service:9002/api/v1
       FLEXLEASE_PROOF_STORAGE_ROOT: /app/storage/order-proofs
       SERVER_PORT: 9004
     volumes:
@@ -165,6 +166,7 @@ services:
       SERVER_PORT: 9005
       FLEXLEASE_ORDER_SERVICE_BASE_URL: http://order-service:9004/api/v1
       FLEXLEASE_NOTIFICATION_SERVICE_BASE_URL: http://notification-service:9006/api/v1
+      FLEXLEASE_USER_SERVICE_BASE_URL: http://user-service:9002/api/v1
     depends_on:
       - registry-service
       - postgres
