@@ -7,10 +7,12 @@ import com.flexlease.common.exception.BusinessException;
 import com.flexlease.common.notification.NotificationChannel;
 import com.flexlease.common.notification.NotificationSendRequest;
 import com.flexlease.common.security.FlexleasePrincipal;
+import com.flexlease.notification.domain.NotificationLog;
 import com.flexlease.notification.domain.NotificationStatus;
 import com.flexlease.notification.repository.NotificationLogRepository;
 import com.flexlease.notification.repository.NotificationTemplateRepository;
 import com.flexlease.notification.service.NotificationService;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -159,6 +161,53 @@ class NotificationServiceIntegrationTest {
             assertThat(logs).isNotEmpty();
             assertThat(logs).allMatch(log -> "DISPUTE".equals(log.contextType()));
         }
+    }
+
+    @Test
+    void adminCanFilterByChannel() {
+        UUID recipient = UUID.randomUUID();
+        notificationService.sendNotification(new NotificationSendRequest(
+                null,
+                NotificationChannel.IN_APP,
+                recipient.toString(),
+                "站内信提醒",
+                "消息正文",
+                Map.of()
+        ));
+        notificationService.sendNotification(new NotificationSendRequest(
+                null,
+                NotificationChannel.EMAIL,
+                "user@example.com",
+                "邮件提醒",
+                "您有新的通知",
+                Map.of()
+        ));
+
+        try (SecurityContextHandle ignored = withPrincipal(UUID.randomUUID(), null, "admin-user", Set.of("ADMIN"))) {
+            var logs = notificationService.listLogs(null, null, null, NotificationChannel.EMAIL);
+            assertThat(logs).isNotEmpty();
+            assertThat(logs).allMatch(log -> log.channel() == NotificationChannel.EMAIL);
+        }
+    }
+
+    @Test
+    void shouldPersistFailedLogWhenBusinessExceptionOccurs() {
+        long before = notificationLogRepository.count();
+        assertThatThrownBy(() -> notificationService.sendNotification(new NotificationSendRequest(
+                null,
+                NotificationChannel.EMAIL,
+                "invalid-email",
+                "主题",
+                "正文",
+                Map.of()
+        ))).isInstanceOf(BusinessException.class);
+
+        assertThat(notificationLogRepository.count()).isEqualTo(before + 1);
+        var latest = notificationLogRepository.findAll().stream()
+                .max(Comparator.comparing(NotificationLog::getCreatedAt))
+                .orElseThrow();
+        assertThat(latest.getStatus()).isEqualTo(NotificationStatus.FAILED);
+        assertThat(latest.getErrorMessage()).contains("邮箱地址格式不正确");
     }
 
     private SecurityContextHandle withPrincipal(UUID userId, UUID vendorId, String username, Set<String> roles) {

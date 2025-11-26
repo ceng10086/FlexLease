@@ -75,16 +75,21 @@ public class NotificationService {
             normalizeContextReference(request.contextReference())
         );
 
+        BusinessException businessFailure = null;
         try {
             simulateDelivery(channel, request.recipient());
             log.markSent();
         } catch (BusinessException ex) {
-            throw ex;
+            log.markFailed(ex.getMessage());
+            businessFailure = ex;
         } catch (Exception ex) {
             log.markFailed(ex.getMessage());
         }
 
         NotificationLog saved = logRepository.save(log);
+        if (businessFailure != null) {
+            throw businessFailure;
+        }
         return toResponse(saved);
     }
 
@@ -94,6 +99,13 @@ public class NotificationService {
     }
 
     public List<NotificationLogResponse> listLogs(NotificationStatus status, String recipient, String contextType) {
+        return listLogs(status, recipient, contextType, null);
+    }
+
+    public List<NotificationLogResponse> listLogs(NotificationStatus status,
+                                                  String recipient,
+                                                  String contextType,
+                                                  NotificationChannel channel) {
         FlexleasePrincipal principal = SecurityUtils.requirePrincipal();
         boolean hasGlobalAccess = principal.hasRole("ADMIN") || principal.hasRole("INTERNAL");
         String normalizedRecipient = recipient != null && !recipient.isBlank() ? recipient : null;
@@ -123,7 +135,13 @@ public class NotificationService {
             }
         }
 
-        List<NotificationLog> logs = logRepository.findLatest(normalizedRecipient, status, normalizedContextType, PageRequest.of(0, 50));
+        List<NotificationLog> logs = logRepository.findLatest(
+                normalizedRecipient,
+                status,
+                normalizedContextType,
+                channel,
+                PageRequest.of(0, 50)
+        );
         return logs.stream().map(this::toResponse).toList();
     }
 

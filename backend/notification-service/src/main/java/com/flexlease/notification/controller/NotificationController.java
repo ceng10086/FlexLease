@@ -3,6 +3,7 @@ package com.flexlease.notification.controller;
 import com.flexlease.common.dto.ApiResponse;
 import com.flexlease.common.exception.BusinessException;
 import com.flexlease.common.exception.ErrorCode;
+import com.flexlease.common.notification.NotificationChannel;
 import com.flexlease.common.notification.NotificationSendRequest;
 import com.flexlease.common.security.FlexleasePrincipal;
 import com.flexlease.common.security.SecurityUtils;
@@ -12,6 +13,7 @@ import com.flexlease.notification.dto.NotificationTemplateResponse;
 import com.flexlease.notification.service.NotificationService;
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.Locale;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -41,7 +43,8 @@ public class NotificationController {
     @GetMapping("/logs")
     public ApiResponse<List<NotificationLogResponse>> logs(@RequestParam(required = false) String status,
                                                            @RequestParam(required = false) String recipient,
-                                                           @RequestParam(required = false) String contextType) {
+                                                           @RequestParam(required = false) String contextType,
+                                                           @RequestParam(required = false) String channel) {
         NotificationStatus statusEnum = null;
         if (status != null && !status.isBlank()) {
             try {
@@ -50,10 +53,18 @@ public class NotificationController {
                 throw new BusinessException(ErrorCode.VALIDATION_ERROR, "非法状态值: " + status);
             }
         }
+        NotificationChannel channelEnum = null;
+        if (channel != null && !channel.isBlank()) {
+            try {
+                channelEnum = NotificationChannel.valueOf(channel.toUpperCase(Locale.ROOT));
+            } catch (IllegalArgumentException ex) {
+                throw new BusinessException(ErrorCode.VALIDATION_ERROR, "非法通知渠道: " + channel);
+            }
+        }
         FlexleasePrincipal principal = SecurityUtils.requirePrincipal();
         String normalizedRecipient = recipient != null && !recipient.isBlank() ? recipient : null;
         if (principal.hasRole("ADMIN") || principal.hasRole("INTERNAL")) {
-            return ApiResponse.success(notificationService.listLogs(statusEnum, normalizedRecipient, contextType));
+            return ApiResponse.success(notificationService.listLogs(statusEnum, normalizedRecipient, contextType, channelEnum));
         }
 
         if (principal.hasRole("VENDOR")) {
@@ -64,7 +75,7 @@ public class NotificationController {
             if (normalizedRecipient != null && !normalizedRecipient.equals(vendorRecipient)) {
                 throw new BusinessException(ErrorCode.FORBIDDEN, "禁止查看其他厂商的通知");
             }
-            return ApiResponse.success(notificationService.listLogs(statusEnum, vendorRecipient, contextType));
+            return ApiResponse.success(notificationService.listLogs(statusEnum, vendorRecipient, contextType, channelEnum));
         }
 
         if (principal.userId() == null) {
@@ -74,7 +85,7 @@ public class NotificationController {
         if (normalizedRecipient != null && !normalizedRecipient.equals(userRecipient)) {
             throw new BusinessException(ErrorCode.FORBIDDEN, "禁止查看其他用户的通知");
         }
-        return ApiResponse.success(notificationService.listLogs(statusEnum, userRecipient, contextType));
+        return ApiResponse.success(notificationService.listLogs(statusEnum, userRecipient, contextType, channelEnum));
     }
 
     @GetMapping("/templates")
