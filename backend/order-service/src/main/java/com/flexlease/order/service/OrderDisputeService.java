@@ -65,7 +65,6 @@ public class OrderDisputeService {
         this.orderSurveyService = orderSurveyService;
     }
 
-    @Transactional(Transactional.TxType.SUPPORTS)
     public List<OrderDisputeResponse> list(UUID orderId) {
         RentalOrder order = loadOrder(orderId);
         ensureReadable(order);

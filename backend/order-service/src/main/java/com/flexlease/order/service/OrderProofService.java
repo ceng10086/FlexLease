@@ -67,7 +67,6 @@ public class OrderProofService {
         this.orderProofRepository = orderProofRepository;
     }
 
-    @Transactional(Transactional.TxType.SUPPORTS)
     public List<OrderProofResponse> list(UUID orderId) {
         RentalOrder order = loadOrder(orderId);
         ensureReadable(order);
@@ -118,7 +117,6 @@ public class OrderProofService {
         }
     }
 
-    @Transactional(Transactional.TxType.SUPPORTS)
     public ProofFileResource loadProofFile(String storedName) {
         OrderProof proof = orderProofRepository.findByFileName(storedName)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "取证文件不存在"));

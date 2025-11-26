@@ -32,7 +32,6 @@ public class OrderContractService {
         this.contractRepository = contractRepository;
     }
 
-    @Transactional(Transactional.TxType.SUPPORTS)
     public OrderContractResponse getContract(UUID orderId) {
         RentalOrder order = loadOrder(orderId);
         assertReadable(order);

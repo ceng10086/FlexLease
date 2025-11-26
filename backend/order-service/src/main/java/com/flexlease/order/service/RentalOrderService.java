@@ -220,7 +220,6 @@ public class RentalOrderService {
         }
     }
 
-    @Transactional(Transactional.TxType.SUPPORTS)
     public RentalOrderResponse getOrder(UUID orderId) {
         RentalOrder order = rentalOrderRepository.findByIdWithDetails(orderId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "订单不存在"));
@@ -228,7 +227,6 @@ public class RentalOrderService {
         return assembler.toOrderResponse(order);
     }
 
-    @Transactional(Transactional.TxType.SUPPORTS)
     public PagedResponse<RentalOrderSummaryResponse> listOrdersForUser(UUID userId, OrderStatus status, Pageable pageable) {
         ensureUserListPermission(userId);
         Page<RentalOrder> page = status == null
@@ -237,7 +235,6 @@ public class RentalOrderService {
         return toPagedResponse(page);
     }
 
-    @Transactional(Transactional.TxType.SUPPORTS)
     public PagedResponse<RentalOrderSummaryResponse> listOrdersForVendor(UUID vendorId, OrderStatus status, Pageable pageable) {
         ensureVendorListPermission(vendorId);
         Page<RentalOrder> page = status == null
@@ -246,7 +243,6 @@ public class RentalOrderService {
         return toPagedResponse(page);
     }
 
-    @Transactional(Transactional.TxType.SUPPORTS)
     public PagedResponse<RentalOrderSummaryResponse> listOrdersForAdmin(UUID userId, UUID vendorId, OrderStatus status, Pageable pageable) {
         ensureAdminAccess();
         if (userId != null && vendorId != null) {

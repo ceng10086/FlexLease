@@ -59,7 +59,6 @@ public class OrderSurveyService {
         this.surveyProperties = surveyProperties;
     }
 
-    @Transactional(Transactional.TxType.SUPPORTS)
     public List<OrderSurveyResponse> list(UUID orderId) {
         RentalOrder order = loadOrder(orderId);
         ensureReadable(order);
