@@ -13,7 +13,7 @@ spring:
         - id: user-service
           uri: lb://user-service
           predicates:
-            - Path=/api/v1/users/**,/api/v1/admin/users/**,/api/v1/vendors,/api/v1/vendors/*,/api/v1/vendors/*/suspend,/api/v1/vendors/applications/**,/api/v1/customers/profile/**
+            - Path=/api/v1/users/**,/api/v1/admin/users/**,/api/v1/vendors,/api/v1/vendors/*,/api/v1/vendors/**,/api/v1/vendors/*/suspend,/api/v1/vendors/applications/**,/api/v1/customers/profile/**
         - id: product-service
           uri: lb://product-service
           predicates:

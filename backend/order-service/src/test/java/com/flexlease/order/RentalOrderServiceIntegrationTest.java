@@ -190,7 +190,13 @@ class RentalOrderServiceIntegrationTest {
                 PaymentStatus.SUCCEEDED,
                 preview.totalAmount(),
                 null,
-                List.of()
+                List.of(
+                        new PaymentTransactionView.RefundView(
+                                UUID.randomUUID(),
+                                new BigDecimal("20.00"),
+                                OffsetDateTime.now()
+                        )
+                )
         );
         org.mockito.Mockito.when(paymentClient.loadTransaction(transactionId)).thenReturn(transactionView);
 

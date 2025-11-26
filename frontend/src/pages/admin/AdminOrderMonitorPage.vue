@@ -18,6 +18,7 @@
           <a-input
             v-model:value="filters.userId"
             placeholder="可选"
+            :disabled="disableUserFilter"
             :style="{ width: isMobile ? '100%' : '240px' }"
           />
         </a-form-item>
@@ -25,6 +26,7 @@
           <a-input
             v-model:value="filters.vendorId"
             placeholder="可选"
+            :disabled="disableVendorFilter"
             :style="{ width: isMobile ? '100%' : '240px' }"
           />
         </a-form-item>
@@ -296,6 +298,8 @@ const filters = reactive<{ userId?: string; vendorId?: string; status?: OrderSta
 const loading = ref(false);
 const orders = ref<RentalOrderSummary[]>([]);
 const pagination = reactive({ current: 1, pageSize: 10, total: 0 });
+const disableUserFilter = computed(() => Boolean(filters.vendorId));
+const disableVendorFilter = computed(() => Boolean(filters.userId));
 
 const detailDrawer = reactive<{ open: boolean; loading: boolean; order: RentalOrderDetail | null }>(
   {
@@ -379,6 +383,10 @@ const disputeActorLabel = (role?: string | null) => {
 };
 
 const loadOrders = async () => {
+  if (filters.userId && filters.vendorId) {
+    message.warning('请仅填写用户 ID 或厂商 ID 中的一项');
+    return;
+  }
   loading.value = true;
   try {
     const result = await listAdminOrders({

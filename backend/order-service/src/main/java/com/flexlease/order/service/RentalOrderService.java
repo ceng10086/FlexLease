@@ -999,13 +999,18 @@ public class RentalOrderService {
                 : transaction.refunds().stream()
                 .map(PaymentTransactionView.RefundView::amount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal deposit = order.getDepositAmount();
-        BigDecimal remaining = deposit.subtract(refunded);
-        if (remaining.compareTo(BigDecimal.ZERO) <= 0) {
+        BigDecimal transactionAmount = transaction.amount() == null ? BigDecimal.ZERO : transaction.amount();
+        BigDecimal refundableBalance = transactionAmount.subtract(refunded);
+        if (refundableBalance.compareTo(BigDecimal.ZERO) <= 0) {
             return BigDecimal.ZERO;
         }
-        paymentClient.createRefund(order.getPaymentTransactionId(), remaining, "订单退租押金退款");
-        return remaining;
+        BigDecimal deposit = order.getDepositAmount();
+        BigDecimal targetRefund = deposit.min(refundableBalance);
+        if (targetRefund.compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO;
+        }
+        paymentClient.createRefund(order.getPaymentTransactionId(), targetRefund, "订单退租押金退款");
+        return targetRefund;
     }
 
     private void releaseReservedInventory(RentalOrder order) {
