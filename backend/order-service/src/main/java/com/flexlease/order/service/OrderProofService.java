@@ -13,6 +13,7 @@ import com.flexlease.order.domain.OrderProof;
 import com.flexlease.order.domain.OrderProofType;
 import com.flexlease.order.domain.RentalOrder;
 import com.flexlease.order.dto.OrderProofResponse;
+import com.flexlease.order.repository.OrderProofRepository;
 import com.flexlease.order.repository.RentalOrderRepository;
 import com.flexlease.order.storage.ProofStorageService;
 import com.flexlease.order.storage.ProofStorageService.StoredFile;
@@ -26,6 +27,7 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.core.io.Resource;
 
 @Service
 @Transactional
@@ -49,17 +51,20 @@ public class OrderProofService {
     private final OrderAssembler orderAssembler;
     private final OrderTimelineService timelineService;
     private final NotificationClient notificationClient;
+    private final OrderProofRepository orderProofRepository;
 
     public OrderProofService(RentalOrderRepository rentalOrderRepository,
                              ProofStorageService proofStorageService,
                              OrderAssembler orderAssembler,
                              OrderTimelineService timelineService,
-                             NotificationClient notificationClient) {
+                             NotificationClient notificationClient,
+                             OrderProofRepository orderProofRepository) {
         this.rentalOrderRepository = rentalOrderRepository;
         this.proofStorageService = proofStorageService;
         this.orderAssembler = orderAssembler;
         this.timelineService = timelineService;
         this.notificationClient = notificationClient;
+        this.orderProofRepository = orderProofRepository;
     }
 
     @Transactional(Transactional.TxType.SUPPORTS)
@@ -111,6 +116,17 @@ public class OrderProofService {
             proofStorageService.delete(stored.storedName());
             throw ex;
         }
+    }
+
+    @Transactional(Transactional.TxType.SUPPORTS)
+    public ProofFileResource loadProofFile(String storedName) {
+        OrderProof proof = orderProofRepository.findByFileName(storedName)
+                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "取证文件不存在"));
+        RentalOrder order = proof.getOrder();
+        ensureReadable(order);
+        Resource resource = proofStorageService.loadAsResource(storedName);
+        String contentType = proof.getContentType() != null ? proof.getContentType() : "application/octet-stream";
+        return new ProofFileResource(storedName, contentType, proof.getFileSize(), resource);
     }
 
     private void ensureProofTypeAllowed(OrderActorRole role, OrderProofType type) {
@@ -221,5 +237,11 @@ public class OrderProofService {
         } catch (RuntimeException ex) {
             // ignore
         }
+    }
+
+    public record ProofFileResource(String fileName,
+                                    String contentType,
+                                    long fileSize,
+                                    Resource resource) {
     }
 }

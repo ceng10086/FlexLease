@@ -204,7 +204,7 @@
                 <span>{{ formatDate(item.uploadedAt) }}</span>
               </div>
               <p class="proof-item__desc">{{ item.description || '未填写说明' }}</p>
-              <a :href="item.fileUrl" target="_blank" rel="noopener">查看文件</a>
+              <a href="#" @click.prevent="handleDownloadProof(item)">查看文件</a>
             </div>
           </div>
           <a-form layout="vertical" class="mt-12">
@@ -459,6 +459,7 @@ import {
   type RentalOrderSummary,
   type RentalOrderDetail,
   type OrderEvent,
+  type OrderProof,
   type OrderProofType,
   type OrderDispute,
   type DisputeResolutionOption,
@@ -473,6 +474,7 @@ import {
 } from '../../utils/orderAmounts';
 import OrderContractDrawer from '../../components/orders/OrderContractDrawer.vue';
 import { useAuthStore } from '../../stores/auth';
+import http from '../../services/http';
 
 const vendorStatuses: OrderStatus[] = [
   'PENDING_PAYMENT',
@@ -519,8 +521,6 @@ const proofForm = reactive({
   uploading: false,
   inputKey: Date.now()
 });
-const SHIPMENT_PHOTO_REQUIRED = 3;
-const SHIPMENT_VIDEO_REQUIRED = 1;
 const vendorDisputeModal = reactive({
   open: false,
   reason: '',
@@ -559,10 +559,32 @@ const proofTypeOptions: { label: string; value: OrderProofType }[] = [
 
 const proofTypeMap: Record<OrderProofType, string> = proofLabelMap;
 
+const API_PREFIX = '/api/v1';
+const normalizeApiPath = (url: string) =>
+  url.startsWith(API_PREFIX) ? url.substring(API_PREFIX.length) : url;
+
+const inferProofExtension = (url?: string | null) => {
+  if (!url) {
+    return '';
+  }
+  const match = url.match(/(\.[a-zA-Z0-9]+)$/);
+  return match ? match[1] : '';
+};
+
+const resolveProofDownloadName = (proof: OrderProof) => {
+  const extension = inferProofExtension(proof.fileUrl);
+  return `${proof.proofType ?? 'PROOF'}-${proof.id}${extension}`;
+};
+
 const disputes = computed(() => detail.order?.disputes ?? []);
 const vendorSurveys = computed(() =>
   detail.order?.surveys?.filter((item) => item.targetRole === 'VENDOR') ?? []
 );
+
+const shipmentRequirement = computed(() => ({
+  photos: detail.order?.shipmentPhotoRequired ?? 0,
+  videos: detail.order?.shipmentVideoRequired ?? 0
+}));
 
 const disputeOptions: { label: string; value: DisputeResolutionOption }[] = [
   { label: '重新发货/补发', value: 'REDELIVER' },
@@ -623,17 +645,18 @@ const shipmentProofStats = computed(() => {
 });
 
 const meetsShipmentProofRequirement = computed(() =>
-  shipmentProofStats.value.photos >= SHIPMENT_PHOTO_REQUIRED &&
-  shipmentProofStats.value.videos >= SHIPMENT_VIDEO_REQUIRED
+  shipmentProofStats.value.photos >= shipmentRequirement.value.photos &&
+  shipmentProofStats.value.videos >= shipmentRequirement.value.videos
 );
 
 const canSubmitShipment = computed(() => canShip.value && meetsShipmentProofRequirement.value);
 const shipmentRequirementHint = computed(() => {
-  if (SHIPMENT_PHOTO_REQUIRED === 0 && SHIPMENT_VIDEO_REQUIRED === 0) {
+  if (shipmentRequirement.value.photos === 0 && shipmentRequirement.value.videos === 0) {
     return '无需额外凭证即可发货。';
   }
   const stats = shipmentProofStats.value;
-  return `需至少上传${SHIPMENT_PHOTO_REQUIRED}张照片和${SHIPMENT_VIDEO_REQUIRED}段视频（当前 ${stats.photos}/${SHIPMENT_PHOTO_REQUIRED} 张、${stats.videos}/${SHIPMENT_VIDEO_REQUIRED} 段）`;
+  const requirement = shipmentRequirement.value;
+  return `需至少上传${requirement.photos}张照片和${requirement.videos}段视频（当前 ${stats.photos}/${requirement.photos} 张、${stats.videos}/${requirement.videos} 段）`;
 });
 const resolveActorLabel = (event: OrderEvent) => {
   if (event.actorRole === 'USER') {
@@ -952,6 +975,29 @@ const handleProofUpload = async () => {
     message.error('上传取证资料失败，请稍后重试');
   } finally {
     proofForm.uploading = false;
+  }
+};
+
+const handleDownloadProof = async (proof: OrderProof) => {
+  if (!proof.fileUrl) {
+    message.warning('文件地址无效');
+    return;
+  }
+  const path = normalizeApiPath(proof.fileUrl);
+  try {
+    const response = await http.get(path, { responseType: 'blob' });
+    const blob = new Blob([response.data], { type: proof.contentType ?? 'application/octet-stream' });
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = resolveProofDownloadName(proof);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(objectUrl);
+  } catch (error) {
+    console.error('下载取证资料失败', error);
+    message.error('下载取证资料失败，请稍后重试');
   }
 };
 

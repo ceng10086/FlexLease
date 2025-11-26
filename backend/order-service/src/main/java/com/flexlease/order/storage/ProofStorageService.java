@@ -5,6 +5,7 @@ import com.flexlease.common.exception.ErrorCode;
 import com.flexlease.order.config.ProofStorageProperties;
 import jakarta.annotation.PostConstruct;
 import java.io.IOException;
+import java.net.MalformedURLException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -12,6 +13,8 @@ import java.util.Locale;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
@@ -60,6 +63,22 @@ public class ProofStorageService {
                 file.getContentType(),
                 file.getSize()
         );
+    }
+
+    public Resource loadAsResource(String storedName) {
+        if (!StringUtils.hasText(storedName)) {
+            throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "文件不存在");
+        }
+        try {
+            Path target = rootLocation.resolve(storedName).normalize();
+            Resource resource = new UrlResource(target.toUri());
+            if (!resource.exists() || !resource.isReadable()) {
+                throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "文件不存在或不可读");
+            }
+            return resource;
+        } catch (MalformedURLException ex) {
+            throw new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "文件地址无效");
+        }
     }
 
     public void delete(String fileName) {

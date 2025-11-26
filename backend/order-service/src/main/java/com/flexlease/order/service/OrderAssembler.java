@@ -1,5 +1,6 @@
 package com.flexlease.order.service;
 
+import com.flexlease.order.config.ProofPolicyProperties;
 import com.flexlease.order.domain.OrderDispute;
 import com.flexlease.order.domain.OrderExtensionRequest;
 import com.flexlease.order.domain.OrderEvent;
@@ -23,6 +24,14 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class OrderAssembler {
+
+        private final int shipmentPhotoRequired;
+        private final int shipmentVideoRequired;
+
+        public OrderAssembler(ProofPolicyProperties proofPolicyProperties) {
+                this.shipmentPhotoRequired = Math.max(0, proofPolicyProperties.getShipmentPhotoRequired());
+                this.shipmentVideoRequired = Math.max(0, proofPolicyProperties.getShipmentVideoRequired());
+        }
 
     public RentalOrderResponse toOrderResponse(RentalOrder order) {
         return new RentalOrderResponse(
@@ -73,7 +82,9 @@ public class OrderAssembler {
                 order.getSurveys().stream()
                         .sorted(Comparator.comparing(OrderSatisfactionSurvey::getRequestedAt))
                         .map(this::toSurveyResponse)
-                        .toList()
+                        .toList(),
+                shipmentPhotoRequired,
+                shipmentVideoRequired
         );
     }
 

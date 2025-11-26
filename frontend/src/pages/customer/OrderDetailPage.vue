@@ -73,7 +73,7 @@
                   <span>{{ formatDate(item.uploadedAt) }}</span>
                 </div>
                 <p class="proof-item__desc">{{ item.description || '未填写说明' }}</p>
-                <a :href="item.fileUrl" target="_blank" rel="noopener">查看文件</a>
+                <a href="#" @click.prevent="handleDownloadProof(item)">查看文件</a>
               </div>
             </div>
           </template>
@@ -420,6 +420,7 @@ import {
 } from '../../utils/orderAmounts';
 import OrderContractDrawer from '../../components/orders/OrderContractDrawer.vue';
 import { friendlyErrorMessage } from '../../utils/error';
+import http from '../../services/http';
 
 const route = useRoute();
 const router = useRouter();
@@ -492,6 +493,23 @@ const proofTypeOptions: { label: string; value: OrderProofType }[] = [
 
 const proofTypeMap: Record<OrderProofType, string> = proofLabelMap;
 
+const API_PREFIX = '/api/v1';
+const normalizeApiPath = (url: string) =>
+  url.startsWith(API_PREFIX) ? url.substring(API_PREFIX.length) : url;
+
+const inferProofExtension = (url?: string | null) => {
+  if (!url) {
+    return '';
+  }
+  const match = url.match(/(\.[a-zA-Z0-9]+)$/);
+  return match ? match[1] : '';
+};
+
+const resolveProofDownloadName = (proof: OrderProof) => {
+  const extension = inferProofExtension(proof.fileUrl);
+  return `${proof.proofType ?? 'PROOF'}-${proof.id}${extension}`;
+};
+
 const disputes = computed(() => order.value?.disputes ?? []);
 const userSurveys = computed(() =>
   order.value?.surveys?.filter((item) => item.targetRole === 'USER') ?? []
@@ -505,9 +523,7 @@ const canConfirmReceive = computed(() => {
   if (!order.value) {
     return false;
   }
-  const status = order.value.status;
-  const statusAllowed = status === 'AWAITING_SHIPMENT' || status === 'IN_LEASE';
-  return statusAllowed && hasReceiveProof.value;
+  return order.value.status === 'IN_LEASE' && hasReceiveProof.value;
 });
 
 const disputeOptions: { label: string; value: DisputeResolutionOption }[] = [
@@ -847,6 +863,29 @@ const handleProofUpload = async () => {
     message.error(friendlyErrorMessage(error, '上传取证资料失败，请稍后重试'));
   } finally {
     proofForm.uploading = false;
+  }
+};
+
+const handleDownloadProof = async (proof: OrderProof) => {
+  if (!proof.fileUrl) {
+    message.warning('文件地址无效');
+    return;
+  }
+  const path = normalizeApiPath(proof.fileUrl);
+  try {
+    const response = await http.get(path, { responseType: 'blob' });
+    const blob = new Blob([response.data], { type: proof.contentType ?? 'application/octet-stream' });
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = resolveProofDownloadName(proof);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(objectUrl);
+  } catch (error) {
+    console.error('下载取证资料失败', error);
+    message.error(friendlyErrorMessage(error, '下载取证资料失败，请稍后重试'));
   }
 };
 

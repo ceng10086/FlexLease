@@ -330,6 +330,8 @@ export type RentalOrderDetail = {
   extensionCount: number;
   shippingCarrier?: string | null;
   shippingTrackingNo?: string | null;
+  shipmentPhotoRequired: number;
+  shipmentVideoRequired: number;
   createdAt: string;
   updatedAt: string;
   items: RentalOrderItem[];

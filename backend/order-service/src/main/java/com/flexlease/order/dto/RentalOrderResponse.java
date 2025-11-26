@@ -37,6 +37,8 @@ public record RentalOrderResponse(
         List<OrderReturnResponse> returns,
         List<OrderProofResponse> proofs,
         List<OrderDisputeResponse> disputes,
-        List<OrderSurveyResponse> surveys
+        List<OrderSurveyResponse> surveys,
+        int shipmentPhotoRequired,
+        int shipmentVideoRequired
 ) {
 }
