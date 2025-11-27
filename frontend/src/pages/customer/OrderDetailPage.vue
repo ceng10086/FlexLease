@@ -526,7 +526,7 @@ const canConfirmReceive = computed(() => {
   if (!order.value) {
     return false;
   }
-  return order.value.status === 'IN_LEASE' && hasReceiveProof.value;
+  return order.value.status === 'AWAITING_RECEIPT' && hasReceiveProof.value;
 });
 
 const disputeOptions: { label: string; value: DisputeResolutionOption }[] = [

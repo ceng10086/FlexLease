@@ -152,6 +152,10 @@ class OrderAnalyticsServiceIntegrationTest {
             return order;
         }
         order.ship("SF", "TRACK");
+        if (targetStatus == OrderStatus.AWAITING_RECEIPT) {
+            return order;
+        }
+        order.confirmReceive();
         if (targetStatus == OrderStatus.IN_LEASE) {
             return order;
         }

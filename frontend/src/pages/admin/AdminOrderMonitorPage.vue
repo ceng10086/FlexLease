@@ -276,6 +276,7 @@ import { useViewport } from '../../composables/useViewport';
 const orderStatusOptions: OrderStatus[] = [
   'PENDING_PAYMENT',
   'AWAITING_SHIPMENT',
+  'AWAITING_RECEIPT',
   'IN_LEASE',
   'RETURN_REQUESTED',
   'RETURN_IN_PROGRESS',

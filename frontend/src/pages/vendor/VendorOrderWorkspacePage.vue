@@ -125,6 +125,17 @@
               </template>
               <template v-else-if="canCompleteReturn">
                 <a-form layout="vertical">
+                  <a-form-item label="押金退款金额 (元)">
+                    <a-input-number
+                      v-model:value="returnCompletionForm.refundAmount"
+                      :min="0"
+                      :max="maxRefundableDeposit"
+                      :precision="2"
+                      style="width: 100%"
+                      placeholder="默认按押金全额退回"
+                    />
+                    <p class="form-hint">如需扣减押金，请填写实际退款金额；留空则按押金全额退款。</p>
+                  </a-form-item>
                   <a-form-item label="完结备注">
                     <a-textarea v-model:value="returnCompletionForm.remark" :rows="3" placeholder="可选" />
                   </a-form-item>
@@ -135,7 +146,7 @@
                   >
                     确认退租完成
                   </a-button>
-                  <p class="form-hint">确认后将触发入库与押金退款。</p>
+                  <p class="form-hint">确认后将触发入库与押金退款（可按需扣减）。</p>
                 </a-form>
               </template>
               <p class="form-hint" v-else>当前状态无需退租操作。</p>
@@ -501,6 +512,7 @@ import http from '../../services/http';
 const vendorStatuses: OrderStatus[] = [
   'PENDING_PAYMENT',
   'AWAITING_SHIPMENT',
+  'AWAITING_RECEIPT',
   'IN_LEASE',
   'RETURN_REQUESTED',
   'RETURN_IN_PROGRESS',
@@ -533,7 +545,7 @@ const detail = reactive<{ open: boolean; loading: boolean; order: RentalOrderDet
 
 const shipForm = reactive({ carrier: '', trackingNumber: '', loading: false });
 const returnForm = reactive({ remark: '', loading: false });
-const returnCompletionForm = reactive({ remark: '', loading: false });
+const returnCompletionForm = reactive({ remark: '', refundAmount: null as number | null, loading: false });
 const extensionDecisionForm = reactive({ remark: '', loading: false });
 const buyoutDecisionForm = reactive({ remark: '', loading: false });
 const contractDrawerOpen = ref(false);
@@ -632,6 +644,7 @@ const isBuyoutRequested = computed(() => detail.order?.status === 'BUYOUT_REQUES
 const canShip = computed(() => detail.order?.status === 'AWAITING_SHIPMENT');
 const canApproveReturn = computed(() => detail.order?.status === 'RETURN_REQUESTED');
 const canCompleteReturn = computed(() => detail.order?.status === 'RETURN_IN_PROGRESS');
+const maxRefundableDeposit = computed(() => detail.order?.depositAmount ?? 0);
 const conversationEvents = computed(() =>
   detail.order?.events?.filter((item) => item.eventType === 'COMMUNICATION_NOTE') ?? []
 );
@@ -816,6 +829,7 @@ const openDetail = async (orderId: string) => {
     shipForm.trackingNumber = detail.order?.shippingTrackingNo ?? '';
     returnForm.remark = '';
     returnCompletionForm.remark = '';
+    returnCompletionForm.refundAmount = detail.order?.depositAmount ?? null;
     extensionDecisionForm.remark = '';
     buyoutDecisionForm.remark = '';
   } catch (error) {
@@ -922,14 +936,31 @@ const handleReturnCompletion = async () => {
     });
     message.success('退租流程已完结');
     returnCompletionForm.remark = '';
+  const rawAmount = returnCompletionForm.refundAmount;
+  let refundAmount: number | undefined;
+  if (rawAmount !== null && rawAmount !== undefined && rawAmount !== '') {
+    const normalized = Math.round(Number(rawAmount) * 100) / 100;
+    if (Number.isNaN(normalized) || normalized < 0) {
+      message.warning('请输入有效的退款金额');
+      return;
+    }
+    if (normalized > maxRefundableDeposit.value + 1e-6) {
+      message.warning(`退款金额不可超过押金 ¥${formatCurrency(maxRefundableDeposit.value)}`);
+      return;
+    }
+    refundAmount = normalized;
+  }
     await refreshDetail();
     await loadOrders();
   } catch (error) {
     console.error('完结退租失败', error);
-    message.error('完结退租失败，请稍后重试');
+      remark: returnCompletionForm.remark || '已完成退租验收',
+      refundAmount
   } finally {
     returnCompletionForm.loading = false;
   }
+    await refreshDetail();
+    returnCompletionForm.refundAmount = detail.order?.depositAmount ?? null;
 };
 
 const handleExtensionDecision = async (approve: boolean) => {

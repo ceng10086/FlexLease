@@ -77,6 +77,7 @@ const auth = useAuthStore();
 const orderStatuses: OrderStatus[] = [
   'PENDING_PAYMENT',
   'AWAITING_SHIPMENT',
+  'AWAITING_RECEIPT',
   'IN_LEASE',
   'RETURN_REQUESTED',
   'RETURN_IN_PROGRESS',
@@ -95,6 +96,7 @@ const pagination = reactive({ current: 1, pageSize: 10, total: 0 });
 const statusDict: Record<OrderStatus, { label: string; color: string }> = {
   PENDING_PAYMENT: { label: '待支付', color: 'orange' },
   AWAITING_SHIPMENT: { label: '待发货', color: 'blue' },
+  AWAITING_RECEIPT: { label: '待收货', color: 'geekblue' },
   IN_LEASE: { label: '在租中', color: 'green' },
   RETURN_REQUESTED: { label: '退租处理中', color: 'gold' },
   RETURN_IN_PROGRESS: { label: '退租中', color: 'purple' },

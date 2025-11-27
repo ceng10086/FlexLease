@@ -214,7 +214,7 @@ class RentalOrderServiceIntegrationTest {
             shipped = rentalOrderService.shipOrder(created.id(),
                     new OrderShipmentRequest(vendorId, "SF", "SF123456789"));
         }
-        assertThat(shipped.status()).isEqualTo(OrderStatus.IN_LEASE);
+        assertThat(shipped.status()).isEqualTo(OrderStatus.AWAITING_RECEIPT);
         assertThat(shipped.shippingCarrier()).isEqualTo("SF");
 
         try (SecurityContextHandle ignored = withPrincipal(userId, "customer", "USER")) {
@@ -267,7 +267,7 @@ class RentalOrderServiceIntegrationTest {
         RentalOrderResponse returnCompleted;
         try (SecurityContextHandle ignored = withPrincipal(vendorAccountId, vendorId, "vendor-%s".formatted(vendorId), "VENDOR")) {
             returnCompleted = rentalOrderService.completeReturn(created.id(),
-                    new OrderReturnCompleteRequest(vendorId, "确认完结"));
+                                        new OrderReturnCompleteRequest(vendorId, "确认完结", preview.depositAmount()));
         }
         assertThat(returnCompleted.status()).isEqualTo(OrderStatus.COMPLETED);
 

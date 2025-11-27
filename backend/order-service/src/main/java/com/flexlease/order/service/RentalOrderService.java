@@ -54,6 +54,7 @@ import com.flexlease.order.domain.OrderProof;
 import com.flexlease.order.repository.RentalOrderRepository;
 import jakarta.transaction.Transactional;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -365,7 +366,11 @@ public class RentalOrderService {
         if (!hasReceiveProof) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "请先上传收货凭证后再确认收货");
         }
-        order.confirmReceive();
+        try {
+            order.confirmReceive();
+        } catch (IllegalStateException ex) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "当前状态不支持确认收货");
+        }
         recordEvent(order, OrderEventType.ORDER_RECEIVED, "用户确认收货", request.actorId());
         notifyVendor(order, "买家确认收货", "订单 %s 已确认收货，租期正式开始计算。".formatted(order.getOrderNo()));
         return assembler.toOrderResponse(order);
@@ -441,7 +446,7 @@ public class RentalOrderService {
     public RentalOrderResponse applyReturn(UUID orderId, OrderReturnApplyRequest request) {
         RentalOrder order = getOrderForUpdate(orderId);
         ensureUser(order, request.userId());
-        if (order.getStatus() != OrderStatus.IN_LEASE && order.getStatus() != OrderStatus.RETURN_IN_PROGRESS) {
+        if (order.getStatus() != OrderStatus.IN_LEASE) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "当前状态不支持退租");
         }
         returnRequestRepository.findFirstByOrderIdAndStatusOrderByRequestedAtDesc(orderId, ReturnRequestStatus.PENDING)
@@ -514,12 +519,13 @@ public class RentalOrderService {
         List<InventoryCommand> commands = buildInventoryCommands(order);
         boolean inboundDone = false;
         BigDecimal refundedAmount = BigDecimal.ZERO;
+        BigDecimal requestedRefundAmount = normalizeRefundAmount(order, request.refundAmount());
         try {
             if (!commands.isEmpty()) {
                 inventoryReservationClient.inbound(order.getId(), commands);
                 inboundDone = true;
             }
-            refundedAmount = issueDepositRefundIfNeeded(order);
+            refundedAmount = issueDepositRefundIfNeeded(order, requestedRefundAmount);
         } catch (RuntimeException ex) {
             if (inboundDone && !commands.isEmpty()) {
                 try {
@@ -535,6 +541,9 @@ public class RentalOrderService {
         attributes.put("returnRequestId", approvedRequest.getId());
         if (request.remark() != null && !request.remark().isBlank()) {
             attributes.put("remark", request.remark());
+        }
+        if (requestedRefundAmount != null) {
+            attributes.put("requestedRefundAmount", requestedRefundAmount);
         }
         if (refundedAmount.compareTo(BigDecimal.ZERO) > 0) {
             attributes.put("refundAmount", refundedAmount);
@@ -1006,11 +1015,15 @@ public class RentalOrderService {
                 .toList();
     }
 
-    private BigDecimal issueDepositRefundIfNeeded(RentalOrder order) {
+    private BigDecimal issueDepositRefundIfNeeded(RentalOrder order, BigDecimal requestedRefundAmount) {
         if (order.getPaymentTransactionId() == null) {
             return BigDecimal.ZERO;
         }
         if (order.getDepositAmount() == null || order.getDepositAmount().compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal targetRefund = requestedRefundAmount == null ? order.getDepositAmount() : requestedRefundAmount;
+        if (targetRefund.compareTo(BigDecimal.ZERO) <= 0) {
             return BigDecimal.ZERO;
         }
         PaymentTransactionView transaction = paymentClient.loadTransaction(order.getPaymentTransactionId());
@@ -1030,13 +1043,31 @@ public class RentalOrderService {
         if (refundableBalance.compareTo(BigDecimal.ZERO) <= 0) {
             return BigDecimal.ZERO;
         }
-        BigDecimal deposit = order.getDepositAmount();
-        BigDecimal targetRefund = deposit.min(refundableBalance);
-        if (targetRefund.compareTo(BigDecimal.ZERO) <= 0) {
+        BigDecimal refundableTarget = targetRefund.min(order.getDepositAmount()).min(refundableBalance);
+        if (refundableTarget.compareTo(BigDecimal.ZERO) <= 0) {
             return BigDecimal.ZERO;
         }
-        paymentClient.createRefund(order.getPaymentTransactionId(), targetRefund, "订单退租押金退款");
-        return targetRefund;
+        paymentClient.createRefund(order.getPaymentTransactionId(), refundableTarget, "订单退租押金退款");
+        return refundableTarget;
+    }
+
+    private BigDecimal normalizeRefundAmount(RentalOrder order, BigDecimal requestedAmount) {
+        if (requestedAmount == null) {
+            return null;
+        }
+        if (requestedAmount.compareTo(BigDecimal.ZERO) < 0) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "退款金额不可为负");
+        }
+        if (order.getDepositAmount() == null || order.getDepositAmount().compareTo(BigDecimal.ZERO) <= 0) {
+            if (requestedAmount.compareTo(BigDecimal.ZERO) > 0) {
+                throw new BusinessException(ErrorCode.VALIDATION_ERROR, "当前订单无押金可退");
+            }
+            return BigDecimal.ZERO;
+        }
+        if (requestedAmount.compareTo(order.getDepositAmount()) > 0) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "退款金额不可超过押金");
+        }
+        return requestedAmount.setScale(2, RoundingMode.HALF_UP);
     }
 
     private void releaseReservedInventory(RentalOrder order) {

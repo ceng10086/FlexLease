@@ -41,6 +41,7 @@ public class OrderAnalyticsService {
 
     private static final List<OrderStatus> ACTIVE_STATUSES = List.of(
             OrderStatus.AWAITING_SHIPMENT,
+            OrderStatus.AWAITING_RECEIPT,
             OrderStatus.IN_LEASE,
             OrderStatus.RETURN_REQUESTED,
             OrderStatus.RETURN_IN_PROGRESS,
@@ -49,6 +50,7 @@ public class OrderAnalyticsService {
 
     private static final List<OrderStatus> GMV_STATUSES = List.of(
             OrderStatus.AWAITING_SHIPMENT,
+            OrderStatus.AWAITING_RECEIPT,
             OrderStatus.IN_LEASE,
             OrderStatus.RETURN_REQUESTED,
             OrderStatus.RETURN_IN_PROGRESS,

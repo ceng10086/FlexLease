@@ -4,6 +4,7 @@ import type { CreditTier } from '../types/credit';
 export type OrderStatus =
   | 'PENDING_PAYMENT'
   | 'AWAITING_SHIPMENT'
+  | 'AWAITING_RECEIPT'
   | 'IN_LEASE'
   | 'RETURN_REQUESTED'
   | 'RETURN_IN_PROGRESS'
@@ -115,6 +116,7 @@ export type OrderReturnDecisionPayload = {
 export type OrderReturnCompletePayload = {
   vendorId: string;
   remark?: string;
+  refundAmount?: number | null;
 };
 
 export type OrderBuyoutApplyPayload = {

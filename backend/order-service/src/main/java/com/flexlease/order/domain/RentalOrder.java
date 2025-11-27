@@ -367,16 +367,17 @@ public class RentalOrder {
 
     public void ship(String carrier, String trackingNo) {
         ensureStatus(OrderStatus.AWAITING_SHIPMENT);
-        this.status = OrderStatus.IN_LEASE;
+        this.status = OrderStatus.AWAITING_RECEIPT;
         this.shippingCarrier = carrier;
         this.shippingTrackingNo = trackingNo;
-        if (this.leaseStartAt == null) {
-            this.leaseStartAt = OffsetDateTime.now();
-        }
     }
 
     public void confirmReceive() {
-        ensureStatus(OrderStatus.IN_LEASE);
+        ensureStatus(OrderStatus.AWAITING_RECEIPT);
+        this.status = OrderStatus.IN_LEASE;
+        if (this.leaseStartAt == null) {
+            this.leaseStartAt = OffsetDateTime.now();
+        }
     }
 
     public void requestReturn() {
