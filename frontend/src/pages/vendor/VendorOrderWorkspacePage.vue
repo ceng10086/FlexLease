@@ -928,14 +928,7 @@ const handleReturnCompletion = async () => {
   if (!vendorId) {
     return;
   }
-  returnCompletionForm.loading = true;
-  try {
-    await completeOrderReturn(detail.order.id, {
-      vendorId,
-      remark: returnCompletionForm.remark || '已完成退租验收'
-    });
-    message.success('退租流程已完结');
-    returnCompletionForm.remark = '';
+
   const rawAmount = returnCompletionForm.refundAmount;
   let refundAmount: number | undefined;
   if (rawAmount !== null && rawAmount !== undefined && rawAmount !== '') {
@@ -950,17 +943,25 @@ const handleReturnCompletion = async () => {
     }
     refundAmount = normalized;
   }
+
+  returnCompletionForm.loading = true;
+  try {
+    await completeOrderReturn(detail.order.id, {
+      vendorId,
+      remark: returnCompletionForm.remark || '已完成退租验收',
+      refundAmount
+    });
+    message.success('退租流程已完结');
+    returnCompletionForm.remark = '';
+    returnCompletionForm.refundAmount = detail.order?.depositAmount ?? null;
     await refreshDetail();
     await loadOrders();
   } catch (error) {
     console.error('完结退租失败', error);
-      remark: returnCompletionForm.remark || '已完成退租验收',
-      refundAmount
+    message.error('完结退租失败，请稍后重试');
   } finally {
     returnCompletionForm.loading = false;
   }
-    await refreshDetail();
-    returnCompletionForm.refundAmount = detail.order?.depositAmount ?? null;
 };
 
 const handleExtensionDecision = async (approve: boolean) => {
