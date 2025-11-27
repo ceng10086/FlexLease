@@ -10,7 +10,8 @@ export type OrderStatus =
   | 'COMPLETED'
   | 'BUYOUT_REQUESTED'
   | 'BUYOUT_COMPLETED'
-  | 'CANCELLED';
+  | 'CANCELLED'
+  | 'EXCEPTION_CLOSED';
 
 type ApiResponse<T> = {
   code: number;
@@ -57,6 +58,7 @@ export type OrderPreviewResponse = {
 
 export type CreateOrderPayload = OrderPreviewPayload & {
   cartItemIds?: string[];
+  remark?: string | null;
 };
 
 export type RentalOrderSummary = {
@@ -107,6 +109,11 @@ export type OrderReturnApplyPayload = {
 export type OrderReturnDecisionPayload = {
   vendorId: string;
   approve: boolean;
+  remark?: string;
+};
+
+export type OrderReturnCompletePayload = {
+  vendorId: string;
   remark?: string;
 };
 
@@ -330,6 +337,7 @@ export type RentalOrderDetail = {
   extensionCount: number;
   shippingCarrier?: string | null;
   shippingTrackingNo?: string | null;
+  customerRemark?: string | null;
   shipmentPhotoRequired: number;
   shipmentVideoRequired: number;
   createdAt: string;
@@ -415,6 +423,14 @@ export const confirmOrderReceive = async (
   payload: OrderActorPayload
 ) : Promise<RentalOrderDetail> => {
   const response = await http.post<ApiResponse<RentalOrderDetail>>(`/orders/${orderId}/confirm-receive`, payload);
+  return response.data.data;
+};
+
+export const completeOrderReturn = async (
+  orderId: string,
+  payload: OrderReturnCompletePayload
+): Promise<RentalOrderDetail> => {
+  const response = await http.post<ApiResponse<RentalOrderDetail>>(`/orders/${orderId}/return/complete`, payload);
   return response.data.data;
 };
 

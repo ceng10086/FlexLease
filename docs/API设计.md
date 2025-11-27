@@ -143,7 +143,7 @@
 | 方法 | URL | 描述 | 请求体要点 | 响应要点 |
 | ---- | --- | ---- | ---------- | -------- |
 | POST | `/orders/preview` | 价格试算（押金、租金、合计） | `{ userId, vendorId, planType?, leaseStartAt?, leaseEndAt?, items: [{ productId, skuId?, planId?, productName, skuCode?, planSnapshot?, quantity, unitRentAmount, unitDepositAmount, buyoutPrice? }] }` | `depositAmount`, `rentAmount`, `totalAmount` |
-| POST | `/orders` | 创建订单（可传 `items` 或 `cartItemIds`，服务端生成 `orderNo` 并固化明细快照） | `{ userId, vendorId, planType?, leaseStartAt?, leaseEndAt?, items?: [...], cartItemIds?: [] }`<br>当 `cartItemIds` 提供时自动从购物车加载明细并清空对应条目 | `RentalOrderResponse`（含订单基础信息、明细、事件、续租/退租记录） |
+| POST | `/orders` | 创建订单（可传 `items` 或 `cartItemIds`，服务端生成 `orderNo` 并固化明细快照） | `{ userId, vendorId, planType?, leaseStartAt?, leaseEndAt?, items?: [...], cartItemIds?: [], remark? }`<br>当 `cartItemIds` 提供时自动从购物车加载明细并清空对应条目 | `RentalOrderResponse`（含订单基础信息、明细、事件、续租/退租记录） |
 | GET | `/orders/{orderId}` | 查看订单详情 | - | `RentalOrderResponse` |
 | GET | `/orders` | 查询订单列表 | 需提供 `userId` 或 `vendorId` 其一，可选 `status`、`page`、`size` | `PagedResponse<RentalOrderSummaryResponse>` |
 
@@ -161,10 +161,11 @@
 | POST | `/orders/{orderId}/extend/approve` | VENDOR | 处理续租申请，更新租期 | `{ vendorId, approve, remark? }` |
 | POST | `/orders/{orderId}/return` | USER | 发起退租申请，记录物流信息 | `{ userId, reason?, logisticsCompany?, trackingNumber? }` |
 | POST | `/orders/{orderId}/return/approve` | VENDOR | 审核退租，更新状态（完成/退回租赁） | `{ vendorId, approve, remark? }` |
+| POST | `/orders/{orderId}/return/complete` | VENDOR | 确认退租完成，触发入库与押金退款 | `{ vendorId, remark? }` |
 | POST | `/orders/{orderId}/buyout` | USER | 申请买断，可调整买断金额 | `{ userId, buyoutAmount?, remark? }` |
 | POST | `/orders/{orderId}/buyout/confirm` | VENDOR | 处理买断请求（通过/驳回） | `{ vendorId, approve, remark? }` |
 
-> 厂商端订单操作需携带登录厂商的 `vendorId`，服务端会基于 JWT 内的厂商身份做二次校验，仅允许匹配租赁单的厂商执行操作；管理员/内部角色可跳过该限制以便干预。发货会自动触发库存 `OUTBOUND + RELEASE`，退租同样会执行 `INBOUND` 并按押金余额发起退款。
+> 厂商端订单操作需携带登录厂商的 `vendorId`，服务端会基于 JWT 内的厂商身份做二次校验，仅允许匹配租赁单的厂商执行操作；管理员/内部角色可跳过该限制以便干预。发货会自动触发库存 `OUTBOUND + RELEASE`，退租审批通过后需调用 `/return/complete`，届时才会执行 `INBOUND` 并按押金余额发起退款。
 
 > `planSnapshot` 均为服务端认可的方案快照 JSON，字段包含 `planId`、`planType`、`termMonths`、`depositAmount`、`rentAmountMonthly`、`buyoutPrice`，前端/工具侧在构造请求或读取响应时请以该格式为准。
 
@@ -182,7 +183,7 @@
 | ---- | --- | ---- | -------- |
 | GET | `/admin/orders` | 分页检索订单 | 支持 `userId`、`vendorId`、`status`、`page`、`size`；未带过滤条件时返回全量分页 |
 | GET | `/admin/orders/{orderId}` | 查看详情 | 返回与 `/orders/{id}` 相同的订单详情 |
-| POST | `/admin/orders/{orderId}/force-close` | 强制关闭订单 | `{ "adminId", "reason?" }`，将订单置为 `CANCELLED` 并追加事件记录 |
+| POST | `/admin/orders/{orderId}/force-close` | 强制关闭订单 | `{ "adminId", "reason?" }`，将订单置为 `EXCEPTION_CLOSED` 并追加事件记录 |
 
 ### 5.5 购物车接口
 | 方法 | URL | 描述 | 请求体要点 | 备注 |

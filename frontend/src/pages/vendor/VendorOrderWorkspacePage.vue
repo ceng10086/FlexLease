@@ -44,6 +44,9 @@
             <a-descriptions-item label="押金">¥{{ formatCurrency(rentalOrderDeposit(detail.order)) }}</a-descriptions-item>
             <a-descriptions-item label="租金">¥{{ formatCurrency(rentalOrderRent(detail.order)) }}</a-descriptions-item>
             <a-descriptions-item label="创建时间">{{ formatDate(detail.order.createdAt) }}</a-descriptions-item>
+            <a-descriptions-item label="客户备注" :span="2" v-if="detail.order.customerRemark">
+              {{ detail.order.customerRemark }}
+            </a-descriptions-item>
           </a-descriptions>
           <a-space style="margin: 12px 0;">
             <a-button type="link" @click="contractDrawerOpen = true">查看电子合同</a-button>
@@ -92,32 +95,50 @@
               </a-form>
             </div>
             <div class="action-box">
-              <h5>退租审批</h5>
-              <a-form layout="vertical">
-                <a-form-item label="审批意见">
-                  <a-textarea v-model:value="returnForm.remark" :rows="3" placeholder="可选" />
-                </a-form-item>
-                <a-space>
+              <h5>退租处理</h5>
+              <template v-if="canApproveReturn">
+                <a-form layout="vertical">
+                  <a-form-item label="审批意见">
+                    <a-textarea v-model:value="returnForm.remark" :rows="3" placeholder="可选" />
+                  </a-form-item>
+                  <a-space>
+                    <a-button
+                      type="primary"
+                      danger
+                      :loading="returnForm.loading"
+                      :disabled="!canApproveReturn"
+                      @click="handleReturnDecision(false)"
+                    >
+                      拒绝退租
+                    </a-button>
+                    <a-button
+                      type="primary"
+                      :loading="returnForm.loading"
+                      :disabled="!canApproveReturn"
+                      @click="handleReturnDecision(true)"
+                    >
+                      同意退租
+                    </a-button>
+                  </a-space>
+                  <p class="form-hint">审批通过后订单将进入“退租中”。</p>
+                </a-form>
+              </template>
+              <template v-else-if="canCompleteReturn">
+                <a-form layout="vertical">
+                  <a-form-item label="完结备注">
+                    <a-textarea v-model:value="returnCompletionForm.remark" :rows="3" placeholder="可选" />
+                  </a-form-item>
                   <a-button
                     type="primary"
-                    danger
-                    :loading="returnForm.loading"
-                    :disabled="!canHandleReturn"
-                    @click="handleReturnDecision(false)"
+                    :loading="returnCompletionForm.loading"
+                    @click="handleReturnCompletion"
                   >
-                    拒绝退租
+                    确认退租完成
                   </a-button>
-                  <a-button
-                    type="primary"
-                    :loading="returnForm.loading"
-                    :disabled="!canHandleReturn"
-                    @click="handleReturnDecision(true)"
-                  >
-                    确认退租
-                  </a-button>
-                </a-space>
-                <p class="form-hint" v-if="!canHandleReturn">仅退租流程中可审批。</p>
-              </a-form>
+                  <p class="form-hint">确认后将触发入库与押金退款。</p>
+                </a-form>
+              </template>
+              <p class="form-hint" v-else>当前状态无需退租操作。</p>
             </div>
             <div class="action-box" v-if="pendingExtension">
               <h5>续租审批</h5>
@@ -446,6 +467,7 @@ import {
   fetchOrder,
   shipOrder,
   decideOrderReturn,
+  completeOrderReturn,
   decideOrderExtension,
   decideOrderBuyout,
   postOrderMessage,
@@ -485,7 +507,8 @@ const vendorStatuses: OrderStatus[] = [
   'COMPLETED',
   'BUYOUT_REQUESTED',
   'BUYOUT_COMPLETED',
-  'CANCELLED'
+  'CANCELLED',
+  'EXCEPTION_CLOSED'
 ];
 
 const {
@@ -510,6 +533,7 @@ const detail = reactive<{ open: boolean; loading: boolean; order: RentalOrderDet
 
 const shipForm = reactive({ carrier: '', trackingNumber: '', loading: false });
 const returnForm = reactive({ remark: '', loading: false });
+const returnCompletionForm = reactive({ remark: '', loading: false });
 const extensionDecisionForm = reactive({ remark: '', loading: false });
 const buyoutDecisionForm = reactive({ remark: '', loading: false });
 const contractDrawerOpen = ref(false);
@@ -606,10 +630,8 @@ const pendingExtension = computed(() =>
 );
 const isBuyoutRequested = computed(() => detail.order?.status === 'BUYOUT_REQUESTED');
 const canShip = computed(() => detail.order?.status === 'AWAITING_SHIPMENT');
-const canHandleReturn = computed(() => {
-  const status = detail.order?.status;
-  return status === 'RETURN_REQUESTED' || status === 'RETURN_IN_PROGRESS';
-});
+const canApproveReturn = computed(() => detail.order?.status === 'RETURN_REQUESTED');
+const canCompleteReturn = computed(() => detail.order?.status === 'RETURN_IN_PROGRESS');
 const conversationEvents = computed(() =>
   detail.order?.events?.filter((item) => item.eventType === 'COMMUNICATION_NOTE') ?? []
 );
@@ -793,6 +815,7 @@ const openDetail = async (orderId: string) => {
     shipForm.carrier = detail.order?.shippingCarrier ?? '';
     shipForm.trackingNumber = detail.order?.shippingTrackingNo ?? '';
     returnForm.remark = '';
+    returnCompletionForm.remark = '';
     extensionDecisionForm.remark = '';
     buyoutDecisionForm.remark = '';
   } catch (error) {
@@ -852,8 +875,8 @@ const handleReturnDecision = async (approve: boolean) => {
   if (!detail.order) {
     return;
   }
-  if (!canHandleReturn.value) {
-    message.warning('当前没有待处理的退租申请');
+  if (!canApproveReturn.value) {
+    message.warning('当前没有待处理的退租审批');
     return;
   }
   const vendorId = requireVendorId(true);
@@ -867,7 +890,8 @@ const handleReturnDecision = async (approve: boolean) => {
       approve,
       remark: returnForm.remark || (approve ? '同意退租' : '拒绝退租')
     });
-    message.success(approve ? '已确认退租' : '已驳回退租');
+    message.success(approve ? '已同意退租申请' : '已驳回退租');
+    returnForm.remark = '';
     await refreshDetail();
     await loadOrders();
   } catch (error) {
@@ -875,6 +899,36 @@ const handleReturnDecision = async (approve: boolean) => {
     message.error('退租审批失败，请稍后重试');
   } finally {
     returnForm.loading = false;
+  }
+};
+
+const handleReturnCompletion = async () => {
+  if (!detail.order) {
+    return;
+  }
+  if (!canCompleteReturn.value) {
+    message.warning('当前状态无需完结退租');
+    return;
+  }
+  const vendorId = requireVendorId(true);
+  if (!vendorId) {
+    return;
+  }
+  returnCompletionForm.loading = true;
+  try {
+    await completeOrderReturn(detail.order.id, {
+      vendorId,
+      remark: returnCompletionForm.remark || '已完成退租验收'
+    });
+    message.success('退租流程已完结');
+    returnCompletionForm.remark = '';
+    await refreshDetail();
+    await loadOrders();
+  } catch (error) {
+    console.error('完结退租失败', error);
+    message.error('完结退租失败，请稍后重试');
+  } finally {
+    returnCompletionForm.loading = false;
   }
 };
 

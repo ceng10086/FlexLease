@@ -41,6 +41,7 @@ import com.flexlease.order.dto.OrderPaymentRequest;
 import com.flexlease.order.dto.OrderPreviewRequest;
 import com.flexlease.order.dto.OrderPreviewResponse;
 import com.flexlease.order.dto.OrderReturnApplyRequest;
+import com.flexlease.order.dto.OrderReturnCompleteRequest;
 import com.flexlease.order.dto.OrderReturnDecisionRequest;
 import com.flexlease.order.dto.OrderShipmentRequest;
 import com.flexlease.order.dto.RentalOrderResponse;
@@ -167,7 +168,8 @@ class RentalOrderServiceIntegrationTest {
                 null,
                 null,
                 List.of(itemRequest),
-                List.of()
+                List.of(),
+                        null
         ));
         assertThat(created.status()).isEqualTo(OrderStatus.PENDING_PAYMENT);
 
@@ -255,12 +257,19 @@ class RentalOrderServiceIntegrationTest {
             returnApproved = rentalOrderService.decideReturn(created.id(),
                     new OrderReturnDecisionRequest(vendorId, true, "已验收"));
         }
-        assertThat(returnApproved.status()).isEqualTo(OrderStatus.COMPLETED);
+        assertThat(returnApproved.status()).isEqualTo(OrderStatus.RETURN_IN_PROGRESS);
         assertThat(returnApproved.returns())
                 .isNotEmpty();
         assertThat(returnApproved.returns()
                 .get(returnApproved.returns().size() - 1)
                 .status().name()).isEqualTo("APPROVED");
+
+        RentalOrderResponse returnCompleted;
+        try (SecurityContextHandle ignored = withPrincipal(vendorAccountId, vendorId, "vendor-%s".formatted(vendorId), "VENDOR")) {
+            returnCompleted = rentalOrderService.completeReturn(created.id(),
+                    new OrderReturnCompleteRequest(vendorId, "确认完结"));
+        }
+        assertThat(returnCompleted.status()).isEqualTo(OrderStatus.COMPLETED);
 
         org.mockito.Mockito.verify(inventoryReservationClient, org.mockito.Mockito.atLeastOnce())
                 .outbound(org.mockito.ArgumentMatchers.eq(created.id()), org.mockito.ArgumentMatchers.anyList());
@@ -309,7 +318,8 @@ class RentalOrderServiceIntegrationTest {
                 null,
                 null,
                 List.of(itemRequest),
-                List.of()
+                List.of(),
+                null
         ));
 
         OrderDisputeResponse opened;
@@ -384,7 +394,8 @@ class RentalOrderServiceIntegrationTest {
                 null,
                 null,
                 List.of(itemRequest),
-                List.of()
+                List.of(),
+                null
         ));
 
         OrderDisputeResponse opened;
@@ -548,7 +559,8 @@ class RentalOrderServiceIntegrationTest {
                 null,
                 null,
                 List.of(manipulatedItem),
-                List.of()
+                List.of(),
+                null
         ));
 
         assertThat(created.depositAmount()).isEqualByComparingTo("500.00");
@@ -560,7 +572,7 @@ class RentalOrderServiceIntegrationTest {
     }
 
     @Test
-    void adminForceCloseCancelsOrder() {
+        void adminForceCloseMarksExceptionStatus() {
         UUID userId = UUID.randomUUID();
         UUID vendorId = UUID.randomUUID();
         UUID productId = UUID.randomUUID();
@@ -589,7 +601,8 @@ class RentalOrderServiceIntegrationTest {
                 null,
                 null,
                 List.of(itemRequest),
-                List.of()
+                List.of(),
+                null
         ));
 
         UUID transactionId = UUID.randomUUID();
@@ -613,7 +626,7 @@ class RentalOrderServiceIntegrationTest {
                 SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(principal, null));
                 try {
                         RentalOrderResponse forced = rentalOrderService.forceClose(created.id(), "库存异常");
-                        assertThat(forced.status()).isEqualTo(OrderStatus.CANCELLED);
+                        assertThat(forced.status()).isEqualTo(OrderStatus.EXCEPTION_CLOSED);
                         assertThat(forced.events()).anyMatch(event -> event.description().contains("管理员强制关闭")
                                         || event.description().contains("库存异常"));
                 } finally {
@@ -651,7 +664,8 @@ class RentalOrderServiceIntegrationTest {
                 null,
                 null,
                 List.of(itemRequest),
-                List.of()
+                List.of(),
+                null
         ));
 
         UUID transactionId = UUID.randomUUID();
@@ -719,7 +733,8 @@ class RentalOrderServiceIntegrationTest {
                     null,
                     null,
                     List.of(),
-                    List.of(cartItem.id())
+                                        List.of(cartItem.id()),
+                                        null
             ));
         }
 
@@ -759,7 +774,8 @@ class RentalOrderServiceIntegrationTest {
                             new BigDecimal("499.00"),
                             null
                     )),
-                    List.of()
+                            List.of(),
+                            null
             ));
         }
 
@@ -829,7 +845,8 @@ class RentalOrderServiceIntegrationTest {
                             new BigDecimal("380.00"),
                             null
                     )),
-                    List.of()
+                    List.of(),
+                    null
             ));
         }
 
@@ -902,7 +919,8 @@ class RentalOrderServiceIntegrationTest {
                 null,
                 null,
                 List.of(itemRequest),
-                List.of()
+                List.of(),
+                null
         ));
 
         orderMaintenanceScheduler.cancelExpiredPendingOrders();
@@ -948,7 +966,8 @@ class RentalOrderServiceIntegrationTest {
                 null,
                 null,
                 List.of(itemRequest),
-                List.of()
+                List.of(),
+                null
         )))
                 .isInstanceOf(BusinessException.class)
                 .extracting("errorCode")
@@ -984,7 +1003,8 @@ class RentalOrderServiceIntegrationTest {
                         new BigDecimal("188.00"),
                         null
                 )),
-                List.of()
+                List.of(),
+                null
         ));
 
         try (SecurityContextHandle ignored = withPrincipal(UUID.randomUUID(), otherVendorId, "other-vendor", "VENDOR")) {

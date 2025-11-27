@@ -105,6 +105,9 @@
           <a-descriptions-item label="创建时间">{{ formatDate(detailDrawer.order.createdAt) }}</a-descriptions-item>
           <a-descriptions-item label="承运方" v-if="detailDrawer.order.shippingCarrier">{{ detailDrawer.order.shippingCarrier }}</a-descriptions-item>
           <a-descriptions-item label="运单号" v-if="detailDrawer.order.shippingTrackingNo">{{ detailDrawer.order.shippingTrackingNo }}</a-descriptions-item>
+          <a-descriptions-item label="客户备注" :span="2" v-if="detailDrawer.order.customerRemark">
+            {{ detailDrawer.order.customerRemark }}
+          </a-descriptions-item>
         </a-descriptions>
         <a-space style="margin: 12px 0;">
           <a-button type="link" @click="contractDrawerOpen = true">查看电子合同</a-button>
@@ -279,7 +282,8 @@ const orderStatusOptions: OrderStatus[] = [
   'COMPLETED',
   'BUYOUT_REQUESTED',
   'BUYOUT_COMPLETED',
-  'CANCELLED'
+  'CANCELLED',
+  'EXCEPTION_CLOSED'
 ];
 
 const { isMobile, width: viewportWidth } = useViewport();
@@ -327,7 +331,7 @@ const canForceClose = computed(() => {
   if (!detailDrawer.order) {
     return false;
   }
-  return !['COMPLETED', 'CANCELLED', 'BUYOUT_COMPLETED'].includes(detailDrawer.order.status);
+  return !['COMPLETED', 'CANCELLED', 'BUYOUT_COMPLETED', 'EXCEPTION_CLOSED'].includes(detailDrawer.order.status);
 });
 
 const disputes = computed(() => detailDrawer.order?.disputes ?? []);

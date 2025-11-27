@@ -267,7 +267,8 @@ const handleCreate = async () => {
       planType: currentPlan.value?.planType,
       leaseStartAt: form.leaseStart?.toISOString(),
       leaseEndAt: form.leaseEnd?.toISOString(),
-      items: buildOrderItems()
+      items: buildOrderItems(),
+      remark: form.remark?.trim() ? form.remark.trim() : undefined
     });
     await handleAutoPayment(order);
     router.replace({ name: 'orders' });

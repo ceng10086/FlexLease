@@ -31,6 +31,9 @@
             <a-descriptions-item label="结束日期" v-if="order.leaseEndAt">{{ formatDate(order.leaseEndAt) }}</a-descriptions-item>
             <a-descriptions-item label="承运方" v-if="order.shippingCarrier">{{ order.shippingCarrier }}</a-descriptions-item>
             <a-descriptions-item label="运单号" v-if="order.shippingTrackingNo">{{ order.shippingTrackingNo }}</a-descriptions-item>
+            <a-descriptions-item label="备注" :span="2" v-if="order.customerRemark">
+              {{ order.customerRemark }}
+            </a-descriptions-item>
           </a-descriptions>
         </a-card>
 

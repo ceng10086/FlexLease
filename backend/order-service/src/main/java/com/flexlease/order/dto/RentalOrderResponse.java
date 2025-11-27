@@ -29,6 +29,7 @@ public record RentalOrderResponse(
         int extensionCount,
         String shippingCarrier,
         String shippingTrackingNo,
+        String customerRemark,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt,
         List<RentalOrderItemResponse> items,

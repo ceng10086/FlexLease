@@ -99,7 +99,8 @@ class OrderProofServiceIntegrationTest {
                         new BigDecimal("288.00"),
                         null
                 )),
-                List.of()
+            List.of(),
+            null
         );
         var created = rentalOrderService.createOrder(createOrderRequest);
 
@@ -153,7 +154,8 @@ class OrderProofServiceIntegrationTest {
                 new BigDecimal("288.00"),
                 null
             )),
-            List.of()
+            List.of(),
+            null
         );
         var created = rentalOrderService.createOrder(createOrderRequest);
 

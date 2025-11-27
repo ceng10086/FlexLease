@@ -21,6 +21,7 @@ import com.flexlease.order.dto.OrderPaymentRequest;
 import com.flexlease.order.dto.OrderPreviewRequest;
 import com.flexlease.order.dto.OrderPreviewResponse;
 import com.flexlease.order.dto.OrderReturnApplyRequest;
+import com.flexlease.order.dto.OrderReturnCompleteRequest;
 import com.flexlease.order.dto.OrderReturnDecisionRequest;
 import com.flexlease.order.dto.OrderShipmentRequest;
 import com.flexlease.order.dto.PagedResponse;
@@ -201,6 +202,12 @@ public class RentalOrderController {
     public ApiResponse<RentalOrderResponse> decideReturn(@PathVariable UUID orderId,
                                                          @Valid @RequestBody OrderReturnDecisionRequest request) {
         return ApiResponse.success(rentalOrderService.decideReturn(orderId, request));
+    }
+
+    @PostMapping("/{orderId}/return/complete")
+    public ApiResponse<RentalOrderResponse> completeReturn(@PathVariable UUID orderId,
+                                                           @Valid @RequestBody OrderReturnCompleteRequest request) {
+        return ApiResponse.success(rentalOrderService.completeReturn(orderId, request));
     }
 
     @PostMapping("/{orderId}/buyout")

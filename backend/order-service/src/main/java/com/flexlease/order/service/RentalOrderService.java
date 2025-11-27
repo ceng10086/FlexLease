@@ -41,6 +41,7 @@ import com.flexlease.order.dto.OrderPaymentRequest;
 import com.flexlease.order.dto.OrderPreviewRequest;
 import com.flexlease.order.dto.OrderPreviewResponse;
 import com.flexlease.order.dto.OrderReturnApplyRequest;
+import com.flexlease.order.dto.OrderReturnCompleteRequest;
 import com.flexlease.order.dto.OrderReturnDecisionRequest;
 import com.flexlease.order.dto.OrderShipmentRequest;
 import com.flexlease.order.dto.PagedResponse;
@@ -194,6 +195,8 @@ public class RentalOrderService {
                 request.leaseStartAt(),
                 request.leaseEndAt()
         );
+
+        order.updateCustomerRemark(request.remark());
 
         resolvedItems.forEach(item -> order.addItem(toOrderItem(item)));
 
@@ -477,38 +480,16 @@ public class RentalOrderService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "没有待处理的退租申请"));
         if (request.approve()) {
             returnRequest.approve(request.vendorId(), request.remark());
-            List<InventoryCommand> commands = buildInventoryCommands(order);
-            boolean inboundDone = false;
-            BigDecimal refundedAmount = BigDecimal.ZERO;
-            try {
-                if (!commands.isEmpty()) {
-                    inventoryReservationClient.inbound(order.getId(), commands);
-                    inboundDone = true;
-                }
-                refundedAmount = issueDepositRefundIfNeeded(order);
-            } catch (RuntimeException ex) {
-                if (inboundDone && !commands.isEmpty()) {
-                    try {
-                        inventoryReservationClient.outbound(order.getId(), commands);
-                    } catch (RuntimeException compensationEx) {
-                        LOG.warn("Failed to compensate inventory outbound for order {} after inbound: {}", order.getOrderNo(), compensationEx.getMessage());
-                    }
-                }
-                throw ex;
-            }
-            order.completeReturn();
+            order.markReturnInProgress();
             Map<String, Object> attributes = new HashMap<>();
             if (request.remark() != null && !request.remark().isBlank()) {
                 attributes.put("remark", request.remark());
             }
-            if (refundedAmount.compareTo(BigDecimal.ZERO) > 0) {
-                attributes.put("refundAmount", refundedAmount);
-            }
             recordEvent(order, OrderEventType.RETURN_APPROVED,
-                    request.remark() == null ? "退租完成" : request.remark(),
+                    request.remark() == null ? "退租申请已通过" : request.remark(),
                     request.vendorId(),
                     attributes);
-            notifyUser(order, "退租已完成", "订单 %s 的退租申请已通过。".formatted(order.getOrderNo()));
+            notifyUser(order, "退租已通过", "订单 %s 的退租申请已通过，请按指引寄回设备。".formatted(order.getOrderNo()));
         } else {
             returnRequest.reject(request.vendorId(), request.remark());
             order.resumeLease();
@@ -518,6 +499,51 @@ public class RentalOrderService {
             notifyUser(order, "退租被拒", "订单 %s 的退租申请未通过，原因：%s"
                     .formatted(order.getOrderNo(), request.remark() == null ? "无" : request.remark()));
         }
+        return assembler.toOrderResponse(order);
+    }
+
+    public RentalOrderResponse completeReturn(UUID orderId, OrderReturnCompleteRequest request) {
+        RentalOrder order = getOrderForUpdate(orderId);
+        ensureVendor(order, request.vendorId());
+        if (order.getStatus() != OrderStatus.RETURN_IN_PROGRESS) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "当前状态不支持完结退租");
+        }
+        OrderReturnRequest approvedRequest = returnRequestRepository
+                .findFirstByOrderIdAndStatusOrderByRequestedAtDesc(orderId, ReturnRequestStatus.APPROVED)
+                .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "没有已批准的退租申请"));
+        List<InventoryCommand> commands = buildInventoryCommands(order);
+        boolean inboundDone = false;
+        BigDecimal refundedAmount = BigDecimal.ZERO;
+        try {
+            if (!commands.isEmpty()) {
+                inventoryReservationClient.inbound(order.getId(), commands);
+                inboundDone = true;
+            }
+            refundedAmount = issueDepositRefundIfNeeded(order);
+        } catch (RuntimeException ex) {
+            if (inboundDone && !commands.isEmpty()) {
+                try {
+                    inventoryReservationClient.outbound(order.getId(), commands);
+                } catch (RuntimeException compensationEx) {
+                    LOG.warn("Failed to compensate inventory outbound for order {} after inbound: {}", order.getOrderNo(), compensationEx.getMessage());
+                }
+            }
+            throw ex;
+        }
+        order.completeReturn();
+        Map<String, Object> attributes = new HashMap<>();
+        attributes.put("returnRequestId", approvedRequest.getId());
+        if (request.remark() != null && !request.remark().isBlank()) {
+            attributes.put("remark", request.remark());
+        }
+        if (refundedAmount.compareTo(BigDecimal.ZERO) > 0) {
+            attributes.put("refundAmount", refundedAmount);
+        }
+        recordEvent(order, OrderEventType.RETURN_COMPLETED,
+                request.remark() == null ? "退租完成" : request.remark(),
+                request.vendorId(),
+                attributes);
+        notifyUser(order, "退租已完成", "订单 %s 的退租已完成。".formatted(order.getOrderNo()));
         return assembler.toOrderResponse(order);
     }
 

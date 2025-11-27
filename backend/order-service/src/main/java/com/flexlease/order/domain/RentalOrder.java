@@ -89,6 +89,9 @@ public class RentalOrder {
     @Column(name = "shipping_tracking_no", length = 100)
     private String shippingTrackingNo;
 
+    @Column(name = "customer_remark")
+    private String customerRemark;
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
@@ -268,6 +271,19 @@ public class RentalOrder {
         return shippingTrackingNo;
     }
 
+    public String getCustomerRemark() {
+        return customerRemark;
+    }
+
+    public void updateCustomerRemark(String remark) {
+        if (remark == null) {
+            this.customerRemark = null;
+            return;
+        }
+        String normalized = remark.trim();
+        this.customerRemark = normalized.isEmpty() ? null : normalized;
+    }
+
     public OffsetDateTime getCreatedAt() {
         return createdAt;
     }
@@ -410,7 +426,7 @@ public class RentalOrder {
         if (status == OrderStatus.CANCELLED || status == OrderStatus.COMPLETED || status == OrderStatus.BUYOUT_COMPLETED) {
             throw new IllegalStateException("订单已处于终态，无法强制关闭");
         }
-        this.status = OrderStatus.CANCELLED;
+        this.status = OrderStatus.EXCEPTION_CLOSED;
     }
 
     public void updateBuyoutAmount(BigDecimal amount) {

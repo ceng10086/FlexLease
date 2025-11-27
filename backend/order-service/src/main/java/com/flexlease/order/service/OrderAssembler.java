@@ -56,6 +56,7 @@ public class OrderAssembler {
                 order.getExtensionCount(),
                 order.getShippingCarrier(),
                 order.getShippingTrackingNo(),
+                order.getCustomerRemark(),
                 order.getCreatedAt(),
                 order.getUpdatedAt(),
                 order.getItems().stream().map(this::toItemResponse).toList(),

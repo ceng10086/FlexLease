@@ -83,7 +83,8 @@ const orderStatuses: OrderStatus[] = [
   'COMPLETED',
   'BUYOUT_REQUESTED',
   'BUYOUT_COMPLETED',
-  'CANCELLED'
+  'CANCELLED',
+  'EXCEPTION_CLOSED'
 ];
 
 const loading = ref(false);
@@ -100,7 +101,8 @@ const statusDict: Record<OrderStatus, { label: string; color: string }> = {
   COMPLETED: { label: '已完成', color: 'default' },
   BUYOUT_REQUESTED: { label: '买断审批', color: 'cyan' },
   BUYOUT_COMPLETED: { label: '已买断', color: 'success' },
-  CANCELLED: { label: '已取消', color: 'red' }
+  CANCELLED: { label: '已取消', color: 'red' },
+  EXCEPTION_CLOSED: { label: '异常关闭', color: 'magenta' }
 };
 
 const statusMeta = (status: OrderStatus) => statusDict[status] ?? { label: status, color: 'blue' };
