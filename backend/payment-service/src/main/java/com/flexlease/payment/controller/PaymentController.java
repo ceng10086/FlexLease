@@ -71,6 +71,7 @@ public class PaymentController {
 
     @GetMapping("/{transactionId}")
     public ApiResponse<PaymentTransactionResponse> getTransaction(@PathVariable UUID transactionId) {
+        SecurityUtils.requirePrincipal();
         return ApiResponse.success(paymentTransactionService.getTransaction(transactionId));
     }
 

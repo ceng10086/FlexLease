@@ -1,5 +1,6 @@
 import {
   initPayment,
+  type PaymentScene,
   type PaymentSplitPayload,
   type PaymentStatus
 } from '../services/paymentService';
@@ -51,6 +52,7 @@ export const autoCompleteInitialPayment = async ({
   }
 
   const splits: PaymentSplitPayload[] = [];
+  let scene: PaymentScene = 'DEPOSIT';
   if (depositPortion > 0) {
     splits.push({
       splitType: 'DEPOSIT_RESERVE',
@@ -69,10 +71,18 @@ export const autoCompleteInitialPayment = async ({
     });
   }
 
+  if (buyoutPortionRaw > 0) {
+    scene = 'BUYOUT';
+  } else if (rentPortionRaw > 0) {
+    scene = 'RENT';
+  } else if (depositPortion > 0) {
+    scene = 'DEPOSIT';
+  }
+
   const transaction = await initPayment(orderId, {
     userId,
     vendorId,
-    scene: 'DEPOSIT',
+    scene,
     channel: 'MOCK',
     amount: totalAmount,
     description: description ?? '自动支付（下单即付）',

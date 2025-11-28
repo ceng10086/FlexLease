@@ -57,11 +57,7 @@ public class OrderContractService {
     }
 
     private void assertReadable(RentalOrder order) {
-        Optional<FlexleasePrincipal> principalOpt = SecurityUtils.getCurrentPrincipal();
-        if (principalOpt.isEmpty()) {
-            return;
-        }
-        FlexleasePrincipal principal = principalOpt.get();
+        FlexleasePrincipal principal = SecurityUtils.requirePrincipal();
         if (principal.hasRole("ADMIN") || principal.hasRole("INTERNAL")) {
             return;
         }

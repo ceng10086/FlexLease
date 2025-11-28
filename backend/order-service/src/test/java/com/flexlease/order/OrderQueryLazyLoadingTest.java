@@ -112,8 +112,14 @@ class OrderQueryLazyLoadingTest {
             SecurityContextHolder.clearContext();
         }
 
-        OrderContractResponse contract = orderContractService.getContract(order.getId());
-        assertThat(contract.orderId()).isEqualTo(order.getId());
+        FlexleasePrincipal contractPrincipal = new FlexleasePrincipal(order.getUserId(), order.getVendorId(), "user", Set.of("USER"));
+        setAuthentication(contractPrincipal);
+        try {
+            OrderContractResponse contract = orderContractService.getContract(order.getId());
+            assertThat(contract.orderId()).isEqualTo(order.getId());
+        } finally {
+            SecurityContextHolder.clearContext();
+        }
     }
 
     private void setAuthentication(FlexleasePrincipal principal) {

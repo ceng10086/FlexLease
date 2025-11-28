@@ -108,7 +108,8 @@ public class PaymentTransactionService {
     public PaymentTransactionResponse getTransaction(UUID transactionId) {
         PaymentTransaction transaction = paymentTransactionRepository.findById(transactionId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "支付流水不存在"));
-        SecurityUtils.getCurrentPrincipal().ifPresent(principal -> validateViewPermission(principal, transaction));
+        FlexleasePrincipal principal = SecurityUtils.requirePrincipal();
+        validateViewPermission(principal, transaction);
         return assembler.toResponse(transaction);
     }
 
