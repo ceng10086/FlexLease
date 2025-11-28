@@ -233,8 +233,17 @@
               </a-select>
             </a-form-item>
             <a-form-item label="支付金额">
-              <a-input-number v-model:value="paymentForm.amount" :min="0.01" :step="0.01" style="width: 100%" />
+              <a-input-number
+                v-model:value="paymentForm.amount"
+                :min="0.01"
+                :step="0.01"
+                style="width: 100%"
+                :disabled="true"
+              />
             </a-form-item>
+            <p class="form-hint">
+              当前仅支持一次性支付订单总额 ¥{{ formatCurrency(requiredPaymentAmount || 0) }}，金额已锁定。
+            </p>
             <a-button type="primary" block :loading="paymentForm.loading" @click="handleCreatePayment">生成支付单</a-button>
           </a-form>
           <a-alert
@@ -388,7 +397,7 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, reactive, ref } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { message, Modal } from 'ant-design-vue';
 import { useAuthStore } from '../../stores/auth';
@@ -644,6 +653,17 @@ const canEscalateDispute = (item: OrderDispute) => item.status === 'OPEN' || ite
 
 const canAppealDispute = (item: OrderDispute) => item.status === 'CLOSED' && item.appealCount < 1;
 
+const requiredPaymentAmount = computed(() => (order.value ? rentalOrderTotal(order.value) : 0));
+
+watch(
+  requiredPaymentAmount,
+  (amount) => {
+    const normalized = Math.round((amount || 0) * 100) / 100;
+    paymentForm.amount = normalized;
+  },
+  { immediate: true }
+);
+
 const loadOrder = async () => {
   loading.value = true;
   try {
@@ -696,9 +716,10 @@ const handleCreatePayment = async () => {
     message.error('请先登录');
     return;
   }
-  const normalizedAmount = Math.round((Number(paymentForm.amount) || 0) * 100) / 100;
+  const normalizedAmount = Math.round(requiredPaymentAmount.value * 100) / 100;
+  paymentForm.amount = normalizedAmount;
   if (!normalizedAmount || normalizedAmount <= 0) {
-    message.warning('请输入有效的支付金额');
+    message.warning('当前订单暂无需支付');
     return;
   }
   const splits = buildManualPaymentSplits(paymentForm.scene, normalizedAmount);
@@ -1134,6 +1155,12 @@ const handleContractSigned = async () => {
 .contract-hint {
   color: #64748b;
   font-size: 12px;
+}
+
+.form-hint {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #64748b;
 }
 
 .order-guidance {

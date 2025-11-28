@@ -1,4 +1,8 @@
-import { initPayment, type PaymentSplitPayload } from '../services/paymentService';
+import {
+  initPayment,
+  type PaymentSplitPayload,
+  type PaymentStatus
+} from '../services/paymentService';
 
 export type AutoPaymentParams = {
   orderId: string;
@@ -11,6 +15,12 @@ export type AutoPaymentParams = {
   description?: string;
 };
 
+export type AutoPaymentResult = {
+  succeeded: boolean;
+  status: PaymentStatus;
+  transactionId?: string;
+};
+
 export const autoCompleteInitialPayment = async ({
   orderId,
   vendorId,
@@ -20,7 +30,7 @@ export const autoCompleteInitialPayment = async ({
   rentAmount,
   buyoutAmount,
   description
-}: AutoPaymentParams): Promise<boolean> => {
+}: AutoPaymentParams): Promise<AutoPaymentResult> => {
   const normalize = (value?: number | null) => {
     if (value === undefined || value === null || Number.isNaN(value)) {
       return 0;
@@ -34,7 +44,10 @@ export const autoCompleteInitialPayment = async ({
   const totalAmount = normalize(amount ?? (depositPortion + rentPortionRaw + buyoutPortionRaw));
 
   if (!totalAmount || totalAmount <= 0) {
-    return false;
+    return {
+      succeeded: false,
+      status: 'PENDING'
+    };
   }
 
   const splits: PaymentSplitPayload[] = [];
@@ -56,7 +69,7 @@ export const autoCompleteInitialPayment = async ({
     });
   }
 
-  await initPayment(orderId, {
+  const transaction = await initPayment(orderId, {
     userId,
     vendorId,
     scene: 'DEPOSIT',
@@ -65,5 +78,10 @@ export const autoCompleteInitialPayment = async ({
     description: description ?? '自动支付（下单即付）',
     splits: splits.length ? splits : undefined
   });
-  return true;
+  const status = (transaction?.status as PaymentStatus) ?? ('PENDING' as PaymentStatus);
+  return {
+    succeeded: status === 'SUCCEEDED',
+    status,
+    transactionId: transaction?.id
+  };
 };
