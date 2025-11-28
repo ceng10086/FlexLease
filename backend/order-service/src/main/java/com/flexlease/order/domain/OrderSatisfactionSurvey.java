@@ -163,7 +163,6 @@ public class OrderSatisfactionSurvey {
     public void markOpen() {
         if (status == OrderSurveyStatus.PENDING) {
             this.status = OrderSurveyStatus.OPEN;
-            this.reminderSent = true;
         }
     }
 

@@ -103,6 +103,11 @@ export default defineConfig((configEnv: ConfigEnv) => {
           target: env.VITE_API_PROXY,
           changeOrigin: true,
           secure: false
+        },
+        '/media': {
+          target: env.VITE_API_PROXY,
+          changeOrigin: true,
+          secure: false
         }
       }
     : defaultProxy;
