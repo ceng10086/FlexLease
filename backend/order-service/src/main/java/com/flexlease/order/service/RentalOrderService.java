@@ -72,6 +72,7 @@ import org.springframework.stereotype.Service;
 public class RentalOrderService {
 
     private static final Logger LOG = LoggerFactory.getLogger(RentalOrderService.class);
+    private static final String ADMIN_NOTIFICATION_RECIPIENT = "ADMIN";
 
     private final RentalOrderRepository rentalOrderRepository;
     private final OrderExtensionRequestRepository extensionRequestRepository;
@@ -344,16 +345,23 @@ public class RentalOrderService {
             }
             throw ex;
         }
-        Map<String, Object> shipmentAttributes = Map.of(
-                "carrier", request.carrier(),
-                "trackingNumber", request.trackingNumber()
-        );
+        Map<String, Object> shipmentAttributes = new HashMap<>();
+        shipmentAttributes.put("carrier", request.carrier());
+        shipmentAttributes.put("trackingNumber", request.trackingNumber());
+        String shipmentNote = Optional.ofNullable(request.message()).map(String::trim).filter(s -> !s.isBlank()).orElse(null);
+        if (shipmentNote != null) {
+            shipmentAttributes.put("note", shipmentNote);
+        }
+        String baseDescription = "发货信息: " + request.carrier() + " / " + request.trackingNumber();
+        String description = shipmentNote == null ? baseDescription : baseDescription + "，留言：" + shipmentNote;
         recordEvent(order, OrderEventType.ORDER_SHIPPED,
-                "发货信息: " + request.carrier() + " / " + request.trackingNumber(),
-                request.vendorId(),
-                shipmentAttributes);
-        notifyUser(order, "订单已发货", "订单 %s 已发货，承运方 %s，运单号 %s。"
-            .formatted(order.getOrderNo(), request.carrier(), request.trackingNumber()));
+            description,
+            request.vendorId(),
+            shipmentAttributes);
+        String userContent = shipmentNote == null
+            ? "订单 %s 已发货，承运方 %s，运单号 %s。".formatted(order.getOrderNo(), request.carrier(), request.trackingNumber())
+            : "订单 %s 已发货，承运方 %s，运单号 %s。附言：%s".formatted(order.getOrderNo(), request.carrier(), request.trackingNumber(), shipmentNote);
+        notifyUser(order, "订单已发货", userContent);
         return assembler.toOrderResponse(order);
     }
 
@@ -453,6 +461,7 @@ public class RentalOrderService {
                 .ifPresent(existing -> {
                     throw new BusinessException(ErrorCode.VALIDATION_ERROR, "已有待处理的退租申请");
                 });
+        ensureReturnProofBundle(order, request.userId());
         order.requestReturn();
         OrderReturnRequest returnRequest = OrderReturnRequest.create(
                 request.reason(),
@@ -474,6 +483,7 @@ public class RentalOrderService {
                 returnAttributes);
         notifyVendor(order, "收到退租申请", "订单 %s 用户提交退租申请，请及时处理。"
             .formatted(order.getOrderNo()));
+        notifyAdminReturnRequest(order, request);
         return assembler.toOrderResponse(order);
     }
 
@@ -967,6 +977,48 @@ public class RentalOrderService {
         }
     }
 
+    private void notifyAdminReturnRequest(RentalOrder order, OrderReturnApplyRequest requestPayload) {
+        Map<String, Object> variables = new HashMap<>();
+        variables.put("orderNo", order.getOrderNo());
+        variables.put("vendorId", order.getVendorId().toString());
+        variables.put("userId", order.getUserId().toString());
+        if (requestPayload.reason() != null && !requestPayload.reason().isBlank()) {
+            variables.put("reason", requestPayload.reason());
+        }
+        if (requestPayload.logisticsCompany() != null && !requestPayload.logisticsCompany().isBlank()) {
+            variables.put("logisticsCompany", requestPayload.logisticsCompany());
+        }
+        if (requestPayload.trackingNumber() != null && !requestPayload.trackingNumber().isBlank()) {
+            variables.put("trackingNumber", requestPayload.trackingNumber());
+        }
+        String logisticsLine;
+        if (requestPayload.logisticsCompany() == null || requestPayload.logisticsCompany().isBlank()) {
+            logisticsLine = "用户尚未填写物流信息";
+        } else {
+            String tracking = Optional.ofNullable(requestPayload.trackingNumber()).filter(t -> !t.isBlank()).orElse("待补录");
+            logisticsLine = "物流信息：" + requestPayload.logisticsCompany() + " / " + tracking;
+        }
+        String subject = "退租申请提醒";
+        String reasonText = Optional.ofNullable(requestPayload.reason()).filter(r -> !r.isBlank()).orElse("用户发起退租");
+        String content = "订单 %s 用户已提交退租申请：%s。%s"
+                .formatted(order.getOrderNo(), reasonText, logisticsLine);
+        NotificationSendRequest notification = new NotificationSendRequest(
+                null,
+                NotificationChannel.IN_APP,
+                ADMIN_NOTIFICATION_RECIPIENT,
+                subject,
+                content,
+                variables,
+                "RETURN_ALERT",
+                order.getId().toString()
+        );
+        try {
+            notificationClient.send(notification);
+        } catch (RuntimeException ex) {
+            LOG.warn("Failed to send admin return notification for order {}: {}", order.getOrderNo(), ex.getMessage());
+        }
+    }
+
     private OrderItemRequest toOrderItemRequest(CartItem cartItem) {
         return new OrderItemRequest(
                 cartItem.getProductId(),
@@ -1310,6 +1362,31 @@ public class RentalOrderService {
             BigDecimal unitDepositAmount,
             BigDecimal buyoutPrice
     ) {
+    }
+
+    private void ensureReturnProofBundle(RentalOrder order, UUID userId) {
+        int minPhotos = Math.max(0, proofPolicyProperties.getReturnPhotoRequired());
+        int minVideos = Math.max(0, proofPolicyProperties.getReturnVideoRequired());
+        if (minPhotos == 0 && minVideos == 0) {
+            return;
+        }
+        long photoCount = order.getProofs().stream()
+                .filter(proof -> proof.getProofType() == OrderProofType.RETURN)
+                .filter(proof -> proof.getActorRole() == OrderActorRole.USER)
+                .filter(proof -> userId == null || userId.equals(proof.getUploadedBy()))
+                .filter(this::isImageProof)
+                .count();
+        long videoCount = order.getProofs().stream()
+                .filter(proof -> proof.getProofType() == OrderProofType.RETURN)
+                .filter(proof -> proof.getActorRole() == OrderActorRole.USER)
+                .filter(proof -> userId == null || userId.equals(proof.getUploadedBy()))
+                .filter(this::isVideoProof)
+                .count();
+        if (photoCount < minPhotos || videoCount < minVideos) {
+            String message = "退租凭证不足，需至少上传 %d 张照片和 %d 段视频"
+                    .formatted(minPhotos, minVideos);
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, message);
+        }
     }
 
     private void ensureShipmentProofBundle(RentalOrder order) {

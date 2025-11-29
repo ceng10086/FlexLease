@@ -218,7 +218,7 @@ class RentalOrderServiceIntegrationTest {
         RentalOrderResponse shipped;
         try (SecurityContextHandle ignored = withPrincipal(vendorAccountId, vendorId, "vendor-%s".formatted(vendorId), "VENDOR")) {
             shipped = rentalOrderService.shipOrder(created.id(),
-                    new OrderShipmentRequest(vendorId, "SF", "SF123456789"));
+                    new OrderShipmentRequest(vendorId, "SF", "SF123456789", null));
         }
         assertThat(shipped.status()).isEqualTo(OrderStatus.AWAITING_RECEIPT);
         assertThat(shipped.shippingCarrier()).isEqualTo("SF");
@@ -253,6 +253,8 @@ class RentalOrderServiceIntegrationTest {
         assertThat(extensionApproved.extensions()
                 .get(extensionApproved.extensions().size() - 1)
                 .status().name()).isEqualTo("APPROVED");
+
+        uploadReturnProofBundle(created.id(), userId);
 
         RentalOrderResponse returnRequested = rentalOrderService.applyReturn(created.id(),
                 new OrderReturnApplyRequest(userId, "不再需要", "SF", "SF987654321"));
@@ -1183,6 +1185,27 @@ class RentalOrderServiceIntegrationTest {
                                         new byte[]{9, 9, 9}
                         );
                         orderProofService.upload(orderId, vendorAccountId, OrderProofType.SHIPMENT, "开机演示", video);
+                }
+        }
+
+        private void uploadReturnProofBundle(UUID orderId, UUID userId) {
+                try (SecurityContextHandle ignored = withPrincipal(userId, "customer", "USER")) {
+                        for (int i = 0; i < 2; i++) {
+                                MockMultipartFile photo = new MockMultipartFile(
+                                                "file",
+                                                "return-%d.jpg".formatted(i + 1),
+                                                "image/jpeg",
+                                                new byte[]{(byte) (i + 4)}
+                                );
+                                orderProofService.upload(orderId, userId, OrderProofType.RETURN, "退租照片" + (i + 1), photo);
+                        }
+                        MockMultipartFile video = new MockMultipartFile(
+                                        "file",
+                                        "return-evidence.mp4",
+                                        "video/mp4",
+                                        new byte[]{7, 7, 7}
+                        );
+                        orderProofService.upload(orderId, userId, OrderProofType.RETURN, "退租视频", video);
                 }
         }
 

@@ -7,6 +7,7 @@ import java.util.UUID;
 public record OrderShipmentRequest(
         @NotNull UUID vendorId,
         @NotBlank String carrier,
-        @NotBlank String trackingNumber
+        @NotBlank String trackingNumber,
+        String message
 ) {
 }

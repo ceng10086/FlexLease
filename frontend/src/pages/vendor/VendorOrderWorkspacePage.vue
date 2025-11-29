@@ -80,6 +80,14 @@
                     :disabled="!canShip"
                   />
                 </a-form-item>
+                <a-form-item label="留言给用户">
+                  <a-textarea
+                    v-model:value="shipForm.message"
+                    :rows="3"
+                    placeholder="例如：预计送达时间、拆箱注意事项（可选）"
+                    :disabled="!canShip"
+                  />
+                </a-form-item>
                 <a-button
                   type="primary"
                   :loading="shipForm.loading"
@@ -543,7 +551,7 @@ const detail = reactive<{ open: boolean; loading: boolean; order: RentalOrderDet
   }
 );
 
-const shipForm = reactive({ carrier: '', trackingNumber: '', loading: false });
+const shipForm = reactive({ carrier: '', trackingNumber: '', message: '', loading: false });
 const returnForm = reactive({ remark: '', loading: false });
 const returnCompletionForm = reactive({ remark: '', refundAmount: null as number | null, loading: false });
 const extensionDecisionForm = reactive({ remark: '', loading: false });
@@ -828,6 +836,7 @@ const openDetail = async (orderId: string) => {
     detail.order = await fetchOrder(orderId);
     shipForm.carrier = detail.order?.shippingCarrier ?? '';
     shipForm.trackingNumber = detail.order?.shippingTrackingNo ?? '';
+    shipForm.message = '';
     returnForm.remark = '';
     returnCompletionForm.remark = '';
     returnCompletionForm.refundAmount = detail.order?.depositAmount ?? null;
@@ -873,9 +882,11 @@ const handleShip = async () => {
     await shipOrder(detail.order.id, {
       vendorId,
       carrier: shipForm.carrier,
-      trackingNumber: shipForm.trackingNumber
+      trackingNumber: shipForm.trackingNumber,
+      message: shipForm.message?.trim() ? shipForm.message.trim() : undefined
     });
     message.success('发货信息已提交');
+    shipForm.message = '';
     await refreshDetail();
     await loadOrders();
   } catch (error) {

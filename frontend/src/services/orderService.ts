@@ -82,6 +82,7 @@ export type OrderShipmentPayload = {
   vendorId: string;
   carrier: string;
   trackingNumber: string;
+  message?: string;
 };
 
 export type OrderActorPayload = {
@@ -342,6 +343,8 @@ export type RentalOrderDetail = {
   customerRemark?: string | null;
   shipmentPhotoRequired: number;
   shipmentVideoRequired: number;
+  returnPhotoRequired: number;
+  returnVideoRequired: number;
   createdAt: string;
   updatedAt: string;
   items: RentalOrderItem[];

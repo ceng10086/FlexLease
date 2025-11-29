@@ -40,6 +40,8 @@ public record RentalOrderResponse(
         List<OrderDisputeResponse> disputes,
         List<OrderSurveyResponse> surveys,
         int shipmentPhotoRequired,
-        int shipmentVideoRequired
+        int shipmentVideoRequired,
+        int returnPhotoRequired,
+        int returnVideoRequired
 ) {
 }

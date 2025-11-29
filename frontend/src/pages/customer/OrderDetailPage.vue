@@ -296,8 +296,44 @@
             <a-form-item label="退租原因">
               <a-textarea v-model:value="returnForm.reason" :rows="2" placeholder="填写退租原因" />
             </a-form-item>
+            <a-alert
+              v-if="requiresReturnProof"
+              type="info"
+              show-icon
+              class="mb-8"
+              :message="returnProofHint"
+            />
+            <p v-else class="form-hint mb-8">{{ returnProofHint }}</p>
+            <a-form-item label="退租凭证上传" v-if="requiresReturnProof">
+              <div class="form-hint mb-8">{{ returnProofHint }}</div>
+              <input
+                type="file"
+                :key="returnProofForm.inputKey"
+                @change="handleReturnProofFileChange"
+              />
+              <p class="proof-file-hint" v-if="returnProofForm.file">{{ returnProofForm.file.name }}</p>
+              <a-textarea
+                class="mt-8"
+                v-model:value="returnProofForm.description"
+                :rows="2"
+                placeholder="可选：补充说明此次寄件情况"
+              />
+              <a-button
+                class="mt-8"
+                type="dashed"
+                :loading="returnProofForm.uploading"
+                @click="handleReturnProofUpload"
+              >
+                上传退租凭证
+              </a-button>
+            </a-form-item>
             <a-space direction="vertical" style="width: 100%">
-              <a-button block :loading="returnForm.loading" @click="confirmReturnRequest">
+              <a-button
+                block
+                :loading="returnForm.loading"
+                :disabled="requiresReturnProof && !meetsReturnProofRequirement"
+                @click="confirmReturnRequest"
+              >
                 申请退租
               </a-button>
               <a-button type="primary" block :loading="buyoutForm.loading" @click="confirmBuyout">
@@ -462,6 +498,12 @@ const proofForm = reactive({
   uploading: false,
   inputKey: Date.now()
 });
+const returnProofForm = reactive({
+  description: '',
+  file: null as File | null,
+  uploading: false,
+  inputKey: Date.now()
+});
 
 const disputeModal = reactive({
   open: false,
@@ -531,6 +573,37 @@ const proofList = computed(() => order.value?.proofs ?? []);
 const hasReceiveProof = computed(() =>
   proofList.value.some((item) => item.proofType === 'RECEIVE' && item.actorRole === 'USER')
 );
+const returnRequirement = computed(() => ({
+  photos: order.value?.returnPhotoRequired ?? 0,
+  videos: order.value?.returnVideoRequired ?? 0
+}));
+const requiresReturnProof = computed(
+  () => returnRequirement.value.photos > 0 || returnRequirement.value.videos > 0
+);
+const returnProofStats = computed(() => {
+  const proofs = proofList.value.filter(
+    (item) => item.proofType === 'RETURN' && item.actorRole === 'USER'
+  );
+  return {
+    photos: proofs.filter(isImageProof).length,
+    videos: proofs.filter(isVideoProof).length
+  };
+});
+const meetsReturnProofRequirement = computed(() => {
+  if (!requiresReturnProof.value) {
+    return true;
+  }
+  return (
+    returnProofStats.value.photos >= returnRequirement.value.photos &&
+    returnProofStats.value.videos >= returnRequirement.value.videos
+  );
+});
+const returnProofHint = computed(() => {
+  if (!requiresReturnProof.value) {
+    return '无需额外凭证即可发起退租';
+  }
+  return `需至少上传${returnRequirement.value.photos}张照片和${returnRequirement.value.videos}段视频（当前 ${returnProofStats.value.photos}/${returnRequirement.value.photos} 张、${returnProofStats.value.videos}/${returnRequirement.value.videos} 段）`;
+});
 const canConfirmReceive = computed(() => {
   if (!order.value) {
     return false;
@@ -554,6 +627,23 @@ const disputeOptionMap = disputeOptions.reduce<Record<DisputeResolutionOption, s
 const formatCurrency = (value: number) => value.toFixed(2);
 const formatDate = (value: string) => new Date(value).toLocaleString();
 const proofTypeLabel = (type: OrderProofType) => proofTypeMap[type] ?? type;
+const normalizeString = (value?: string | null) => value?.toLowerCase() ?? '';
+const isImageProof = (proof: OrderProof) => {
+  const type = normalizeString(proof.contentType);
+  if (type.startsWith('image/')) {
+    return true;
+  }
+  const fileUrl = normalizeString(proof.fileUrl);
+  return fileUrl.endsWith('.jpg') || fileUrl.endsWith('.jpeg') || fileUrl.endsWith('.png');
+};
+const isVideoProof = (proof: OrderProof) => {
+  const type = normalizeString(proof.contentType);
+  if (type.startsWith('video/')) {
+    return true;
+  }
+  const fileUrl = normalizeString(proof.fileUrl);
+  return fileUrl.endsWith('.mp4') || fileUrl.endsWith('.mov') || fileUrl.endsWith('.m4v');
+};
 const conversationEvents = computed(() =>
   order.value?.events?.filter((item) => item.eventType === 'COMMUNICATION_NOTE') ?? []
 );
@@ -834,6 +924,10 @@ const handleExtension = async () => {
 };
 
 const confirmReturnRequest = () => {
+  if (!meetsReturnProofRequirement.value) {
+    message.warning(returnProofHint.value);
+    return;
+  }
   Modal.confirm({
     title: '提交退租申请',
     content: '提交后厂商将安排回收，若仍在使用请暂缓操作。',
@@ -845,6 +939,10 @@ const confirmReturnRequest = () => {
 
 const handleReturnRequest = async () => {
   if (!order.value || !auth.user?.id) {
+    return;
+  }
+  if (!meetsReturnProofRequirement.value) {
+    message.warning(returnProofHint.value);
     return;
   }
   returnForm.loading = true;
@@ -926,6 +1024,44 @@ const handleProofUpload = async () => {
     message.error(friendlyErrorMessage(error, '上传取证资料失败，请稍后重试'));
   } finally {
     proofForm.uploading = false;
+  }
+};
+
+const handleReturnProofFileChange = (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  returnProofForm.file = target.files && target.files.length > 0 ? target.files[0] : null;
+};
+
+const handleReturnProofUpload = async () => {
+  if (!order.value) {
+    return;
+  }
+  if (!auth.user?.id) {
+    message.error('请先登录');
+    return;
+  }
+  if (!returnProofForm.file) {
+    message.warning('请选择需要上传的退租凭证');
+    return;
+  }
+  returnProofForm.uploading = true;
+  try {
+    await uploadOrderProof(order.value.id, {
+      actorId: auth.user.id,
+      proofType: 'RETURN' as OrderProofType,
+      description: returnProofForm.description || undefined,
+      file: returnProofForm.file
+    });
+    message.success('退租凭证已上传');
+    returnProofForm.description = '';
+    returnProofForm.file = null;
+    returnProofForm.inputKey = Date.now();
+    await loadOrder();
+  } catch (error) {
+    console.error('上传退租凭证失败', error);
+    message.error(friendlyErrorMessage(error, '上传退租凭证失败，请稍后重试'));
+  } finally {
+    returnProofForm.uploading = false;
   }
 };
 
