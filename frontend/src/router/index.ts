@@ -154,7 +154,8 @@ router.beforeEach(async (to: RouteLocationNormalized) => {
     return true;
   }
 
-  if (to.meta.requiresAuth && !auth.isAuthenticated) {
+  const requiresAuth = to.matched.some((record) => record.meta?.requiresAuth);
+  if (requiresAuth && !auth.isAuthenticated) {
     return { path: '/login', query: { redirect: to.fullPath } };
   }
 

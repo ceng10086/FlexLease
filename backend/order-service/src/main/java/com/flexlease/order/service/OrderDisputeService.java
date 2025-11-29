@@ -261,10 +261,13 @@ public class OrderDisputeService {
         if (rawDelta == null) {
             return null;
         }
+        if (rawDelta == 0) {
+            return 0;
+        }
         if (rawDelta > 0) {
             return -rawDelta;
         }
-        return rawDelta;
+        return Math.abs(rawDelta);
     }
 
     private void notifyCreditChange(RentalOrder order, int delta) {

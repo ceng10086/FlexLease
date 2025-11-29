@@ -149,7 +149,8 @@ const channelCards = [
 ];
 
 const contextOptions = [
-  { value: 'DISPUTE', label: '纠纷通知' }
+  { value: 'DISPUTE', label: '纠纷通知' },
+  { value: 'CREDIT', label: '信用积分提醒' }
 ];
 
 const statusColor = (status: NotificationStatus) => {
@@ -192,6 +193,8 @@ const contextLabel = (context?: string | null) => {
   switch (context) {
     case 'DISPUTE':
       return '纠纷通知';
+    case 'CREDIT':
+      return '信用积分提醒';
     default:
       return context;
   }

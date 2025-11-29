@@ -354,7 +354,7 @@ class RentalOrderServiceIntegrationTest {
         try (SecurityContextHandle ignored = withPrincipal(adminId, "admin", "ADMIN")) {
             resolved = orderDisputeService.resolve(created.id(), opened.id(), new OrderDisputeResolveRequest(
                     DisputeResolutionOption.PARTIAL_REFUND,
-                    -12,
+                    12,
                     "确认用户责任"
             ));
         }
