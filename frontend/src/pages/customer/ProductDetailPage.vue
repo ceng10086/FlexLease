@@ -92,13 +92,13 @@ import { serializePlanSnapshot } from '../../utils/planSnapshot';
 
 const route = useRoute();
 const router = useRouter();
-const productId = route.params.productId as string;
 const auth = useAuthStore();
 
 const loading = ref(false);
 const product = ref<CatalogProductDetail | null>(null);
 const selectedPlanId = ref<string | undefined>();
 const selectedSkuId = ref<string | undefined>();
+const currentProductId = ref<string | null>(typeof route.params.productId === 'string' ? (route.params.productId as string) : null);
 
 const form = reactive<{ quantity: number; leaseStart?: Dayjs; leaseEnd?: Dayjs }>({ quantity: 1 });
 const addingToCart = ref(false);
@@ -110,12 +110,22 @@ const canCheckout = computed(() => currentPlan.value && currentSku.value && form
 
 const formatCurrency = (value: number) => value.toFixed(2);
 
-const loadProduct = async () => {
+const resetSelections = () => {
+  selectedPlanId.value = undefined;
+  selectedSkuId.value = undefined;
+  form.quantity = 1;
+  form.leaseStart = undefined;
+  form.leaseEnd = undefined;
+};
+
+const loadProduct = async (id: string) => {
   loading.value = true;
+  product.value = null;
   try {
-    product.value = await fetchCatalogProduct(productId);
-    selectedPlanId.value = product.value.rentalPlans[0]?.id;
-    selectedSkuId.value = product.value.rentalPlans[0]?.skus[0]?.id;
+    const detail = await fetchCatalogProduct(id);
+    product.value = detail;
+    selectedPlanId.value = detail.rentalPlans[0]?.id;
+    selectedSkuId.value = detail.rentalPlans[0]?.skus[0]?.id;
   } catch (error) {
     console.error('加载商品详情失败', error);
     message.error('加载商品详情失败，请返回重试');
@@ -196,7 +206,22 @@ watch(selectedPlanId, (planId) => {
   selectedSkuId.value = plan?.skus[0]?.id;
 });
 
-loadProduct();
+watch(
+  () => route.params.productId,
+  (newProductId) => {
+    if (typeof newProductId !== 'string' || !newProductId) {
+      product.value = null;
+      return;
+    }
+    if (currentProductId.value === newProductId && product.value) {
+      return;
+    }
+    currentProductId.value = newProductId;
+    resetSelections();
+    loadProduct(newProductId);
+  },
+  { immediate: true }
+);
 </script>
 
 <style scoped>

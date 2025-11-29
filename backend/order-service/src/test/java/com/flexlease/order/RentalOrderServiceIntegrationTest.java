@@ -19,6 +19,7 @@ import com.flexlease.order.client.ProductCatalogClient.CatalogProductView.Rental
 import com.flexlease.order.client.ProductCatalogClient.CatalogProductView.SkuView;
 import com.flexlease.order.client.UserProfileClient;
 import com.flexlease.order.domain.DisputeResolutionOption;
+import com.flexlease.order.domain.OrderDispute;
 import com.flexlease.order.domain.OrderDisputeStatus;
 import com.flexlease.order.domain.OrderEventType;
 import com.flexlease.order.domain.OrderProofType;
@@ -45,6 +46,7 @@ import com.flexlease.order.dto.OrderReturnCompleteRequest;
 import com.flexlease.order.dto.OrderReturnDecisionRequest;
 import com.flexlease.order.dto.OrderShipmentRequest;
 import com.flexlease.order.dto.RentalOrderResponse;
+import com.flexlease.order.repository.OrderDisputeRepository;
 import com.flexlease.order.service.CartService;
 import com.flexlease.order.service.OrderContractService;
 import com.flexlease.order.service.OrderDisputeService;
@@ -66,6 +68,7 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.mock.web.MockMultipartFile;
 
 @SpringBootTest
@@ -87,6 +90,9 @@ class RentalOrderServiceIntegrationTest {
 
     @Autowired
     private OrderDisputeService orderDisputeService;
+
+        @Autowired
+        private OrderDisputeRepository orderDisputeRepository;
 
         @Autowired
         private OrderProofService orderProofService;
@@ -362,6 +368,62 @@ class RentalOrderServiceIntegrationTest {
         assertThat(resolved.status()).isEqualTo(OrderDisputeStatus.CLOSED);
         assertThat(resolved.userCreditDelta()).isEqualTo(-12);
         Mockito.verify(userProfileClient).adjustCredit(Mockito.eq(userId), Mockito.eq(-12), Mockito.anyString());
+    }
+
+    @Test
+    void shouldAutoEscalateDisputeAfterDeadline() {
+        UUID userId = UUID.randomUUID();
+        UUID vendorId = UUID.randomUUID();
+        UUID productId = UUID.randomUUID();
+        UUID skuId = UUID.randomUUID();
+        UUID planId = UUID.randomUUID();
+
+        OrderItemRequest itemRequest = new OrderItemRequest(
+                productId,
+                skuId,
+                planId,
+                "超时纠纷商品",
+                "SKU-DISPUTE-DEADLINE",
+                null,
+                1,
+                new BigDecimal("199.00"),
+                new BigDecimal("399.00"),
+                null
+        );
+
+        stubProductCatalog(productId, vendorId, planId, skuId);
+        RentalOrderResponse created = rentalOrderService.createOrder(new CreateOrderRequest(
+                userId,
+                vendorId,
+                "STANDARD",
+                null,
+                null,
+                List.of(itemRequest),
+                List.of(),
+                null
+        ));
+
+        OrderDisputeResponse opened;
+        try (SecurityContextHandle ignored = withPrincipal(userId, "timeout-user", "USER")) {
+            opened = orderDisputeService.create(created.id(), new OrderDisputeCreateRequest(
+                    userId,
+                    DisputeResolutionOption.PARTIAL_REFUND,
+                    "测试超时",
+                    null
+            ));
+        }
+
+        OrderDispute persisted = orderDisputeRepository.findByIdAndOrderId(opened.id(), created.id())
+                .orElseThrow();
+        ReflectionTestUtils.setField(persisted, "deadlineAt", OffsetDateTime.now().minusHours(2));
+        orderDisputeRepository.save(persisted);
+
+        boolean escalated = orderDisputeService.escalateDisputeDueToTimeout(opened.id());
+        assertThat(escalated).isTrue();
+
+        OrderDispute updated = orderDisputeRepository.findByIdAndOrderId(opened.id(), created.id())
+                .orElseThrow();
+        assertThat(updated.getStatus()).isEqualTo(OrderDisputeStatus.PENDING_ADMIN);
     }
 
     @Test

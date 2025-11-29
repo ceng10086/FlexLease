@@ -243,6 +243,39 @@ public class OrderDisputeService {
         return orderAssembler.toDisputeResponse(dispute);
     }
 
+    public boolean escalateDisputeDueToTimeout(UUID disputeId) {
+        OrderDispute dispute = orderDisputeRepository.findById(disputeId)
+                .orElse(null);
+        if (dispute == null) {
+            return false;
+        }
+        if (dispute.getStatus() != OrderDisputeStatus.OPEN) {
+            return false;
+        }
+        OffsetDateTime deadline = dispute.getDeadlineAt();
+        if (deadline == null || deadline.isAfter(OffsetDateTime.now())) {
+            return false;
+        }
+        RentalOrder order = dispute.getOrder();
+        dispute.escalate(null);
+        String reason = "协商超时，系统自动升级平台仲裁";
+        timelineService.append(order,
+                OrderEventType.DISPUTE_ESCALATED,
+                reason,
+                null,
+                Map.of("reason", reason, "auto", true),
+                OrderActorRole.INTERNAL);
+        notifyUser(order,
+            dispute,
+            "纠纷自动进入仲裁",
+            "订单 %s 因协商超时已自动升级平台仲裁，平台将尽快处理。".formatted(order.getOrderNo()));
+        notifyVendor(order,
+            dispute,
+            "纠纷自动进入仲裁",
+            "订单 %s 因协商超时已自动升级平台仲裁，请关注仲裁通知。".formatted(order.getOrderNo()));
+        return true;
+    }
+
     private String buildDecisionMessage(OrderDisputeResolveRequest request, Integer normalizedDelta) {
         String decision = switch (request.decision()) {
             case REDELIVER -> "重新发货/补发";

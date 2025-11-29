@@ -589,6 +589,7 @@ const proofLabelMap: Record<OrderProofType, string> = {
 
 const proofTypeOptions: { label: string; value: OrderProofType }[] = [
   { label: proofLabelMap.SHIPMENT, value: 'SHIPMENT' },
+  { label: proofLabelMap.RETURN, value: 'RETURN' },
   { label: proofLabelMap.INSPECTION, value: 'INSPECTION' },
   { label: proofLabelMap.OTHER, value: 'OTHER' }
 ];

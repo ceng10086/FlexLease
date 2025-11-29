@@ -42,6 +42,7 @@ public class OrderProofService {
 
     private static final Set<OrderProofType> VENDOR_ALLOWED_TYPES = EnumSet.of(
         OrderProofType.SHIPMENT,
+        OrderProofType.RETURN,
         OrderProofType.INSPECTION,
         OrderProofType.OTHER
     );
