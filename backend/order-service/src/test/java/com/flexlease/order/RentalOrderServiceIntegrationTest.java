@@ -438,6 +438,75 @@ class RentalOrderServiceIntegrationTest {
         }
     }
 
+        @Test
+        void shouldNormalizePositiveCreditPenalty() {
+                UUID userId = UUID.randomUUID();
+                UUID vendorId = UUID.randomUUID();
+                UUID vendorAccountId = UUID.randomUUID();
+                UUID productId = UUID.randomUUID();
+                UUID skuId = UUID.randomUUID();
+                UUID planId = UUID.randomUUID();
+
+                OrderItemRequest itemRequest = new OrderItemRequest(
+                                productId,
+                                skuId,
+                                planId,
+                                "信用扣分测试商品",
+                                "SKU-CREDIT",
+                                null,
+                                1,
+                                new BigDecimal("150.00"),
+                                new BigDecimal("200.00"),
+                                null
+                );
+
+                stubProductCatalog(productId, vendorId, planId, skuId);
+                RentalOrderResponse created = rentalOrderService.createOrder(new CreateOrderRequest(
+                                userId,
+                                vendorId,
+                                "STANDARD",
+                                null,
+                                null,
+                                List.of(itemRequest),
+                                List.of(),
+                                null
+                ));
+
+                OrderDisputeResponse opened;
+                try (SecurityContextHandle ignored = withPrincipal(userId, "credit-user", "USER")) {
+                        opened = orderDisputeService.create(created.id(), new OrderDisputeCreateRequest(
+                                        userId,
+                                        DisputeResolutionOption.RETURN_WITH_DEPOSIT_DEDUCTION,
+                                        "设备严重受损",
+                                        null
+                        ));
+                }
+
+                try (SecurityContextHandle ignored = withPrincipal(vendorAccountId, vendorId, "credit-vendor", "VENDOR")) {
+                        orderDisputeService.respond(created.id(), opened.id(), new OrderDisputeResponseRequest(
+                                        vendorAccountId,
+                                        DisputeResolutionOption.REDELIVER,
+                                        false,
+                                        "建议换新"
+                        ));
+                }
+
+                UUID adminId = UUID.randomUUID();
+                OrderDisputeResponse resolved;
+                try (SecurityContextHandle ignored = withPrincipal(adminId, "admin", "ADMIN")) {
+                        resolved = orderDisputeService.resolve(created.id(), opened.id(), new OrderDisputeResolveRequest(
+                                        DisputeResolutionOption.PARTIAL_REFUND,
+                                        15,
+                                        "用户责任，扣分"
+                        ));
+                }
+
+                assertThat(resolved.userCreditDelta()).isEqualTo(-15);
+                Mockito.verify(userProfileClient).adjustCredit(Mockito.eq(userId), Mockito.eq(-15), Mockito.anyString());
+                Mockito.verify(notificationClient, Mockito.atLeastOnce())
+                        .send(Mockito.argThat(req -> "信用积分变动提醒".equals(req.subject())));
+        }
+
     @Test
     void shouldApplyCreditDiscount() {
         UUID userId = UUID.randomUUID();

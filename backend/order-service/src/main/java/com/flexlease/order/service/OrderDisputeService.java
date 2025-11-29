@@ -40,6 +40,7 @@ public class OrderDisputeService {
 
     private static final Logger LOG = LoggerFactory.getLogger(OrderDisputeService.class);
     private static final String DISPUTE_CONTEXT = "DISPUTE";
+    private static final String CREDIT_CONTEXT = "CREDIT";
 
     private final RentalOrderRepository rentalOrderRepository;
     private final OrderDisputeRepository orderDisputeRepository;
@@ -204,30 +205,32 @@ public class OrderDisputeService {
         UUID adminId = SecurityUtils.requireUserId();
         RentalOrder order = loadOrder(orderId);
         OrderDispute dispute = loadDispute(orderId, disputeId);
+        Integer normalizedDelta = normalizeCreditDelta(request.penalizeUserDelta());
         dispute.resolveByAdmin(
-                request.decision(),
-                StringUtils.hasText(request.remark()) ? request.remark().trim() : null,
-                adminId,
-                request.penalizeUserDelta()
+            request.decision(),
+            StringUtils.hasText(request.remark()) ? request.remark().trim() : null,
+            adminId,
+            normalizedDelta
         );
         timelineService.append(order,
                 OrderEventType.DISPUTE_RESOLVED,
-                buildDecisionMessage(request),
+            buildDecisionMessage(request, normalizedDelta),
                 adminId,
                 Map.of("decision", request.decision().name(),
-                        "penalizeUserDelta", request.penalizeUserDelta()),
+                "penalizeUserDelta", normalizedDelta),
                 OrderActorRole.ADMIN);
-        if (request.penalizeUserDelta() != null && request.penalizeUserDelta() != 0) {
+        if (normalizedDelta != null && normalizedDelta != 0) {
             try {
                 userProfileClient.adjustCredit(order.getUserId(),
-                        request.penalizeUserDelta(),
+                        normalizedDelta,
                         "订单纠纷裁决");
+                notifyCreditChange(order, normalizedDelta);
             } catch (RuntimeException ex) {
                 LOG.warn("Failed to adjust credit for user {} due to dispute {}: {}",
                         order.getUserId(), disputeId, ex.getMessage());
             }
         }
-        String summary = buildDecisionMessage(request);
+        String summary = buildDecisionMessage(request, normalizedDelta);
         notifyUser(order,
             dispute,
             "纠纷裁决结果",
@@ -240,12 +243,51 @@ public class OrderDisputeService {
         return orderAssembler.toDisputeResponse(dispute);
     }
 
-    private String buildDecisionMessage(OrderDisputeResolveRequest request) {
-        String decision = request.decision().name();
-        if (request.penalizeUserDelta() != null && request.penalizeUserDelta() != 0) {
-            return "%s，信用变动 %d 分".formatted(decision, request.penalizeUserDelta());
+    private String buildDecisionMessage(OrderDisputeResolveRequest request, Integer normalizedDelta) {
+        String decision = switch (request.decision()) {
+            case REDELIVER -> "重新发货/补发";
+            case PARTIAL_REFUND -> "部分退款继续租赁";
+            case RETURN_WITH_DEPOSIT_DEDUCTION -> "退租并扣押金";
+            case DISCOUNTED_BUYOUT -> "优惠买断";
+            case CUSTOM -> "自定义方案";
+        };
+        if (normalizedDelta != null && normalizedDelta != 0) {
+            return "%s，信用变动 %d 分".formatted(decision, normalizedDelta);
         }
         return decision;
+    }
+
+    private Integer normalizeCreditDelta(Integer rawDelta) {
+        if (rawDelta == null) {
+            return null;
+        }
+        if (rawDelta > 0) {
+            return -rawDelta;
+        }
+        return rawDelta;
+    }
+
+    private void notifyCreditChange(RentalOrder order, int delta) {
+        String direction = delta > 0 ? "增加" : "扣减";
+        int absolute = Math.abs(delta);
+        NotificationSendRequest request = new NotificationSendRequest(
+                null,
+                NotificationChannel.IN_APP,
+                order.getUserId().toString(),
+                "信用积分变动提醒",
+                "订单 %s 纠纷裁决导致信用%s %d 分。".formatted(order.getOrderNo(), direction, absolute),
+                Map.of(
+                        "orderNo", order.getOrderNo(),
+                        "creditDelta", delta
+                ),
+                CREDIT_CONTEXT,
+                order.getId().toString()
+        );
+        try {
+            notificationClient.send(request);
+        } catch (RuntimeException ex) {
+            LOG.warn("Failed to notify user {} of credit change: {}", order.getUserId(), ex.getMessage());
+        }
     }
 
     private RentalOrder loadOrder(UUID orderId) {

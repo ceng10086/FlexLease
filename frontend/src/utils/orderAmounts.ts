@@ -89,5 +89,7 @@ export const rentalOrderDeposit = (order: RentalOrderDetail) =>
   resolveOrderDeposit<RentalOrderItem>({ ...order, items: order.items });
 export const rentalOrderRent = (order: RentalOrderDetail) =>
   resolveOrderRent<RentalOrderItem>({ ...order, items: order.items });
+export const rentalOrderBuyout = (order: RentalOrderDetail) =>
+  resolveOrderBuyout<RentalOrderItem>({ ...order, items: order.items });
 export const rentalOrderTotal = (order: RentalOrderDetail) =>
   resolveOrderTotal<RentalOrderItem>({ ...order, items: order.items });

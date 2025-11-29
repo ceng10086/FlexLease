@@ -232,7 +232,7 @@
             <a-select-option value="CUSTOM">自定义方案</a-select-option>
           </a-select>
         </a-form-item>
-        <a-form-item label="信用扣分（可为负数）">
+        <a-form-item label="信用扣分（正数扣分，负数加分）">
           <a-input-number
             v-model:value="adminDisputeModal.creditDelta"
             :step="1"

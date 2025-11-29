@@ -238,11 +238,10 @@
                 :min="0.01"
                 :step="0.01"
                 style="width: 100%"
-                :disabled="true"
               />
             </a-form-item>
             <p class="form-hint">
-              当前仅支持一次性支付订单总额 ¥{{ formatCurrency(requiredPaymentAmount || 0) }}，金额已锁定。
+              {{ paymentAmountHint }}
             </p>
             <a-button type="primary" block :loading="paymentForm.loading" @click="handleCreatePayment">生成支付单</a-button>
           </a-form>
@@ -427,6 +426,7 @@ import {
   resolveItemDeposit,
   resolveItemRent,
   rentalOrderDeposit,
+  rentalOrderBuyout,
   rentalOrderRent,
   rentalOrderTotal
 } from '../../utils/orderAmounts';
@@ -653,12 +653,53 @@ const canEscalateDispute = (item: OrderDispute) => item.status === 'OPEN' || ite
 
 const canAppealDispute = (item: OrderDispute) => item.status === 'CLOSED' && item.appealCount < 1;
 
-const requiredPaymentAmount = computed(() => (order.value ? rentalOrderTotal(order.value) : 0));
+const paymentSceneDefaultAmount = computed(() => {
+  if (!order.value) {
+    return 0;
+  }
+  switch (paymentForm.scene) {
+    case 'DEPOSIT':
+      return rentalOrderDeposit(order.value);
+    case 'RENT':
+      return rentalOrderRent(order.value);
+    case 'BUYOUT':
+      return rentalOrderBuyout(order.value);
+    case 'PENALTY':
+      return 0;
+    default:
+      return rentalOrderTotal(order.value);
+  }
+});
+
+const paymentAmountHint = computed(() => {
+  if (!order.value) {
+    return '订单加载中，请稍后再生成支付单。';
+  }
+  const recommended = formatCurrency(Math.max(paymentSceneDefaultAmount.value, 0));
+  switch (paymentForm.scene) {
+    case 'DEPOSIT':
+      return `建议补缴押金 ¥${recommended}，系统会自动沉淀至平台保证金账户。`;
+    case 'RENT':
+      return `建议支付租金 ¥${recommended}，该金额将直接结算给厂商。`;
+    case 'BUYOUT':
+      return `建议支付买断款 ¥${recommended}，完成后订单将转入买断流程。`;
+    case 'PENALTY':
+      return '请输入与厂商或平台确认的违约金金额，可根据协商结果自行调整。';
+    default:
+      return '请选择支付场景后输入对应金额。';
+  }
+});
 
 watch(
-  requiredPaymentAmount,
-  (amount) => {
-    const normalized = Math.round((amount || 0) * 100) / 100;
+  [() => paymentForm.scene, () => order.value],
+  () => {
+    if (paymentForm.scene === 'PENALTY') {
+      if (!paymentForm.amount || paymentForm.amount <= 0) {
+        paymentForm.amount = 0;
+      }
+      return;
+    }
+    const normalized = Math.round((paymentSceneDefaultAmount.value || 0) * 100) / 100;
     paymentForm.amount = normalized;
   },
   { immediate: true }
@@ -668,7 +709,6 @@ const loadOrder = async () => {
   loading.value = true;
   try {
     order.value = await fetchOrder(orderId);
-    paymentForm.amount = order.value ? rentalOrderTotal(order.value) : 0;
   } catch (error) {
     console.error('加载订单失败', error);
     message.error(friendlyErrorMessage(error, '加载订单失败，请稍后重试'));
@@ -716,8 +756,7 @@ const handleCreatePayment = async () => {
     message.error('请先登录');
     return;
   }
-  const normalizedAmount = Math.round(requiredPaymentAmount.value * 100) / 100;
-  paymentForm.amount = normalizedAmount;
+  const normalizedAmount = Math.round((paymentForm.amount || 0) * 100) / 100;
   if (!normalizedAmount || normalizedAmount <= 0) {
     message.warning('当前订单暂无需支付');
     return;
