@@ -90,6 +90,10 @@ public class NotificationController {
 
     @GetMapping("/templates")
     public ApiResponse<List<NotificationTemplateResponse>> templates() {
+        FlexleasePrincipal principal = SecurityUtils.requirePrincipal();
+        if (!principal.hasRole("ADMIN") && !principal.hasRole("INTERNAL")) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "仅管理员或内部服务可查看通知模板");
+        }
         return ApiResponse.success(notificationService.listTemplates());
     }
 }

@@ -11,14 +11,15 @@ import com.flexlease.order.domain.OrderEventType;
 import com.flexlease.order.domain.OrderStatus;
 import com.flexlease.order.domain.RentalOrder;
 import com.flexlease.order.repository.RentalOrderRepository;
-import jakarta.transaction.Transactional;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 public class OrderMaintenanceScheduler {
@@ -30,21 +31,23 @@ public class OrderMaintenanceScheduler {
     private final NotificationClient notificationClient;
     private final OrderEventPublisher orderEventPublisher;
     private final OrderMaintenanceProperties properties;
+    private final TransactionTemplate transactionTemplate;
 
     public OrderMaintenanceScheduler(RentalOrderRepository rentalOrderRepository,
                                      InventoryReservationClient inventoryReservationClient,
                                      NotificationClient notificationClient,
                                      OrderEventPublisher orderEventPublisher,
-                                     OrderMaintenanceProperties properties) {
+                                     OrderMaintenanceProperties properties,
+                                     TransactionTemplate transactionTemplate) {
         this.rentalOrderRepository = rentalOrderRepository;
         this.inventoryReservationClient = inventoryReservationClient;
         this.notificationClient = notificationClient;
         this.orderEventPublisher = orderEventPublisher;
         this.properties = properties;
+        this.transactionTemplate = transactionTemplate;
     }
 
     @Scheduled(fixedDelayString = "${flexlease.order.maintenance.scan-interval-ms:60000}")
-    @Transactional
     public void cancelExpiredPendingOrders() {
         OffsetDateTime cutoff = OffsetDateTime.now().minusMinutes(properties.getPendingPaymentExpireMinutes());
         List<RentalOrder> expiredOrders = rentalOrderRepository.findByStatusAndCreatedAtBefore(OrderStatus.PENDING_PAYMENT, cutoff);
@@ -52,7 +55,24 @@ public class OrderMaintenanceScheduler {
             return;
         }
         LOG.debug("Found {} pending payment orders exceeding {} minutes", expiredOrders.size(), properties.getPendingPaymentExpireMinutes());
-        expiredOrders.forEach(this::handleExpiration);
+        expiredOrders.stream()
+                .map(RentalOrder::getId)
+                .forEach(this::cancelExpiredOrderSafely);
+    }
+
+    private void cancelExpiredOrderSafely(UUID orderId) {
+        transactionTemplate.executeWithoutResult(status -> {
+            RentalOrder order = rentalOrderRepository.findByIdWithDetails(orderId).orElse(null);
+            if (order == null) {
+                return;
+            }
+            try {
+                handleExpiration(order);
+            } catch (RuntimeException ex) {
+                status.setRollbackOnly();
+                LOG.warn("Failed to auto cancel order {}: {}", order.getOrderNo(), ex.getMessage());
+            }
+        });
     }
 
     private void handleExpiration(RentalOrder order) {
