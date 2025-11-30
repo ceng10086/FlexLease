@@ -212,12 +212,16 @@ public class OrderDisputeService {
             adminId,
             normalizedDelta
         );
+        Map<String, Object> resolutionAttributes = new java.util.HashMap<>();
+        resolutionAttributes.put("decision", request.decision().name());
+        if (normalizedDelta != null) {
+            resolutionAttributes.put("penalizeUserDelta", normalizedDelta);
+        }
         timelineService.append(order,
                 OrderEventType.DISPUTE_RESOLVED,
-            buildDecisionMessage(request, normalizedDelta),
+                buildDecisionMessage(request, normalizedDelta),
                 adminId,
-                Map.of("decision", request.decision().name(),
-                "penalizeUserDelta", normalizedDelta),
+                resolutionAttributes,
                 OrderActorRole.ADMIN);
         if (normalizedDelta != null && normalizedDelta != 0) {
             try {
