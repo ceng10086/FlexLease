@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -59,8 +60,19 @@ public class CartService {
                         request.unitDepositAmount(),
                         request.buyoutPrice()
                 ));
-        CartItem saved = cartItemRepository.save(item);
-        return toResponse(saved);
+        try {
+            CartItem saved = cartItemRepository.save(item);
+            return toResponse(saved);
+        } catch (DataIntegrityViolationException ex) {
+            CartItem existing = cartItemRepository.findByUserIdAndSkuId(request.userId(), request.skuId())
+                    .orElseThrow(() -> ex);
+            existing.increaseQuantity(request.quantity());
+            existing.refreshDetails(request.vendorId(), request.productId(), request.planId(),
+                    request.productName(), request.skuCode(), request.planSnapshot(),
+                    request.unitRentAmount(), request.unitDepositAmount(), request.buyoutPrice());
+            CartItem saved = cartItemRepository.save(existing);
+            return toResponse(saved);
+        }
     }
 
     public CartItemResponse updateItem(UUID itemId, UpdateCartItemRequest request) {

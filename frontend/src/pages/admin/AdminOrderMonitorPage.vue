@@ -324,6 +324,12 @@ const adminDisputeModal = reactive({
   remark: '',
   loading: false
 });
+const formatCreditDeltaForModal = (value: number | null | undefined) => {
+  if (value === null || value === undefined || value === 0) {
+    return 0;
+  }
+  return value * -1;
+};
 
 const formatCurrency = (value: number) => value.toFixed(2);
 const formatDate = (value: string) => new Date(value).toLocaleString();
@@ -467,7 +473,7 @@ const handleForceClose = async () => {
 const openAdminDisputeModal = (dispute: OrderDispute) => {
   adminDisputeModal.disputeId = dispute.id;
   adminDisputeModal.decision = dispute.adminDecisionOption ?? dispute.initiatorOption;
-  adminDisputeModal.creditDelta = dispute.userCreditDelta ?? 0;
+  adminDisputeModal.creditDelta = formatCreditDeltaForModal(dispute.userCreditDelta);
   adminDisputeModal.remark = dispute.adminDecisionRemark ?? '';
   adminDisputeModal.open = true;
 };
