@@ -131,6 +131,7 @@ import { rentalOrderDeposit, rentalOrderRent, rentalOrderTotal } from '../../uti
 import { autoCompleteInitialPayment } from '../../utils/autoPayment';
 import { friendlyErrorMessage } from '../../utils/error';
 import { creditTierColor, creditTierLabel } from '../../types/credit';
+import { generateIdempotencyKey } from '../../utils/idempotency';
 
 const route = useRoute();
 const router = useRouter();
@@ -261,6 +262,7 @@ const handleCreate = async () => {
   }
   loading.create = true;
   try {
+    const idempotencyKey = generateIdempotencyKey();
     const order = await createOrder({
       userId: auth.user.id,
       vendorId: product.value!.vendorId,
@@ -269,7 +271,7 @@ const handleCreate = async () => {
       leaseEndAt: form.leaseEnd?.toISOString(),
       items: buildOrderItems(),
       remark: form.remark?.trim() ? form.remark.trim() : undefined
-    });
+    }, { idempotencyKey });
     await handleAutoPayment(order);
     router.replace({ name: 'orders' });
   } catch (error) {
@@ -282,6 +284,10 @@ const handleCreate = async () => {
 
 const handleAutoPayment = async (order: RentalOrderDetail) => {
   try {
+    if (order.requiresManualReview) {
+      message.info('订单已提交，待人工审核后由平台发起支付');
+      return;
+    }
     const deposit = rentalOrderDeposit(order);
     const rent = rentalOrderRent(order);
     const buyout = order.buyoutAmount ?? 0;

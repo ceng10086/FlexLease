@@ -84,6 +84,7 @@ import {
 import { createOrder, type RentalOrderDetail } from '../../services/orderService';
 import { cartItemDeposit, cartItemRent } from '../../utils/orderAmounts';
 import { autoCompleteInitialPayment } from '../../utils/autoPayment';
+import { generateIdempotencyKey } from '../../utils/idempotency';
 
 const router = useRouter();
 const auth = useAuthStore();
@@ -221,13 +222,14 @@ const handleCheckout = async () => {
   try {
     const [vendorId] = Array.from(vendorIds);
     const planType = resolvePlanTypeFromSelection();
+    const idempotencyKey = generateIdempotencyKey();
     const order = await createOrder({
       userId,
       vendorId,
       planType,
       items: [],
       cartItemIds: [...selectedRowKeys.value]
-    });
+    }, { idempotencyKey });
     await handleAutoPayment(order, userId);
     selectedRowKeys.value = [];
     await loadCart();
@@ -243,6 +245,10 @@ const handleCheckout = async () => {
 
 const handleAutoPayment = async (order: RentalOrderDetail, userId: string) => {
   try {
+    if (order.requiresManualReview) {
+      message.info('订单已提交，待人工审核后由平台发起支付');
+      return;
+    }
     const deposit = order.depositAmount ?? 0;
     const rent = order.rentAmount ?? 0;
     const buyout = order.buyoutAmount ?? 0;

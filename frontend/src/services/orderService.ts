@@ -363,8 +363,18 @@ export const previewOrder = async (
   return response.data.data;
 };
 
-export const createOrder = async (payload: CreateOrderPayload): Promise<RentalOrderDetail> => {
-  const response = await http.post<ApiResponse<RentalOrderDetail>>('/orders', payload);
+export const createOrder = async (
+  payload: CreateOrderPayload,
+  options?: { idempotencyKey?: string }
+): Promise<RentalOrderDetail> => {
+  const config = options?.idempotencyKey
+    ? {
+        headers: {
+          'Idempotency-Key': options.idempotencyKey
+        }
+      }
+    : undefined;
+  const response = await http.post<ApiResponse<RentalOrderDetail>>('/orders', payload, config);
   return response.data.data;
 };
 
