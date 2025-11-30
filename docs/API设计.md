@@ -196,6 +196,36 @@
 
 > 下单传入 `cartItemIds` 后端会自动加载并移除对应购物车条目，同时触发库存预占。
 
+### 5.6 订单沟通与取证
+| 方法 | URL | 描述 | 请求体要点 | 备注 |
+| ---- | --- | ---- | ---------- | ---- |
+| POST | `/orders/{orderId}/messages` | 在时间线中追加沟通记录 | `{ actorId, message }` | 用户/厂商/管理员均可调用，后端会校验请求人与当前登录用户一致，并触发站内信提醒对端 |
+| GET | `/orders/{orderId}/proofs` | 查看全部取证资料 | - | 返回列表按 `uploadedAt` 排序 |
+| POST | `/orders/{orderId}/proofs` | 上传取证文件 | `multipart/form-data`：`actorId`、`proofType=SHIPMENT/RECEIVE/RETURN/INSPECTION/OTHER`、`description?`、`file` | 根据角色限制可选 `proofType`，成功后在时间线追加 `PROOF_UPLOADED` 事件并通过 Notification Service 通知对方 |
+| GET | `/proofs/{fileName}` | 下载取证文件 | - | 静态资源控制器，同步校验当前身份是否有权限读取目标订单 |
+
+> `ProofPolicyProperties` 中可配置发货/退租阶段所需的最少照片/视频数量，未满足要求时 `/orders/{id}/ship`、`/return/complete` 会拒绝操作。
+
+### 5.7 订单纠纷与仲裁
+| 方法 | URL | 角色 | 描述 | 备注 |
+| ---- | --- | ---- | ---- | ---- |
+| GET | `/orders/{orderId}/disputes` | USER/VENDOR/ADMIN | 查看纠纷列表 | 自动按时间排序，返回 `OrderDisputeResponse` |
+| POST | `/orders/{orderId}/disputes` | USER/VENDOR | 发起纠纷 | `{ actorId, option, reason, remark? }`，`option` 为预设方案枚举 |
+| POST | `/orders/{orderId}/disputes/{disputeId}/responses` | USER/VENDOR | 针对纠纷给出方案或确认 | `{ actorId, option, accept, remark? }`，双方轮流响应 |
+| POST | `/orders/{orderId}/disputes/{disputeId}/escalate` | USER/VENDOR | 升级平台仲裁 | `{ actorId, reason? }`，系统也会在截止时间到期后自动升级 |
+| POST | `/orders/{orderId}/disputes/{disputeId}/appeal` | USER/VENDOR | 对已结案纠纷发起申诉 | `{ actorId, reason? }`，最多一次 |
+| POST | `/admin/orders/{orderId}/disputes/{disputeId}/resolve` | ADMIN | 平台裁决 | `{ decision, penalizeUserDelta?, remark? }`；`penalizeUserDelta` 为信用扣分，正数代表扣减 |
+
+> 纠纷的每个阶段都会同步写入时间线，且通过 Notification Service 向双方推送站内信；平台裁决后会自动触发满意度调查。
+
+### 5.8 满意度调研
+| 方法 | URL | 描述 | 请求体要点 |
+| ---- | --- | ---- | ---------- |
+| GET | `/orders/{orderId}/surveys` | 查看订单下的所有调查 | - |
+| POST | `/orders/{orderId}/surveys/{surveyId}/submit` | 提交调查问卷 | `{ actorId, rating (1~5), comment? }` |
+
+> `OrderSurveyScheduler` 会根据 `flexlease.order.survey.*` 定时激活状态为 `PENDING` 的调查并发送邀请，问卷完成后附加时间线事件与感谢通知。
+
 ## 6. 支付与结算（payment-service）
 > 枚举说明：`scene` 取值 `DEPOSIT`/`RENT`/`BUYOUT`/`PENALTY`；`channel` 取值 `MOCK`/`ALIPAY`/`WECHAT`/`BANK_TRANSFER`；`status` 取值 `PENDING`/`SUCCEEDED`/`FAILED`。
 
