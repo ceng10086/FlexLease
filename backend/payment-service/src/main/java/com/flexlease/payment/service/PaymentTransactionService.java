@@ -468,6 +468,7 @@ public class PaymentTransactionService {
         private BigDecimal penalty = BigDecimal.ZERO;
         private BigDecimal platformCommission = BigDecimal.ZERO;
         private BigDecimal refunded = BigDecimal.ZERO;
+        private BigDecimal vendorRefunded = BigDecimal.ZERO;
         private OffsetDateTime lastPaidAt;
         private long count;
         private final OffsetDateTime refundFrom;
@@ -529,11 +530,21 @@ public class PaymentTransactionService {
             transaction.getRefunds().stream()
                     .filter(refund -> refund.getStatus() == RefundStatus.SUCCEEDED)
                     .filter(refund -> isWithinRefundWindow(refund.getRefundedAt()))
-                    .forEach(refund -> refunded = refunded.add(refund.getAmount()));
+                    .forEach(refund -> {
+                        BigDecimal amount = refund.getAmount();
+                        if (amount == null) {
+                            return;
+                        }
+                        refunded = refunded.add(amount);
+                        if (transaction.getScene() != PaymentScene.DEPOSIT) {
+                            vendorRefunded = vendorRefunded.add(amount);
+                        }
+                    });
         }
 
         PaymentSettlementResponse toResponse(UUID vendorId) {
-            BigDecimal netAmount = total.subtract(platformCommission).subtract(refunded);
+            BigDecimal vendorEarnings = rent.add(buyout).add(penalty);
+            BigDecimal netAmount = vendorEarnings.subtract(vendorRefunded);
             return new PaymentSettlementResponse(vendorId, total, deposit, rent, buyout, penalty, platformCommission, refunded, netAmount, lastPaidAt, count);
         }
 

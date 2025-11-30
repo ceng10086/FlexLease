@@ -117,7 +117,7 @@ class PaymentTransactionServiceIntegrationTest {
         assertThat(settlement.rentAmount()).isEqualByComparingTo("180.00");
         assertThat(settlement.platformCommissionAmount()).isEqualByComparingTo("20.00");
         assertThat(settlement.refundedAmount()).isEqualByComparingTo("200.00");
-        assertThat(settlement.netAmount()).isEqualByComparingTo("980.00");
+        assertThat(settlement.netAmount()).isEqualByComparingTo("180.00");
         assertThat(settlement.transactionCount()).isEqualTo(1);
     }
 
@@ -262,15 +262,24 @@ class PaymentTransactionServiceIntegrationTest {
                 "尾款退还"
         ));
 
-        OffsetDateTime future = OffsetDateTime.now().plusDays(1);
-        List<PaymentSettlementResponse> settlements = paymentTransactionService.calculateSettlements(null, null, null, future, null);
+        List<PaymentSettlementResponse> settlements = paymentTransactionService.calculateSettlements(null, null, null, null, null);
         PaymentSettlementResponse settlement = settlements.stream()
                 .filter(item -> item.vendorId().equals(vendorId))
                 .findFirst()
                 .orElseThrow();
 
-        assertThat(settlement.refundedAmount()).isEqualByComparingTo(BigDecimal.ZERO);
-        assertThat(settlement.netAmount()).isEqualByComparingTo("900.00");
+        assertThat(settlement.refundedAmount()).isEqualByComparingTo("300.00");
+        assertThat(settlement.netAmount()).isEqualByComparingTo("600.00");
+
+        OffsetDateTime future = OffsetDateTime.now().plusDays(1);
+        List<PaymentSettlementResponse> filtered = paymentTransactionService.calculateSettlements(null, null, null, future, null);
+        PaymentSettlementResponse filteredSettlement = filtered.stream()
+                .filter(item -> item.vendorId().equals(vendorId))
+                .findFirst()
+                .orElseThrow();
+
+        assertThat(filteredSettlement.refundedAmount()).isEqualByComparingTo(BigDecimal.ZERO);
+        assertThat(filteredSettlement.netAmount()).isEqualByComparingTo("900.00");
     }
 
     private void mockCommissionRate(BigDecimal rate) {
