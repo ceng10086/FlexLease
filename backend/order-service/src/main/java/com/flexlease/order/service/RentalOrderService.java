@@ -304,6 +304,9 @@ public class RentalOrderService {
     public RentalOrderResponse cancelOrder(UUID orderId, OrderCancelRequest request) {
         RentalOrder order = getOrderForUpdate(orderId);
         ensureUser(order, request.userId());
+        if (order.getStatus() != OrderStatus.PENDING_PAYMENT) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "当前状态不支持取消订单");
+        }
         order.cancel();
         recordEvent(order, OrderEventType.ORDER_CANCELLED,
                 request.reason() == null ? "用户取消订单" : request.reason(),
@@ -616,6 +619,11 @@ public class RentalOrderService {
         UUID adminId = SecurityUtils.requireUserId();
         RentalOrder order = getOrderForUpdate(orderId);
         OrderStatus previousStatus = order.getStatus();
+        if (previousStatus == OrderStatus.CANCELLED
+                || previousStatus == OrderStatus.COMPLETED
+                || previousStatus == OrderStatus.BUYOUT_COMPLETED) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "订单已处于终态，无法强制关闭");
+        }
         order.forceClose();
         String message = reason == null || reason.isBlank()
                 ? "管理员强制关闭订单"
