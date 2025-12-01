@@ -113,7 +113,12 @@ public class OrderMaintenanceScheduler {
                 "订单 %s 因支付超时已被自动取消。".formatted(order.getOrderNo()),
                 payload
         );
-        notificationClient.send(userNotification);
+        try {
+            notificationClient.send(userNotification);
+        } catch (RuntimeException ex) {
+            LOG.warn("Failed to notify user about auto cancellation for order {}: {}",
+                    order.getOrderNo(), ex.getMessage());
+        }
 
         NotificationSendRequest vendorNotification = new NotificationSendRequest(
                 null,
@@ -123,6 +128,11 @@ public class OrderMaintenanceScheduler {
                 "订单 %s 因支付超时被系统自动取消，请确认库存记录。".formatted(order.getOrderNo()),
                 payload
         );
-        notificationClient.send(vendorNotification);
+        try {
+            notificationClient.send(vendorNotification);
+        } catch (RuntimeException ex) {
+            LOG.warn("Failed to notify vendor about auto cancellation for order {}: {}",
+                    order.getOrderNo(), ex.getMessage());
+        }
     }
 }
