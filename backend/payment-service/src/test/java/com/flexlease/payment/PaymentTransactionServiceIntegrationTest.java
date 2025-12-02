@@ -25,11 +25,13 @@ import com.flexlease.payment.dto.PaymentSettlementResponse;
 import com.flexlease.payment.dto.PaymentSplitRequest;
 import com.flexlease.payment.dto.PaymentTransactionResponse;
 import com.flexlease.payment.dto.RefundTransactionResponse;
+import com.flexlease.payment.repository.PaymentTransactionRepository;
 import com.flexlease.payment.service.PaymentTransactionService;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,6 +40,9 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -65,6 +70,45 @@ class PaymentTransactionServiceIntegrationTest {
 
     @MockBean
     private VendorServiceClient vendorServiceClient;
+
+    @Autowired
+    private PaymentTransactionRepository paymentTransactionRepository;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
+
+    @Test
+    void shouldNotifyOrderServiceAfterCommitSoTransactionsAreVisible() {
+        TransactionTemplate requiresNew = new TransactionTemplate(transactionManager);
+        requiresNew.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+        AtomicBoolean verified = new AtomicBoolean(false);
+
+        Mockito.doAnswer(invocation -> {
+            UUID transactionId = invocation.getArgument(1);
+            boolean exists = Boolean.TRUE.equals(requiresNew.execute(status ->
+                    paymentTransactionRepository.findById(transactionId).isPresent()));
+            assertThat(exists).isTrue();
+            verified.set(true);
+            return null;
+        }).when(orderServiceClient).notifyPaymentSucceeded(any(), any());
+
+        UUID orderId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        UUID vendorId = UUID.randomUUID();
+
+        PaymentTransactionResponse created = paymentTransactionService.initPayment(orderId, new PaymentInitRequest(
+                userId,
+                vendorId,
+                PaymentScene.RENT,
+                PaymentChannel.MOCK,
+                new BigDecimal("500.00"),
+                "自动支付校验",
+                null
+        ));
+
+        assertThat(created.status()).isEqualTo(PaymentStatus.SUCCEEDED);
+        assertThat(verified).isTrue();
+    }
 
     @Test
     void shouldAutoConfirmAndSettlePayment() {

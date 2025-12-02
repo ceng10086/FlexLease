@@ -41,6 +41,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 @Transactional
@@ -444,7 +446,16 @@ public class PaymentTransactionService {
                 transaction.getScene(),
                 transaction.getAmount()
         );
-        dispatchPaymentSuccess(context);
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    dispatchPaymentSuccess(context);
+                }
+            });
+        } else {
+            dispatchPaymentSuccess(context);
+        }
     }
 
     private void dispatchPaymentSuccess(PaymentSuccessContext context) {
