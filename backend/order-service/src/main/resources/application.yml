@@ -1,6 +1,10 @@
 spring:
   application:
     name: order-service
+  servlet:
+    multipart:
+      max-file-size: ${FLEXLEASE_PROOF_MAX_FILE_SIZE:50MB}
+      max-request-size: ${FLEXLEASE_PROOF_MAX_REQUEST_SIZE:60MB}
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://postgres:5432/flexlease}
     driver-class-name: org.postgresql.Driver
