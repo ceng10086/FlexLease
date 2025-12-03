@@ -58,6 +58,13 @@ export type ProductPayload = {
   coverImageUrl?: string;
 };
 
+export type UploadedProductAsset = {
+  fileName: string;
+  fileUrl: string;
+  contentType: string;
+  fileSize: number;
+};
+
 export type RentalPlanPayload = {
   planType: RentalPlanType;
   termMonths: number;
@@ -268,4 +275,24 @@ export const rejectProduct = async (
     payload
   );
   return response.data.data;
+};
+
+export const uploadProductCover = async (
+  vendorId: string,
+  file: File
+): Promise<UploadedProductAsset> => {
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await http.post<ApiResponse<UploadedProductAsset>>(
+    `/vendors/${vendorId}/products/cover-image`,
+    formData,
+    { headers: { 'Content-Type': 'multipart/form-data' } }
+  );
+  return response.data.data;
+};
+
+export const deleteUploadedProductCover = async (vendorId: string, fileName: string): Promise<void> => {
+  await http.delete<ApiResponse<void>>(`/vendors/${vendorId}/products/cover-image`, {
+    params: { fileName }
+  });
 };

@@ -55,7 +55,23 @@
       <a-form layout="vertical">
         <a-form-item label="商品名称" required><a-input v-model:value="modal.form.name" placeholder="请输入商品名称" /></a-form-item>
         <a-form-item label="分类编码" required><a-input v-model:value="modal.form.categoryCode" placeholder="例如 OFFICE" /></a-form-item>
-        <a-form-item label="封面图 URL"><a-input v-model:value="modal.form.coverImageUrl" placeholder="可选" /></a-form-item>
+        <a-form-item label="商品封面">
+          <a-upload
+            list-type="picture-card"
+            :file-list="coverUpload.fileList"
+            :custom-request="handleCoverUpload"
+            :max-count="1"
+            accept="image/*"
+            :disabled="coverUpload.uploading"
+            @remove="handleCoverRemove"
+          >
+            <div v-if="!coverUpload.fileList.length" class="upload__placeholder">
+              <div class="upload__placeholder-icon">+</div>
+              <div class="upload__placeholder-text">上传封面</div>
+            </div>
+          </a-upload>
+          <p class="form__item-hint">建议上传 600×400px 以上的 JPG/PNG 图片，大小不超过 20MB。</p>
+        </a-form-item>
         <a-form-item label="商品描述"><a-textarea v-model:value="modal.form.description" :rows="4" placeholder="可选" /></a-form-item>
       </a-form>
     </a-modal>
@@ -223,12 +239,14 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, reactive, ref, watch } from 'vue';
+import { reactive, ref, watch } from 'vue';
 import { message } from 'ant-design-vue';
 import { useVendorContext } from '../../composables/useVendorContext';
 import {
   listVendorProducts,
   createVendorProduct,
+  uploadProductCover,
+  deleteUploadedProductCover,
   submitVendorProduct,
   fetchVendorProduct,
   createRentalPlan,
@@ -243,6 +261,21 @@ import {
   type RentalSku,
   type ProductStatus
 } from '../../services/productService';
+
+type UploadDisplayFile = {
+  uid: string;
+  name: string;
+  status?: string;
+  url?: string;
+};
+
+type UploadRequestOption = {
+  file: File | (UploadDisplayFile & { originFileObj?: File });
+  onError?: (error: Error) => void;
+  onSuccess?: (response: unknown, file: File | UploadDisplayFile) => void;
+};
+
+const MAX_COVER_SIZE = 20 * 1024 * 1024;
 
 const {
   vendorId: currentVendorId,
@@ -264,6 +297,84 @@ const modal = reactive({
     coverImageUrl: ''
   }
 });
+
+const coverUpload = reactive<{ fileList: UploadDisplayFile[]; uploading: boolean; fileName: string }>({
+  fileList: [],
+  uploading: false,
+  fileName: ''
+});
+
+const resetCoverUpload = () => {
+  coverUpload.fileList = [];
+  coverUpload.fileName = '';
+  modal.form.coverImageUrl = '';
+};
+
+const handleCoverUpload = async (options: UploadRequestOption) => {
+  const vendorId = requireVendorId(true);
+  if (!vendorId) {
+    options.onError?.(new Error('缺少厂商身份'));
+    return;
+  }
+  const rawFile = options.file;
+  const candidate = rawFile instanceof File ? rawFile : rawFile.originFileObj;
+  if (!candidate) {
+    options.onError?.(new Error('无法读取上传文件'));
+    return;
+  }
+  if (candidate.size > MAX_COVER_SIZE) {
+    const error = new Error('封面图大小不能超过 20MB');
+    message.error(error.message);
+    options.onError?.(error);
+    return;
+  }
+  coverUpload.uploading = true;
+  try {
+    const result = await uploadProductCover(vendorId, candidate);
+    modal.form.coverImageUrl = result.fileUrl;
+    coverUpload.fileName = result.fileName;
+    coverUpload.fileList = [
+      {
+        uid: result.fileName,
+        name: candidate.name,
+        status: 'done',
+        url: result.fileUrl
+      }
+    ];
+    options.onSuccess?.(result, rawFile);
+    message.success('封面图上传成功');
+  } catch (error) {
+    console.error('上传封面失败', error);
+    options.onError?.(error as Error);
+    message.error('封面图上传失败，请稍后重试');
+  } finally {
+    coverUpload.uploading = false;
+  }
+};
+
+const deleteCoverFromServer = async () => {
+  if (!coverUpload.fileName) {
+    resetCoverUpload();
+    return;
+  }
+  const vendorId = requireVendorId();
+  if (!vendorId) {
+    resetCoverUpload();
+    return;
+  }
+  try {
+    await deleteUploadedProductCover(vendorId, coverUpload.fileName);
+  } catch (error) {
+    console.warn('删除未使用的封面图失败', error);
+  } finally {
+    resetCoverUpload();
+  }
+};
+
+const handleCoverRemove = async () => {
+  await deleteCoverFromServer();
+  return true;
+};
 
 const detail = reactive<{ open: boolean; loading: boolean; product: ProductDetail | null }>(
   {
@@ -377,6 +488,7 @@ const handlePageSizeChange = (_: number, size: number) => {
 };
 
 const openCreateModal = () => {
+  resetCoverUpload();
   modal.open = true;
   modal.submitting = false;
   Object.assign(modal.form, { name: '', categoryCode: '', description: '', coverImageUrl: '' });
@@ -395,6 +507,7 @@ const handleCreate = async () => {
   try {
     await createVendorProduct(vendorId, { ...modal.form });
     message.success('商品已创建');
+    resetCoverUpload();
     modal.open = false;
     loadProducts();
   } catch (error) {
@@ -603,6 +716,18 @@ const handleAdjustInventory = async () => {
 };
 
 const planHeader = (plan: RentalPlan) => `${plan.planType} · ${plan.termMonths} 个月`;
+
+watch(
+  () => modal.open,
+  (open, previous) => {
+    if (!open && previous && coverUpload.fileName) {
+      void deleteCoverFromServer();
+    } else if (!open && previous) {
+      resetCoverUpload();
+    }
+  }
+);
+
 watch(
   vendorReady,
   (ready) => {
@@ -665,5 +790,28 @@ watch(
 
 .sku-table {
   margin-top: 12px;
+}
+
+.upload__placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: #94a3b8;
+}
+
+.upload__placeholder-icon {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.upload__placeholder-text {
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+.form__item-hint {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #94a3b8;
 }
 </style>

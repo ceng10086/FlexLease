@@ -125,6 +125,11 @@
 
 > 媒体资源会返回 `fileName/fileUrl/contentType/fileSize/sortOrder` 等字段；上传需使用 `multipart/form-data`，文件默认落盘至 `FLEXLEASE_STORAGE_ROOT` 配置的目录，由 `product-service` 对外暴露 `/media/**` 静态资源。
 
+| 方法 | URL | 描述 | 请求/响应要点 |
+| ---- | --- | ---- | ------------- |
+| POST | `/vendors/{vendorId}/products/cover-image` | 上传商品封面图（未创建商品也可使用） | `multipart/form-data`，字段 `file`；返回 `FileUploadResponse`（`fileName/fileUrl/contentType/fileSize`），前端可将 `fileUrl` 回填到 `coverImageUrl` 字段 |
+| DELETE | `/vendors/{vendorId}/products/cover-image` | 删除未使用的封面文件 | `fileName` 作为 query 参数，供用户取消创建商品或更换封面时清理临时文件 |
+
 ### 4.5 C 端商品展示
 | 方法 | URL | 描述 | 响应要点 |
 | ---- | --- | ---- | -------- |

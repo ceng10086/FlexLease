@@ -6,6 +6,7 @@ import com.flexlease.common.exception.ErrorCode;
 import com.flexlease.common.security.FlexleasePrincipal;
 import com.flexlease.common.security.SecurityUtils;
 import com.flexlease.product.domain.ProductStatus;
+import com.flexlease.product.dto.FileUploadResponse;
 import com.flexlease.product.dto.InventoryAdjustRequest;
 import com.flexlease.product.dto.PagedResponse;
 import com.flexlease.product.dto.ProductRequest;
@@ -16,6 +17,7 @@ import com.flexlease.product.dto.RentalPlanRequest;
 import com.flexlease.product.dto.RentalPlanResponse;
 import com.flexlease.product.dto.SkuRequest;
 import com.flexlease.product.dto.SkuResponse;
+import com.flexlease.product.service.ProductAssetService;
 import com.flexlease.product.service.VendorProductService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -23,6 +25,8 @@ import java.util.UUID;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -31,15 +35,19 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/v1/vendors/{vendorId}/products")
 public class VendorProductController {
 
     private final VendorProductService vendorProductService;
+    private final ProductAssetService productAssetService;
 
-    public VendorProductController(VendorProductService vendorProductService) {
+    public VendorProductController(VendorProductService vendorProductService,
+                                   ProductAssetService productAssetService) {
         this.vendorProductService = vendorProductService;
+        this.productAssetService = productAssetService;
     }
 
     @PostMapping
@@ -157,6 +165,21 @@ public class VendorProductController {
                                                      @Valid @RequestBody InventoryAdjustRequest request) {
         UUID effectiveVendorId = resolveVendorId(vendorId);
         return ApiResponse.success(vendorProductService.adjustInventory(effectiveVendorId, productId, planId, skuId, request));
+    }
+
+    @PostMapping(value = "/cover-image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ApiResponse<FileUploadResponse> uploadCover(@PathVariable UUID vendorId,
+                                                       @RequestParam("file") MultipartFile file) {
+        UUID effectiveVendorId = resolveVendorId(vendorId);
+        return ApiResponse.success(productAssetService.uploadCoverImage(file));
+    }
+
+    @DeleteMapping("/cover-image")
+    public ApiResponse<Void> deleteCover(@PathVariable UUID vendorId,
+                                         @RequestParam("fileName") String fileName) {
+        UUID effectiveVendorId = resolveVendorId(vendorId);
+        productAssetService.deleteTemporaryFile(fileName);
+        return ApiResponse.success();
     }
 
     private UUID resolveVendorId(UUID vendorId) {

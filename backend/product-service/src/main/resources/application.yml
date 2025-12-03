@@ -20,6 +20,10 @@ spring:
     default-schema: product
     schemas: product
     locations: classpath:db/migration
+  servlet:
+    multipart:
+      max-file-size: ${SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE:20MB}
+      max-request-size: ${SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE:20MB}
 server:
   port: ${SERVER_PORT:9003}
 eureka:
@@ -45,3 +49,7 @@ security:
     secret: ${SECURITY_JWT_SECRET:flexlease-default-secret-please-change}
     issuer: ${SECURITY_JWT_ISSUER:flexlease-auth-service}
     internal-access-token: ${SECURITY_JWT_INTERNAL:flexlease-internal-secret}
+    permit-all:
+      - /media/**
+      - /actuator/health
+      - /actuator/info
