@@ -11,6 +11,7 @@ import com.flexlease.user.integration.AuthServiceClient;
 import com.flexlease.user.integration.NotificationClient;
 import com.flexlease.user.repository.UserProfileRepository;
 import jakarta.transaction.Transactional;
+import java.time.OffsetDateTime;
 import java.util.Map;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -79,9 +80,10 @@ public class CreditEventService {
                 buildOrderContext(orderNo, "按时完成支付，信用积分 +5。"),
                 "CREDIT");
         if (profile.advancePaymentMilestoneIfNeeded(STREAK_WINDOW)) {
+            profile.applyCreditDelta(5);
             notifyUser(profile.getUserId(),
                     "稳定履约加成",
-                    "连续 " + STREAK_WINDOW + " 单准时支付，平台已为你解锁「快速审核」通道。",
+                    "连续 " + STREAK_WINDOW + " 单准时支付，额外奖励信用积分 +5，平台已为你解锁「快速审核」通道。",
                     "CREDIT");
         }
     }
@@ -120,10 +122,14 @@ public class CreditEventService {
         String orderNo = attributeAsString(attributes, "orderNo");
         String reason = attributeAsString(attributes, "reason");
 
-        // 冻结账号 30 天
+        // 记录冻结截止时间（30 天后自动解冻）
+        profile.suspendUntil(OffsetDateTime.now().plusDays(SUSPEND_DAYS));
+
+        // 冻结账号
         try {
             authServiceClient.updateAccountStatus(profile.getUserId(), "DISABLED");
-            LOG.info("User {} account suspended for {} days due to malicious behavior", profile.getUserId(), SUSPEND_DAYS);
+            LOG.info("User {} account suspended until {} due to malicious behavior",
+                    profile.getUserId(), profile.getSuspendedUntil());
         } catch (RuntimeException ex) {
             LOG.warn("Failed to suspend user {} account: {}", profile.getUserId(), ex.getMessage());
         }

@@ -208,10 +208,15 @@ public class OrderDisputeService {
 
 
     public OrderDisputeResponse resolve(UUID orderId, UUID disputeId, OrderDisputeResolveRequest request) {
-        SecurityUtils.requireRole("ADMIN");
-        UUID adminId = SecurityUtils.requireUserId();
+        // 复核组权限校验：二次申诉案件需要 REVIEW_PANEL 角色
         RentalOrder order = loadOrder(orderId);
         OrderDispute dispute = loadDispute(orderId, disputeId);
+        if (dispute.getStatus() == OrderDisputeStatus.PENDING_REVIEW_PANEL) {
+            SecurityUtils.requireRole("REVIEW_PANEL");
+        } else {
+            SecurityUtils.requireRole("ADMIN");
+        }
+        UUID adminId = SecurityUtils.requireUserId();
         Integer normalizedDelta = normalizeCreditDelta(request.penalizeUserDelta());
         boolean isMalicious = Boolean.TRUE.equals(request.maliciousBehavior());
         dispute.resolveByAdmin(
@@ -300,15 +305,18 @@ public class OrderDisputeService {
     }
 
     public void sendCountdownReminder(UUID disputeId) {
+        sendCountdownReminder(disputeId, 1, 24);
+    }
+
+    public boolean sendCountdownReminder(UUID disputeId, int targetLevel, int hoursLeft) {
         OrderDispute dispute = orderDisputeRepository.findById(disputeId).orElse(null);
         if (dispute == null || dispute.getStatus() != OrderDisputeStatus.OPEN || dispute.getDeadlineAt() == null) {
-            return;
+            return false;
         }
-        if (!dispute.markCountdownNotified()) {
-            return;
+        if (!dispute.advanceReminderLevel(targetLevel)) {
+            return false;
         }
         orderDisputeRepository.save(dispute);
-        long hoursLeft = Math.max(1, Duration.between(OffsetDateTime.now(), dispute.getDeadlineAt()).toHours());
         RentalOrder order = dispute.getOrder();
         Map<String, Object> variables = Map.of(
                 "orderNo", order.getOrderNo(),
@@ -316,6 +324,7 @@ public class OrderDisputeService {
         );
         sendTemplateNotification(order.getUserId(), "DISPUTE_COUNTDOWN", variables, dispute.getId().toString());
         sendTemplateNotification(order.getVendorId(), "DISPUTE_COUNTDOWN", variables, dispute.getId().toString());
+        return true;
     }
 
     private String buildDecisionMessage(OrderDisputeResolveRequest request, Integer normalizedDelta, boolean malicious) {

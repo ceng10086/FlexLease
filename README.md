@@ -34,7 +34,8 @@ FlexLease 面向 B2C 场景，为厂商与消费者提供从入驻、商品配�
 - **厂商与用户**
   - 厂商入驻申请、管理员审核（自动回写认证中心并创建 vendor 资料）。
   - 厂商资料分页与状态管控、消费者档案（含管理员冻结）。
-  - `CreditEventService` 暴露 `/api/v1/internal/users/{id}/credit-events`，支持实名认证奖励、按时支付/提前归还奖励、逾期惩罚、友好协商加分等自动信用事件，并同步站内信提示。
+  - `CreditEventService` 暴露 `/api/v1/internal/users/{id}/credit-events`，支持实名认证奖励、按时支付/提前归还奖励（连续履约达标额外 +5 分）、逾期惩罚、友好协商加分等自动信用事件，并同步站内信提示。
+  - `AccountUnfreezeScheduler` 每小时自动检查并解冻到期账号（恶意行为冻结 30 天后自动恢复），确保账号生命周期完整闭环。
 - **商品域**
   - 商品 CRUD、租赁方案/租期/押金配置、SKU 库存流水（预占/释放/入库/出库）。
   - 商品提交→审核→上/下架，前台目录查询及媒体资源上传（本地文件系统托管）。
@@ -47,14 +48,14 @@ FlexLease 面向 B2C 场景，为厂商与消费者提供从入驻、商品配�
   - `/orders/{id}/messages` 支持用户与厂商在订单抽屉直接沟通（自动写入时间线），`OrderProofService`（`backend/order-service/src/main/java/com/flexlease/order/service/OrderProofService.java`）提供发货/收货/退租/巡检/其他凭证上传、`/proofs/{fileName}` 下载以及和 Notification Service 的互通提醒。
   - `ProofPolicyService` 对外暴露 `/api/v1/proof-policy`，统一告知各阶段最小凭证数量与拍摄角度，并由 `ProofStorageService` 对图片自动打水印；`CreditRewardService` 根据支付/退租/纠纷结果触发信用事件（含恶意行为 -30 分并冻结账号 30 天）。
   - `OrderDisputeService`（`backend/order-service/src/main/java/com/flexlease/order/service/OrderDisputeService.java`）封装纠纷创建→协商→升级仲裁→平台裁决→信用扣分→满意度调查的全流程，管理员可在 `/api/v1/admin/orders/{id}/disputes/{disputeId}/resolve` 直接裁决，并支持 `maliciousBehavior` 标志自动触发恶意行为惩罚。
-  - 纠纷调度新增倒计时提醒与超时自动升级逻辑，对应通知模板 `DISPUTE_COUNTDOWN`/`DISPUTE_RESOLVED` 会给双方推送待办与结果摘要；用户申诉后进入 `PENDING_REVIEW_PANEL` 状态由复核组重新审理。
+  - 纠纷调度新增多阶段倒计时提醒（24小时、6小时、1小时前各提醒一次）与超时自动升级逻辑；用户二次申诉进入 `PENDING_REVIEW_PANEL` 状态需 `REVIEW_PANEL` 角色裁决，实现复核组权限区分。
   - 满意度调研由 `OrderSurveyService` 定时激活 `/orders/{id}/surveys` 调查，支持双方打分与评价，并追加时间线+站内信提醒。
   - 平台/厂商运营指标、管理员强制关闭、待支付订单自动取消调度。
   - RabbitMQ 事件总线 + Notification-Service 异步告警。
 - **支付与结算**
   - 支付流水初始化、模拟自动确认与回调、手工确认、退款、押金/租金/买断分账。
   - 厂商结算汇总 API（按支付/退款时间窗口过滤），结算明细会携带 `commissionRate/platformCommissionAmount`，与 `users.vendor` 上的行业/信用/SLA 抽成配置联动。
-  - `CommissionReviewScheduler` 每季度自动评估厂商 SLA 评分并调整信用档位（`EXCELLENT/STANDARD/WARNING/RESTRICTED`），从而动态影响抽成比例（可通过 `flexlease.commission.review-cron` 覆盖执行周期）。
+  - `CommissionReviewScheduler` 每季度自动评估厂商 SLA 评分（基于订单履约数据自动计算：准时发货率×40% + 纠纷解决率×30% + 低取消率×30%）并调整信用档位（`EXCELLENT/STANDARD/WARNING/RESTRICTED`），费率变更后自动通知厂商。
   - `payment-service` 将 `PaymentSplit` 记录拆分为 `DEPOSIT_RESERVE/VENDOR_INCOME/PLATFORM_COMMISSION` 三类，并在 `PaymentTransactionResponse` 中反映实际抽成。
 - **通知与运营**
   - 模板化站内通知（支持变量渲染/自定义内容），Redis 缓存模板，最近 50 条日志查询。

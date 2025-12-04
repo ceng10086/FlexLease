@@ -98,6 +98,9 @@ public class OrderDispute {
     @Column(name = "countdown_notified_at")
     private OffsetDateTime countdownNotifiedAt;
 
+    @Column(name = "countdown_reminder_level", nullable = false)
+    private int countdownReminderLevel;
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
@@ -314,6 +317,27 @@ public class OrderDispute {
         if (this.countdownNotifiedAt != null) {
             return false;
         }
+        this.countdownNotifiedAt = OffsetDateTime.now();
+        return true;
+    }
+
+    /**
+     * 获取当前提醒级别。
+     */
+    public int getCountdownReminderLevel() {
+        return countdownReminderLevel;
+    }
+
+    /**
+     * 尝试推进到下一阶段提醒。
+     * @param targetLevel 目标提醒级别（1=24小时提醒, 2=6小时提醒, 3=1小时提醒）
+     * @return 如果成功推进返回 true
+     */
+    public boolean advanceReminderLevel(int targetLevel) {
+        if (this.countdownReminderLevel >= targetLevel) {
+            return false;
+        }
+        this.countdownReminderLevel = targetLevel;
         this.countdownNotifiedAt = OffsetDateTime.now();
         return true;
     }

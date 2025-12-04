@@ -59,6 +59,9 @@ public class UserProfile {
     @Column(name = "payment_streak_milestone", nullable = false)
     private int paymentStreakMilestone;
 
+    @Column(name = "suspended_until")
+    private OffsetDateTime suspendedUntil;
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
@@ -245,5 +248,21 @@ public class UserProfile {
     private void setCreditScoreInternal(int newScore) {
         this.creditScore = newScore;
         this.creditTier = CreditTierRules.tierForScore(newScore);
+    }
+
+    public OffsetDateTime getSuspendedUntil() {
+        return suspendedUntil;
+    }
+
+    public void suspendUntil(OffsetDateTime until) {
+        this.suspendedUntil = until;
+    }
+
+    public boolean isSuspended() {
+        return suspendedUntil != null && OffsetDateTime.now().isBefore(suspendedUntil);
+    }
+
+    public void clearSuspension() {
+        this.suspendedUntil = null;
     }
 }

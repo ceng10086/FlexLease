@@ -59,6 +59,25 @@ public interface OrderDisputeRepository extends JpaRepository<OrderDispute, UUID
                                                  @Param("from") OffsetDateTime from,
                                                  @Param("to") OffsetDateTime to);
 
+    /**
+     * 查找需要发送指定级别提醒的纠纷。
+     * @param status 纠纷状态
+     * @param from 截止时间起点
+     * @param to 截止时间终点
+     * @param reminderLevel 目标提醒级别（未达到该级别的纠纷将被返回）
+     */
+    @Query("""
+            select d.id from OrderDispute d
+            where d.status = :status
+              and d.deadlineAt between :from and :to
+              and d.countdownReminderLevel < :reminderLevel
+            """)
+    List<UUID> findIdsByStatusAndDeadlineBetweenAndReminderLevelLessThan(
+            @Param("status") OrderDisputeStatus status,
+            @Param("from") OffsetDateTime from,
+            @Param("to") OffsetDateTime to,
+            @Param("reminderLevel") int reminderLevel);
+
     interface ResolutionMetric {
         OffsetDateTime getCreatedAt();
 
