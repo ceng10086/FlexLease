@@ -286,7 +286,8 @@ public class OrderDispute {
             throw new IllegalStateException("该纠纷申诉次数已用完");
         }
         this.appealCount += 1;
-        this.status = OrderDisputeStatus.PENDING_ADMIN;
+        // 申诉后进入复核组处理，而非普通管理员
+        this.status = OrderDisputeStatus.PENDING_REVIEW_PANEL;
         this.escalatedBy = actorId;
         this.escalatedAt = OffsetDateTime.now();
         this.adminDecisionOption = null;
@@ -295,6 +296,7 @@ public class OrderDispute {
         this.adminDecisionAt = null;
         this.userCreditDelta = null;
     }
+
 
     public void resolveByAdmin(DisputeResolutionOption decision,
                                String remark,

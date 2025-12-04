@@ -191,20 +191,21 @@ public class OrderDisputeService {
         String reason = StringUtils.hasText(request.reason()) ? request.reason().trim() : "申诉请求";
         timelineService.append(order,
                 OrderEventType.DISPUTE_ESCALATED,
-                "申诉：" + reason,
+                "申诉（转复核组）：" + reason,
                 request.actorId(),
-                Map.of("reason", reason, "appealCount", dispute.getAppealCount()),
+                Map.of("reason", reason, "appealCount", dispute.getAppealCount(), "reviewPanel", true),
                 actorRole);
         notifyUser(order,
             dispute,
-            "纠纷发起申诉",
-            "订单 %s 已发起申诉，平台将复核。".formatted(order.getOrderNo()));
+            "纠纷申诉已受理",
+            "订单 %s 已发起申诉，平台复核组将重新审理。".formatted(order.getOrderNo()));
         notifyVendor(order,
             dispute,
-            "纠纷发起申诉",
-            "订单 %s 已进入申诉复核阶段，请关注消息。".formatted(order.getOrderNo()));
+            "纠纷申诉已受理",
+            "订单 %s 已进入复核组审理阶段，请关注处理结果。".formatted(order.getOrderNo()));
         return orderAssembler.toDisputeResponse(dispute);
     }
+
 
     public OrderDisputeResponse resolve(UUID orderId, UUID disputeId, OrderDisputeResolveRequest request) {
         SecurityUtils.requireRole("ADMIN");
@@ -212,6 +213,7 @@ public class OrderDisputeService {
         RentalOrder order = loadOrder(orderId);
         OrderDispute dispute = loadDispute(orderId, disputeId);
         Integer normalizedDelta = normalizeCreditDelta(request.penalizeUserDelta());
+        boolean isMalicious = Boolean.TRUE.equals(request.maliciousBehavior());
         dispute.resolveByAdmin(
             request.decision(),
             StringUtils.hasText(request.remark()) ? request.remark().trim() : null,
@@ -223,13 +225,22 @@ public class OrderDisputeService {
         if (normalizedDelta != null) {
             resolutionAttributes.put("penalizeUserDelta", normalizedDelta);
         }
+        if (isMalicious) {
+            resolutionAttributes.put("maliciousBehavior", true);
+        }
         timelineService.append(order,
                 OrderEventType.DISPUTE_RESOLVED,
-                buildDecisionMessage(request, normalizedDelta),
+                buildDecisionMessage(request, normalizedDelta, isMalicious),
                 adminId,
                 resolutionAttributes,
                 OrderActorRole.ADMIN);
-        if (normalizedDelta != null && normalizedDelta != 0) {
+
+        // 处理恶意行为：扣 30 分并冻结账号 30 天
+        if (isMalicious) {
+            String reason = StringUtils.hasText(request.remark()) ? request.remark().trim() : "恶意行为";
+            creditRewardService.penalizeMaliciousBehavior(order, reason);
+        } else if (normalizedDelta != null && normalizedDelta != 0) {
+            // 普通信用调整
             try {
                 userProfileClient.adjustCredit(order.getUserId(),
                         normalizedDelta,
@@ -240,7 +251,7 @@ public class OrderDisputeService {
                         order.getUserId(), disputeId, ex.getMessage());
             }
         }
-        String summary = buildDecisionMessage(request, normalizedDelta);
+        String summary = buildDecisionMessage(request, normalizedDelta, isMalicious);
         notifyUser(order,
             dispute,
             "纠纷裁决结果",
@@ -253,6 +264,7 @@ public class OrderDisputeService {
         orderSurveyService.scheduleForDispute(order, dispute);
         return orderAssembler.toDisputeResponse(dispute);
     }
+
 
     public boolean escalateDisputeDueToTimeout(UUID disputeId) {
         OrderDispute dispute = orderDisputeRepository.findById(disputeId)
@@ -306,7 +318,7 @@ public class OrderDisputeService {
         sendTemplateNotification(order.getVendorId(), "DISPUTE_COUNTDOWN", variables, dispute.getId().toString());
     }
 
-    private String buildDecisionMessage(OrderDisputeResolveRequest request, Integer normalizedDelta) {
+    private String buildDecisionMessage(OrderDisputeResolveRequest request, Integer normalizedDelta, boolean malicious) {
         String decision = switch (request.decision()) {
             case REDELIVER -> "重新发货/补发";
             case PARTIAL_REFUND -> "部分退款继续租赁";
@@ -314,11 +326,15 @@ public class OrderDisputeService {
             case DISCOUNTED_BUYOUT -> "优惠买断";
             case CUSTOM -> "自定义方案";
         };
+        if (malicious) {
+            return "%s，判定恶意行为，信用扣 30 分并冻结账号 30 天".formatted(decision);
+        }
         if (normalizedDelta != null && normalizedDelta != 0) {
             return "%s，信用变动 %d 分".formatted(decision, normalizedDelta);
         }
         return decision;
     }
+
 
     private Integer normalizeCreditDelta(Integer rawDelta) {
         if (rawDelta == null) {

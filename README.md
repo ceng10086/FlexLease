@@ -45,15 +45,16 @@ FlexLease 面向 B2C 场景，为厂商与消费者提供从入驻、商品配�
   - 下单支持附带客户备注，厂商工作台与管理员订单抽屉可直接查看，方便处理特殊配送/履约指引。
   - 续租/退租/买断流程及审批、自动库存处理、订单合同生成与签署。
   - `/orders/{id}/messages` 支持用户与厂商在订单抽屉直接沟通（自动写入时间线），`OrderProofService`（`backend/order-service/src/main/java/com/flexlease/order/service/OrderProofService.java`）提供发货/收货/退租/巡检/其他凭证上传、`/proofs/{fileName}` 下载以及和 Notification Service 的互通提醒。
-  - `ProofPolicyService` 对外暴露 `/api/v1/proof-policy`，统一告知各阶段最小凭证数量与拍摄角度，并由 `ProofStorageService` 对图片自动打水印；`CreditRewardService` 根据支付/退租/纠纷结果触发信用事件。
-  - `OrderDisputeService`（`backend/order-service/src/main/java/com/flexlease/order/service/OrderDisputeService.java`）封装纠纷创建→协商→升级仲裁→平台裁决→信用扣分→满意度调查的全流程，管理员可在 `/api/v1/admin/orders/{id}/disputes/{disputeId}/resolve` 直接裁决。
-  - 纠纷调度新增倒计时提醒与超时自动升级逻辑，对应通知模板 `DISPUTE_COUNTDOWN`/`DISPUTE_RESOLVED` 会给双方推送待办与结果摘要。
+  - `ProofPolicyService` 对外暴露 `/api/v1/proof-policy`，统一告知各阶段最小凭证数量与拍摄角度，并由 `ProofStorageService` 对图片自动打水印；`CreditRewardService` 根据支付/退租/纠纷结果触发信用事件（含恶意行为 -30 分并冻结账号 30 天）。
+  - `OrderDisputeService`（`backend/order-service/src/main/java/com/flexlease/order/service/OrderDisputeService.java`）封装纠纷创建→协商→升级仲裁→平台裁决→信用扣分→满意度调查的全流程，管理员可在 `/api/v1/admin/orders/{id}/disputes/{disputeId}/resolve` 直接裁决，并支持 `maliciousBehavior` 标志自动触发恶意行为惩罚。
+  - 纠纷调度新增倒计时提醒与超时自动升级逻辑，对应通知模板 `DISPUTE_COUNTDOWN`/`DISPUTE_RESOLVED` 会给双方推送待办与结果摘要；用户申诉后进入 `PENDING_REVIEW_PANEL` 状态由复核组重新审理。
   - 满意度调研由 `OrderSurveyService` 定时激活 `/orders/{id}/surveys` 调查，支持双方打分与评价，并追加时间线+站内信提醒。
   - 平台/厂商运营指标、管理员强制关闭、待支付订单自动取消调度。
   - RabbitMQ 事件总线 + Notification-Service 异步告警。
 - **支付与结算**
   - 支付流水初始化、模拟自动确认与回调、手工确认、退款、押金/租金/买断分账。
   - 厂商结算汇总 API（按支付/退款时间窗口过滤），结算明细会携带 `commissionRate/platformCommissionAmount`，与 `users.vendor` 上的行业/信用/SLA 抽成配置联动。
+  - `CommissionReviewScheduler` 每季度自动评估厂商 SLA 评分并调整信用档位（`EXCELLENT/STANDARD/WARNING/RESTRICTED`），从而动态影响抽成比例（可通过 `flexlease.commission.review-cron` 覆盖执行周期）。
   - `payment-service` 将 `PaymentSplit` 记录拆分为 `DEPOSIT_RESERVE/VENDOR_INCOME/PLATFORM_COMMISSION` 三类，并在 `PaymentTransactionResponse` 中反映实际抽成。
 - **通知与运营**
   - 模板化站内通知（支持变量渲染/自定义内容），Redis 缓存模板，最近 50 条日志查询。
@@ -74,7 +75,7 @@ FlexLease 面向 B2C 场景，为厂商与消费者提供从入驻、商品配�
 ## 微服务实现要点
 
 - **auth-service**：`backend/auth-service/src/main/java/com/flexlease/auth/config/DataInitializer.java` 会根据 `flexlease.bootstrap.admin.*` 环境变量初始化管理员账号并写入 `ADMIN/VENDOR/USER` 三种角色，账号状态使用 `ENABLED/DISABLED/PENDING_REVIEW` 枚举，`/api/v1/internal/users/**` 以内置 `X-Internal-Token` 保护供其它服务启停账号或绑定 `vendorId`。
-- **user-service**：`VendorApplicationController` 支持厂商反复提交/查看申请，`VendorService` 统一维护 `users.vendor` 表，管理员在 `/vendors/applications/{id}/approve` 触发 `AuthServiceClient` 激活账号；`CustomerProfileController` 会在首次访问时自动建档，管理员可通过 `/admin/users/**` 远程调用认证服务冻结账号，同时 `CreditEventController` 面向内部服务开放 `/credit-events` 用于记录实名认证、按时支付、提前归还、友好协商等信用事件并推送提醒。
+- **user-service**：`VendorApplicationController` 支持厂商反复提交/查看申请，`VendorService` 统一维护 `users.vendor` 表，管理员在 `/vendors/applications/{id}/approve` 触发 `AuthServiceClient` 激活账号；`CustomerProfileController` 会在首次访问时自动建档，管理员可通过 `/admin/users/**` 远程调用认证服务冻结账号，同时 `CreditEventController` 面向内部服务开放 `/credit-events` 用于记录实名认证、按时支付、提前归还、友好协商、恶意行为（扣 30 分+冻结 30 天）等信用事件并推送提醒；`CommissionReviewScheduler` 季度自动评估厂商 SLA 并调整抽成档位。
 - **product-service**：`VendorProductController` 暴露商品/方案/SKU 以及库存调整 API，`InventoryChangeType` 支持 `INBOUND/OUTBOUND/RESERVE/RELEASE`，并通过 `InventoryReservationService` 处理 `/api/v1/internal/inventory/reservations` 批量预占；`ProductMediaController` 以上传到 `FLEXLEASE_STORAGE_ROOT` 目录为中心，返回媒体的 `fileName/fileUrl/contentType/fileSize/sortOrder`；`ProductInquiryService` 用于处理消费者咨询、72 小时过期策略与厂商回复通知。
 - **order-service**：`RentalOrderService` 会读取 `product-service` Catalog 验证计划与 SKU，支持 `cartItemIds` 合并下单、生成 `OrderContract` 并同步 `order_event`、续租/退租/买断审批、押金自动退款以及 `CartService` 的访问控制；`OrderMaintenanceScheduler` 根据 `flexlease.order.maintenance.*` 周期取消 `PENDING_PAYMENT` 订单；`OrderAnalyticsService` 聚合平台与厂商指标供 `/analytics/**` 使用；`CreditRewardService` 负责调用 `/credit-events` 奖惩信用，`ProofPolicyController` 暴露多阶段凭证规范，`OrderDisputeMaintenanceScheduler` 则具备倒计时提醒与自动升级仲裁能力。
 - **payment-service**：`PaymentTransactionService` 结合 `IdempotencyService` 限制同一订单/场景只存在一条待支付流水，`flexlease.payment.auto-confirm` 为真时自动将状态切换为 `SUCCEEDED` 并调用 `order-service` `/internal/orders/{id}/payment-success`；退款通过 `PaymentClient.createRefund` 回流，结算接口会统计押金/租金/买断/违约金及退款窗口。

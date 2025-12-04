@@ -364,7 +364,8 @@ class RentalOrderServiceIntegrationTest {
             resolved = orderDisputeService.resolve(created.id(), opened.id(), new OrderDisputeResolveRequest(
                     DisputeResolutionOption.PARTIAL_REFUND,
                     12,
-                    "确认用户责任"
+                    "确认用户责任",
+                    false
             ));
         }
 
@@ -562,7 +563,8 @@ class RentalOrderServiceIntegrationTest {
                         resolved = orderDisputeService.resolve(created.id(), opened.id(), new OrderDisputeResolveRequest(
                                         DisputeResolutionOption.PARTIAL_REFUND,
                                         15,
-                                        "用户责任，扣分"
+                                        "用户责任，扣分",
+                                        false
                         ));
                 }
 

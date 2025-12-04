@@ -67,6 +67,23 @@ public class CreditRewardService {
         }
     }
 
+    /**
+     * 恶意行为处罚：扣 30 分并冻结账号 30 天。
+     * 适用于恶意拒收、拒不退还、经判定需赔偿等严重违规行为。
+     */
+    public void penalizeMaliciousBehavior(RentalOrder order, String reason) {
+        try {
+            Map<String, Object> attributes = new HashMap<>();
+            attributes.put("orderNo", order.getOrderNo());
+            if (reason != null && !reason.isBlank()) {
+                attributes.put("reason", reason);
+            }
+            userProfileClient.recordCreditEvent(order.getUserId(), "MALICIOUS_BEHAVIOR", attributes);
+        } catch (RuntimeException ex) {
+            LOG.warn("Failed to record malicious behavior credit event for order {}: {}", order.getOrderNo(), ex.getMessage());
+        }
+    }
+
     private boolean isEarlyOrOnTime(OffsetDateTime plannedLeaseEnd) {
         if (plannedLeaseEnd == null) {
             return true;
@@ -75,3 +92,4 @@ public class CreditRewardService {
         return !now.isAfter(plannedLeaseEnd.plus(EARLY_RETURN_GRACE));
     }
 }
+

@@ -7,6 +7,7 @@ import com.flexlease.common.notification.NotificationSendRequest;
 import com.flexlease.user.domain.CreditEventType;
 import com.flexlease.user.domain.UserProfile;
 import com.flexlease.user.dto.UserCreditResponse;
+import com.flexlease.user.integration.AuthServiceClient;
 import com.flexlease.user.integration.NotificationClient;
 import com.flexlease.user.repository.UserProfileRepository;
 import jakarta.transaction.Transactional;
@@ -22,14 +23,19 @@ public class CreditEventService {
 
     private static final Logger LOG = LoggerFactory.getLogger(CreditEventService.class);
     private static final int STREAK_WINDOW = 3;
+    private static final int MALICIOUS_PENALTY = -30;
+    private static final int SUSPEND_DAYS = 30;
 
     private final UserProfileRepository userProfileRepository;
     private final NotificationClient notificationClient;
+    private final AuthServiceClient authServiceClient;
 
     public CreditEventService(UserProfileRepository userProfileRepository,
-                              NotificationClient notificationClient) {
+                              NotificationClient notificationClient,
+                              AuthServiceClient authServiceClient) {
         this.userProfileRepository = userProfileRepository;
         this.notificationClient = notificationClient;
+        this.authServiceClient = authServiceClient;
     }
 
     @Transactional
@@ -44,6 +50,7 @@ public class CreditEventService {
             case EARLY_RETURN -> handleEarlyReturn(profile, attributes);
             case LATE_PAYMENT -> handleLatePayment(profile, attributes);
             case FRIENDLY_DISPUTE -> handleFriendlyDispute(profile, attributes);
+            case MALICIOUS_BEHAVIOR -> handleMaliciousBehavior(profile, attributes);
             default -> throw new BusinessException(ErrorCode.VALIDATION_ERROR, "不支持的信用事件: " + eventType);
         }
         UserProfile saved = userProfileRepository.save(profile);
@@ -74,7 +81,7 @@ public class CreditEventService {
         if (profile.advancePaymentMilestoneIfNeeded(STREAK_WINDOW)) {
             notifyUser(profile.getUserId(),
                     "稳定履约加成",
-                    "连续 " + STREAK_WINDOW + " 单准时支付，平台已为你解锁“快速审核”通道。",
+                    "连续 " + STREAK_WINDOW + " 单准时支付，平台已为你解锁「快速审核」通道。",
                     "CREDIT");
         }
     }
@@ -105,6 +112,28 @@ public class CreditEventService {
                 "友好协商奖励",
                 buildOrderContext(orderNo, "纠纷友好协商达成一致，信用积分 +3。"),
                 "DISPUTE");
+    }
+
+    private void handleMaliciousBehavior(UserProfile profile, Map<String, Object> attributes) {
+        profile.applyCreditDelta(MALICIOUS_PENALTY);
+        profile.resetPaymentStreak();
+        String orderNo = attributeAsString(attributes, "orderNo");
+        String reason = attributeAsString(attributes, "reason");
+
+        // 冻结账号 30 天
+        try {
+            authServiceClient.updateAccountStatus(profile.getUserId(), "DISABLED");
+            LOG.info("User {} account suspended for {} days due to malicious behavior", profile.getUserId(), SUSPEND_DAYS);
+        } catch (RuntimeException ex) {
+            LOG.warn("Failed to suspend user {} account: {}", profile.getUserId(), ex.getMessage());
+        }
+
+        String content = "因恶意行为（%s），信用积分 -30，账号已被冻结 %d 天。如有异议请联系客服申诉。"
+                .formatted(reason != null ? reason : "违规操作", SUSPEND_DAYS);
+        notifyUser(profile.getUserId(),
+                "账号冻结通知",
+                buildOrderContext(orderNo, content),
+                "ALERT");
     }
 
     private void notifyUser(UUID userId,
@@ -139,3 +168,4 @@ public class CreditEventService {
         return "订单 " + orderNo + " " + message;
     }
 }
+
