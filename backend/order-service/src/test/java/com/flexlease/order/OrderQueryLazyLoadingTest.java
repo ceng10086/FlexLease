@@ -106,7 +106,7 @@ class OrderQueryLazyLoadingTest {
         FlexleasePrincipal adminPrincipal = new FlexleasePrincipal(UUID.randomUUID(), null, "admin", Set.of("ADMIN"));
         setAuthentication(adminPrincipal);
         try {
-            PagedResponse<?> adminOrders = rentalOrderService.listOrdersForAdmin(null, null, null, PageRequest.of(0, 5));
+            PagedResponse<?> adminOrders = rentalOrderService.listOrdersForAdmin(null, null, null, null, PageRequest.of(0, 5));
             assertThat(adminOrders.content()).isNotEmpty();
         } finally {
             SecurityContextHolder.clearContext();

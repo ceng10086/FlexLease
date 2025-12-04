@@ -4,6 +4,7 @@ import com.flexlease.order.domain.DisputeResolutionOption;
 import com.flexlease.order.domain.OrderActorRole;
 import com.flexlease.order.domain.OrderDisputeStatus;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.UUID;
 
 public record OrderDisputeResponse(
@@ -14,10 +15,14 @@ public record OrderDisputeResponse(
         DisputeResolutionOption initiatorOption,
         String initiatorReason,
         String initiatorRemark,
+        String initiatorPhoneMemo,
+        List<UUID> initiatorAttachmentProofIds,
         UUID respondentId,
         OrderActorRole respondentRole,
         DisputeResolutionOption respondentOption,
         String respondentRemark,
+        String respondentPhoneMemo,
+        List<UUID> respondentAttachmentProofIds,
         OffsetDateTime respondedAt,
         OffsetDateTime deadlineAt,
         UUID escalatedBy,

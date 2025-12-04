@@ -162,10 +162,44 @@
               <p class="dispute-item__reason">
                 <strong>诉求：</strong>{{ resolutionLabel(item.initiatorOption) }} | {{ item.initiatorReason }}
               </p>
+              <p v-if="item.initiatorPhoneMemo" class="dispute-item__line">
+                电话纪要（发起方）：{{ item.initiatorPhoneMemo }}
+              </p>
+              <div
+                v-if="resolveAttachmentProofs(item.initiatorAttachmentProofIds).length"
+                class="dispute-attachments"
+              >
+                <span>附件（发起方）：</span>
+                <a
+                  v-for="proof in resolveAttachmentProofs(item.initiatorAttachmentProofIds)"
+                  :key="proof.id"
+                  href="#"
+                  @click.prevent="handleDownloadProof(proof)"
+                >
+                  {{ attachmentLabel(proof) }}
+                </a>
+              </div>
               <p v-if="item.respondentOption" class="dispute-item__line">
                 对方建议：{{ resolutionLabel(item.respondentOption) }}
                 <span v-if="item.respondentRemark">（{{ item.respondentRemark }}）</span>
               </p>
+              <p v-if="item.respondentPhoneMemo" class="dispute-item__line">
+                电话纪要（回应方）：{{ item.respondentPhoneMemo }}
+              </p>
+              <div
+                v-if="resolveAttachmentProofs(item.respondentAttachmentProofIds).length"
+                class="dispute-attachments"
+              >
+                <span>附件（回应方）：</span>
+                <a
+                  v-for="proof in resolveAttachmentProofs(item.respondentAttachmentProofIds)"
+                  :key="proof.id"
+                  href="#"
+                  @click.prevent="handleDownloadProof(proof)"
+                >
+                  {{ attachmentLabel(proof) }}
+                </a>
+              </div>
               <p v-if="item.adminDecisionOption" class="dispute-item__line">
                 平台裁决：{{ resolutionLabel(item.adminDecisionOption) }}
                 <span v-if="item.adminDecisionRemark">（{{ item.adminDecisionRemark }}）</span>
@@ -390,6 +424,20 @@
         <a-form-item label="补充说明">
           <a-textarea v-model:value="disputeModal.remark" :rows="2" placeholder="可选" />
         </a-form-item>
+        <a-form-item label="电话纪要">
+          <a-textarea
+            v-model:value="disputeModal.phoneMemo"
+            :rows="2"
+            placeholder="可选：记录与厂商或平台的电话沟通"
+          />
+        </a-form-item>
+        <a-form-item label="上传附件">
+          <input type="file" multiple @change="handleDisputeAttachmentChange" />
+          <p class="dispute-attachment-hint">最多 {{ MAX_DISPUTE_ATTACHMENTS }} 个，支持图片或视频</p>
+          <ul v-if="disputeModal.attachments.length" class="attachment-list">
+            <li v-for="file in disputeModal.attachments" :key="file.name">{{ file.name }}</li>
+          </ul>
+        </a-form-item>
       </a-form>
     </a-modal>
 
@@ -415,6 +463,20 @@
         </a-form-item>
         <a-form-item label="补充说明">
           <a-textarea v-model:value="respondModal.remark" :rows="2" placeholder="可选" />
+        </a-form-item>
+        <a-form-item label="电话纪要">
+          <a-textarea
+            v-model:value="respondModal.phoneMemo"
+            :rows="2"
+            placeholder="可选：记录与对方或平台的沟通"
+          />
+        </a-form-item>
+        <a-form-item label="上传附件">
+          <input type="file" multiple @change="handleRespondAttachmentChange" />
+          <p class="dispute-attachment-hint">最多 {{ MAX_DISPUTE_ATTACHMENTS }} 个</p>
+          <ul v-if="respondModal.attachments.length" class="attachment-list">
+            <li v-for="file in respondModal.attachments" :key="file.name">{{ file.name }}</li>
+          </ul>
         </a-form-item>
       </a-form>
     </a-modal>
@@ -491,6 +553,7 @@ import http from '../../services/http';
 const route = useRoute();
 const router = useRouter();
 const auth = useAuthStore();
+const MAX_DISPUTE_ATTACHMENTS = 5;
 
 const orderId = route.params.orderId as string;
 const loading = ref(false);
@@ -542,6 +605,8 @@ const disputeModal = reactive({
   reason: '',
   option: 'REDELIVER' as DisputeResolutionOption,
   remark: '',
+  phoneMemo: '',
+  attachments: [] as File[],
   loading: false
 });
 
@@ -551,6 +616,8 @@ const respondModal = reactive({
   option: 'REDELIVER' as DisputeResolutionOption,
   accept: true,
   remark: '',
+  phoneMemo: '',
+  attachments: [] as File[],
   loading: false
 });
 
@@ -605,6 +672,20 @@ const proofList = computed(() => order.value?.proofs ?? []);
 const hasReceiveProof = computed(() =>
   proofList.value.some((item) => item.proofType === 'RECEIVE' && item.actorRole === 'USER')
 );
+const proofMap = computed(() => {
+  const map = new Map<string, OrderProof>();
+  proofList.value.forEach((item) => map.set(item.id, item));
+  return map;
+});
+const resolveAttachmentProofs = (ids?: string[] | null) => {
+  if (!ids?.length) {
+    return [] as OrderProof[];
+  }
+  return ids
+    .map((id) => proofMap.value.get(id))
+    .filter((item): item is OrderProof => Boolean(item));
+};
+const attachmentLabel = (proof: OrderProof) => proof.description || proof.proofType || '附件';
 const returnRequirement = computed(() => ({
   photos: order.value?.returnPhotoRequired ?? 0,
   videos: order.value?.returnVideoRequired ?? 0
@@ -1109,6 +1190,43 @@ const handleReturnProofUpload = async () => {
   }
 };
 
+const syncAttachmentSelection = (event: Event, target: { attachments: File[] }) => {
+  const input = event.target as HTMLInputElement;
+  const files = input.files ? Array.from(input.files) : [];
+  if (!files.length) {
+    target.attachments = [];
+    return;
+  }
+  if (files.length > MAX_DISPUTE_ATTACHMENTS) {
+    message.warning(`一次最多上传 ${MAX_DISPUTE_ATTACHMENTS} 个附件，已自动截取前 ${MAX_DISPUTE_ATTACHMENTS} 个`);
+  }
+  target.attachments = files.slice(0, MAX_DISPUTE_ATTACHMENTS);
+};
+
+const handleDisputeAttachmentChange = (event: Event) => syncAttachmentSelection(event, disputeModal);
+const handleRespondAttachmentChange = (event: Event) => syncAttachmentSelection(event, respondModal);
+
+const uploadDisputeAttachments = async (files: File[]) => {
+  if (!order.value || !files.length) {
+    return [] as string[];
+  }
+  if (!auth.user?.id) {
+    message.error('请先登录');
+    throw new Error('未登录');
+  }
+  const ids: string[] = [];
+  for (const file of files) {
+    const proof = await uploadOrderProof(order.value.id, {
+      actorId: auth.user.id,
+      proofType: 'OTHER',
+      description: '纠纷附件',
+      file
+    });
+    ids.push(proof.id);
+  }
+  return ids;
+};
+
 const handleDownloadProof = async (proof: OrderProof) => {
   if (!proof.fileUrl) {
     message.warning('文件地址无效');
@@ -1174,6 +1292,8 @@ const resetDisputeModal = () => {
   disputeModal.reason = '';
   disputeModal.remark = '';
   disputeModal.option = 'REDELIVER';
+  disputeModal.phoneMemo = '';
+  disputeModal.attachments = [];
 };
 
 const handleSubmitDispute = async () => {
@@ -1187,11 +1307,14 @@ const handleSubmitDispute = async () => {
   }
   disputeModal.loading = true;
   try {
+    const attachmentProofIds = await uploadDisputeAttachments(disputeModal.attachments);
     await createOrderDispute(order.value.id, {
       actorId: auth.user.id,
       option: disputeModal.option,
       reason,
-      remark: disputeModal.remark?.trim() || undefined
+      remark: disputeModal.remark?.trim() || undefined,
+      phoneMemo: disputeModal.phoneMemo?.trim() || undefined,
+      attachmentProofIds: attachmentProofIds.length ? attachmentProofIds : undefined
     });
     message.success('纠纷已记录');
     disputeModal.open = false;
@@ -1214,6 +1337,8 @@ const handleCloseRespondModal = () => {
   respondModal.open = false;
   respondModal.disputeId = null;
   respondModal.remark = '';
+  respondModal.phoneMemo = '';
+  respondModal.attachments = [];
 };
 
 const openRespondModal = (dispute: OrderDispute) => {
@@ -1225,6 +1350,8 @@ const openRespondModal = (dispute: OrderDispute) => {
   respondModal.option = dispute.respondentOption ?? dispute.initiatorOption;
   respondModal.accept = true;
   respondModal.remark = '';
+  respondModal.phoneMemo = '';
+  respondModal.attachments = [];
   respondModal.open = true;
 };
 
@@ -1234,11 +1361,14 @@ const handleSubmitRespond = async () => {
   }
   respondModal.loading = true;
   try {
+    const attachmentProofIds = await uploadDisputeAttachments(respondModal.attachments);
     await respondOrderDispute(order.value.id, respondModal.disputeId, {
       actorId: auth.user.id,
       option: respondModal.option,
       accept: respondModal.accept,
-      remark: respondModal.remark?.trim() || undefined
+      remark: respondModal.remark?.trim() || undefined,
+      phoneMemo: respondModal.phoneMemo?.trim() || undefined,
+      attachmentProofIds: attachmentProofIds.length ? attachmentProofIds : undefined
     });
     message.success('已提交回应');
     handleCloseRespondModal();
@@ -1535,6 +1665,31 @@ const handleContractSigned = async () => {
 .dispute-item__line {
   margin: 4px 0;
   color: #334155;
+}
+
+.dispute-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 12px;
+  color: #475569;
+}
+
+.dispute-attachments a {
+  color: #2563eb;
+}
+
+.attachment-list {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+  color: #475569;
+}
+
+.dispute-attachment-hint {
+  margin: 4px 0;
+  font-size: 12px;
+  color: #94a3b8;
 }
 
 .dispute-meta {

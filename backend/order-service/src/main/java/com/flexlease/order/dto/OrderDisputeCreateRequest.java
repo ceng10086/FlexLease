@@ -3,6 +3,7 @@ package com.flexlease.order.dto;
 import com.flexlease.order.domain.DisputeResolutionOption;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import java.util.List;
 import java.util.UUID;
 
 public record OrderDisputeCreateRequest(
@@ -12,6 +13,8 @@ public record OrderDisputeCreateRequest(
         DisputeResolutionOption option,
         @NotBlank(message = "请描述纠纷原因")
         String reason,
-        String remark
+        String remark,
+        String phoneMemo,
+        List<UUID> attachmentProofIds
 ) {
 }

@@ -70,6 +70,7 @@ export type RentalOrderSummary = {
   vendorId: string;
   totalAmount: number;
   createdAt: string;
+  requiresManualReview: boolean;
 };
 
 export type OrderPaymentPayload = {
@@ -247,10 +248,14 @@ export type OrderDispute = {
   initiatorOption: DisputeResolutionOption;
   initiatorReason: string;
   initiatorRemark?: string | null;
+  initiatorPhoneMemo?: string | null;
+  initiatorAttachmentProofIds?: string[];
   respondentId?: string | null;
   respondentRole?: string | null;
   respondentOption?: DisputeResolutionOption | null;
   respondentRemark?: string | null;
+  respondentPhoneMemo?: string | null;
+  respondentAttachmentProofIds?: string[];
   respondedAt?: string | null;
   deadlineAt?: string | null;
   escalatedBy?: string | null;
@@ -291,6 +296,8 @@ export type CreateOrderDisputePayload = {
   option: DisputeResolutionOption;
   reason: string;
   remark?: string;
+  phoneMemo?: string;
+  attachmentProofIds?: string[];
 };
 
 export type RespondOrderDisputePayload = {
@@ -298,6 +305,8 @@ export type RespondOrderDisputePayload = {
   option: DisputeResolutionOption;
   accept: boolean;
   remark?: string;
+  phoneMemo?: string;
+  attachmentProofIds?: string[];
 };
 
 export type EscalateOrderDisputePayload = {
@@ -413,6 +422,7 @@ export const listAdminOrders = async (params: {
   userId?: string;
   vendorId?: string;
   status?: OrderStatus;
+  manualReviewOnly?: boolean;
   page?: number;
   size?: number;
 }) => {

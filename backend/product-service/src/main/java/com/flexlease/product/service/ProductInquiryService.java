@@ -77,7 +77,12 @@ public class ProductInquiryService {
                                         ProductInquiryReplyRequest request) {
         ProductInquiry inquiry = productInquiryRepository.findByIdAndVendorId(inquiryId, vendorId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "咨询不存在或已失效"));
+        ProductInquiryStatus previous = inquiry.getStatus();
+        inquiry.refreshExpirationState();
         if (inquiry.getStatus() == ProductInquiryStatus.EXPIRED) {
+            if (previous != ProductInquiryStatus.EXPIRED) {
+                productInquiryRepository.save(inquiry);
+            }
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "咨询已过期，无法回复");
         }
         inquiry.reply(request.reply().trim());

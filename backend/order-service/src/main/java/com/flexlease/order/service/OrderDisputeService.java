@@ -13,6 +13,7 @@ import com.flexlease.order.domain.OrderActorRole;
 import com.flexlease.order.domain.OrderDispute;
 import com.flexlease.order.domain.OrderDisputeStatus;
 import com.flexlease.order.domain.OrderEventType;
+import com.flexlease.order.domain.OrderProof;
 import com.flexlease.order.domain.RentalOrder;
 import com.flexlease.order.dto.OrderDisputeAppealRequest;
 import com.flexlease.order.dto.OrderDisputeCreateRequest;
@@ -21,14 +22,17 @@ import com.flexlease.order.dto.OrderDisputeResolveRequest;
 import com.flexlease.order.dto.OrderDisputeResponse;
 import com.flexlease.order.dto.OrderDisputeResponseRequest;
 import com.flexlease.order.repository.OrderDisputeRepository;
+import com.flexlease.order.repository.OrderProofRepository;
 import com.flexlease.order.repository.RentalOrderRepository;
 import jakarta.transaction.Transactional;
 import java.time.Duration;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,9 +46,11 @@ public class OrderDisputeService {
     private static final Logger LOG = LoggerFactory.getLogger(OrderDisputeService.class);
     private static final String DISPUTE_CONTEXT = "DISPUTE";
     private static final String CREDIT_CONTEXT = "CREDIT";
+    private static final int MAX_ATTACHMENTS = 5;
 
     private final RentalOrderRepository rentalOrderRepository;
     private final OrderDisputeRepository orderDisputeRepository;
+    private final OrderProofRepository orderProofRepository;
     private final OrderAssembler orderAssembler;
     private final OrderTimelineService timelineService;
     private final NotificationClient notificationClient;
@@ -54,6 +60,7 @@ public class OrderDisputeService {
 
     public OrderDisputeService(RentalOrderRepository rentalOrderRepository,
                                OrderDisputeRepository orderDisputeRepository,
+                               OrderProofRepository orderProofRepository,
                                OrderAssembler orderAssembler,
                                OrderTimelineService timelineService,
                                NotificationClient notificationClient,
@@ -62,6 +69,7 @@ public class OrderDisputeService {
                                CreditRewardService creditRewardService) {
         this.rentalOrderRepository = rentalOrderRepository;
         this.orderDisputeRepository = orderDisputeRepository;
+        this.orderProofRepository = orderProofRepository;
         this.orderAssembler = orderAssembler;
         this.timelineService = timelineService;
         this.notificationClient = notificationClient;
@@ -89,10 +97,24 @@ public class OrderDisputeService {
                 request.reason().trim(),
                 StringUtils.hasText(request.remark()) ? request.remark().trim() : null
         );
+        List<UUID> attachments = sanitizeAttachments(order, request.actorId(), request.attachmentProofIds());
+        if (!attachments.isEmpty()) {
+            dispute.setInitiatorAttachments(attachments);
+        }
+        String phoneMemo = StringUtils.hasText(request.phoneMemo()) ? request.phoneMemo().trim() : null;
+        if (phoneMemo != null) {
+            dispute.setInitiatorPhoneMemo(phoneMemo);
+        }
         order.addDispute(dispute);
         Map<String, Object> attributes = new HashMap<>();
         attributes.put("option", request.option().name());
         attributes.put("reason", request.reason());
+        if (!attachments.isEmpty()) {
+            attributes.put("attachmentCount", attachments.size());
+        }
+        if (phoneMemo != null) {
+            attributes.put("phoneMemo", phoneMemo);
+        }
         timelineService.append(order,
                 OrderEventType.DISPUTE_OPENED,
                 "[%s] %s".formatted(request.option().name(), request.reason()),
@@ -122,6 +144,8 @@ public class OrderDisputeService {
         if (dispute.getStatus() != OrderDisputeStatus.OPEN) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "当前纠纷状态不支持直接响应");
         }
+        List<UUID> attachments = sanitizeAttachments(order, request.actorId(), request.attachmentProofIds());
+        String phoneMemo = StringUtils.hasText(request.phoneMemo()) ? request.phoneMemo().trim() : null;
         dispute.recordResponse(
                 actorRole,
                 request.actorId(),
@@ -129,9 +153,29 @@ public class OrderDisputeService {
                 StringUtils.hasText(request.remark()) ? request.remark().trim() : null,
                 request.accept()
         );
+        if (!attachments.isEmpty()) {
+            if (Objects.equals(dispute.getInitiatorId(), request.actorId())) {
+                dispute.setInitiatorAttachments(attachments);
+            } else {
+                dispute.setRespondentAttachments(attachments);
+            }
+        }
+        if (phoneMemo != null) {
+            if (Objects.equals(dispute.getInitiatorId(), request.actorId())) {
+                dispute.setInitiatorPhoneMemo(phoneMemo);
+            } else {
+                dispute.setRespondentPhoneMemo(phoneMemo);
+            }
+        }
         Map<String, Object> attributes = new HashMap<>();
         attributes.put("option", request.option().name());
         attributes.put("accept", request.accept());
+        if (!attachments.isEmpty()) {
+            attributes.put("attachmentCount", attachments.size());
+        }
+        if (phoneMemo != null) {
+            attributes.put("phoneMemo", phoneMemo);
+        }
         timelineService.append(order,
                 OrderEventType.DISPUTE_RESPONDED,
                 request.accept() ? "对方接受方案" : "对方建议方案：" + request.option(),
@@ -342,6 +386,28 @@ public class OrderDisputeService {
             return "%s，信用变动 %d 分".formatted(decision, normalizedDelta);
         }
         return decision;
+    }
+
+    private List<UUID> sanitizeAttachments(RentalOrder order, UUID actorId, List<UUID> attachmentIds) {
+        if (attachmentIds == null || attachmentIds.isEmpty()) {
+            return List.of();
+        }
+        if (attachmentIds.size() > MAX_ATTACHMENTS) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "附件数量超出上限");
+        }
+        List<UUID> sanitized = new ArrayList<>(attachmentIds.size());
+        for (UUID attachmentId : attachmentIds) {
+            if (attachmentId == null) {
+                continue;
+            }
+            OrderProof proof = orderProofRepository.findByIdAndOrderId(attachmentId, order.getId())
+                    .orElseThrow(() -> new BusinessException(ErrorCode.VALIDATION_ERROR, "附件不存在或不属于该订单"));
+            if (actorId != null && proof.getUploadedBy() != null && !proof.getUploadedBy().equals(actorId)) {
+                throw new BusinessException(ErrorCode.FORBIDDEN, "仅可引用本人上传的附件");
+            }
+            sanitized.add(proof.getId());
+        }
+        return sanitized;
     }
 
 

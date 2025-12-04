@@ -41,6 +41,11 @@
             </a-select-option>
           </a-select>
         </a-form-item>
+        <a-form-item label="人工审核">
+          <a-checkbox v-model:checked="filters.manualReviewOnly">
+            仅显示预警订单
+          </a-checkbox>
+        </a-form-item>
         <a-form-item class="filter-form__actions">
           <a-space :wrap="isMobile">
             <a-button type="primary" :loading="loading" @click="loadOrders">查询</a-button>
@@ -62,6 +67,12 @@
         <a-table-column title="状态" key="status">
           <template #default="{ record }">
             <a-tag>{{ record.status }}</a-tag>
+          </template>
+        </a-table-column>
+        <a-table-column title="风控" key="manualReview">
+          <template #default="{ record }">
+            <a-tag v-if="record.requiresManualReview" color="volcano">需人工审核</a-tag>
+            <span v-else>-</span>
           </template>
         </a-table-column>
         <a-table-column title="用户" key="userId">
@@ -161,10 +172,44 @@
             <p class="dispute-item__reason">
               <strong>诉求：</strong>{{ resolutionLabel(item.initiatorOption) }} | {{ item.initiatorReason }}
             </p>
+            <p v-if="item.initiatorPhoneMemo" class="dispute-item__line">
+              电话纪要（发起方）：{{ item.initiatorPhoneMemo }}
+            </p>
+            <div
+              v-if="resolveAttachmentProofs(item.initiatorAttachmentProofIds).length"
+              class="dispute-attachments"
+            >
+              <span>附件（发起方）：</span>
+              <a
+                v-for="proof in resolveAttachmentProofs(item.initiatorAttachmentProofIds)"
+                :key="proof.id"
+                href="#"
+                @click.prevent="handleDownloadProof(proof)"
+              >
+                {{ attachmentLabel(proof) }}
+              </a>
+            </div>
             <p v-if="item.respondentOption" class="dispute-item__line">
               对方方案：{{ resolutionLabel(item.respondentOption) }}
               <span v-if="item.respondentRemark">（{{ item.respondentRemark }}）</span>
             </p>
+            <p v-if="item.respondentPhoneMemo" class="dispute-item__line">
+              电话纪要（回应方）：{{ item.respondentPhoneMemo }}
+            </p>
+            <div
+              v-if="resolveAttachmentProofs(item.respondentAttachmentProofIds).length"
+              class="dispute-attachments"
+            >
+              <span>附件（回应方）：</span>
+              <a
+                v-for="proof in resolveAttachmentProofs(item.respondentAttachmentProofIds)"
+                :key="proof.id"
+                href="#"
+                @click.prevent="handleDownloadProof(proof)"
+              >
+                {{ attachmentLabel(proof) }}
+              </a>
+            </div>
             <p v-if="item.adminDecisionOption" class="dispute-item__line">
               平台裁决：{{ resolutionLabel(item.adminDecisionOption) }}
               <span v-if="item.adminDecisionRemark">（{{ item.adminDecisionRemark }}）</span>
@@ -261,7 +306,8 @@ import {
   type OrderStatus,
   type RentalOrderDetail,
   type OrderDispute,
-  type DisputeResolutionOption
+  type DisputeResolutionOption,
+  type OrderProof
 } from '../../services/orderService';
 import {
   resolveItemDeposit,
@@ -272,6 +318,7 @@ import {
 } from '../../utils/orderAmounts';
 import OrderContractDrawer from '../../components/orders/OrderContractDrawer.vue';
 import { useViewport } from '../../composables/useViewport';
+import http from '../../services/http';
 
 const orderStatusOptions: OrderStatus[] = [
   'PENDING_PAYMENT',
@@ -287,6 +334,23 @@ const orderStatusOptions: OrderStatus[] = [
   'EXCEPTION_CLOSED'
 ];
 
+const API_PREFIX = '/api/v1';
+const normalizeApiPath = (url: string) =>
+  url.startsWith(API_PREFIX) ? url.substring(API_PREFIX.length) : url;
+
+const inferProofExtension = (url?: string | null) => {
+  if (!url) {
+    return '';
+  }
+  const match = url.match(/(\.[a-zA-Z0-9]+)$/);
+  return match ? match[1] : '';
+};
+
+const resolveProofDownloadName = (proof: OrderProof) => {
+  const extension = inferProofExtension(proof.fileUrl);
+  return `${proof.proofType ?? 'PROOF'}-${proof.id}${extension}`;
+};
+
 const { isMobile, width: viewportWidth } = useViewport();
 const formLayout = computed(() => (isMobile.value ? 'vertical' : 'inline'));
 const tableScroll = computed(() => (isMobile.value ? { x: 900 } : undefined));
@@ -299,7 +363,9 @@ const detailDrawerWidth = computed(() => {
   return Math.min(Math.max(base - 32, 320), 720);
 });
 
-const filters = reactive<{ userId?: string; vendorId?: string; status?: OrderStatus }>({});
+const filters = reactive<{ userId?: string; vendorId?: string; status?: OrderStatus; manualReviewOnly: boolean }>({
+  manualReviewOnly: false
+});
 const loading = ref(false);
 const orders = ref<RentalOrderSummary[]>([]);
 const pagination = reactive({ current: 1, pageSize: 10, total: 0 });
@@ -342,10 +408,46 @@ const canForceClose = computed(() => {
 });
 
 const disputes = computed(() => detailDrawer.order?.disputes ?? []);
+const detailProofMap = computed(() => {
+  const map = new Map<string, OrderProof>();
+  detailDrawer.order?.proofs?.forEach((proof) => map.set(proof.id, proof));
+  return map;
+});
+const resolveAttachmentProofs = (ids?: string[] | null) => {
+  if (!ids?.length) {
+    return [] as OrderProof[];
+  }
+  return ids
+    .map((id) => detailProofMap.value.get(id))
+    .filter((item): item is OrderProof => Boolean(item));
+};
+const attachmentLabel = (proof: OrderProof) => proof.description || proof.proofType || '附件';
 
 const resolveOrderDeposit = (detail: RentalOrderDetail): number => rentalOrderDeposit(detail);
 const resolveOrderRent = (detail: RentalOrderDetail): number => rentalOrderRent(detail);
 const resolveOrderTotal = (detail: RentalOrderDetail): number => rentalOrderTotal(detail);
+
+const handleDownloadProof = async (proof: OrderProof) => {
+  try {
+    if (!proof.fileUrl) {
+      message.warning('当前附件没有可下载的链接');
+      return;
+    }
+    const response = await http.get<ArrayBuffer>(normalizeApiPath(proof.fileUrl), {
+      responseType: 'arraybuffer'
+    });
+    const blob = new Blob([response.data], { type: proof.contentType ?? 'application/octet-stream' });
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = resolveProofDownloadName(proof);
+    anchor.click();
+    window.URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error('下载凭证失败', error);
+    message.error('下载凭证失败，请稍后重试');
+  }
+};
 
 const resolutionLabel = (option?: DisputeResolutionOption | null) =>
   option ? {
@@ -404,6 +506,7 @@ const loadOrders = async () => {
       userId: filters.userId || undefined,
       vendorId: filters.vendorId || undefined,
       status: filters.status,
+      manualReviewOnly: filters.manualReviewOnly ? true : undefined,
       page: pagination.current,
       size: pagination.pageSize
     });
@@ -427,6 +530,7 @@ const resetFilters = () => {
   filters.userId = undefined;
   filters.vendorId = undefined;
   filters.status = undefined;
+  filters.manualReviewOnly = false;
   pagination.current = 1;
   loadOrders();
 };
@@ -568,6 +672,31 @@ watch(
 .dispute-item__line {
   margin: 4px 0;
   color: #334155;
+}
+
+.dispute-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 12px;
+  color: #475569;
+}
+
+.dispute-attachments a {
+  color: #2563eb;
+}
+
+.dispute-attachment-hint {
+  margin: 4px 0;
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.attachment-list {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+  color: #475569;
 }
 
 .dispute-meta {

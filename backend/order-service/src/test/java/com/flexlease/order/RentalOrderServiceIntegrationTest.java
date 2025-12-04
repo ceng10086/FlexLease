@@ -337,7 +337,9 @@ class RentalOrderServiceIntegrationTest {
                     userId,
                     DisputeResolutionOption.PARTIAL_REFUND,
                     "设备存在划痕",
-                    "请求折扣"
+                    "请求折扣",
+                    null,
+                    null
             ));
         }
         assertThat(opened.status()).isEqualTo(OrderDisputeStatus.OPEN);
@@ -347,7 +349,9 @@ class RentalOrderServiceIntegrationTest {
                     vendorAccountId,
                     DisputeResolutionOption.REDELIVER,
                     false,
-                    "优先考虑换新"
+                    "优先考虑换新",
+                    null,
+                    null
             ));
         }
 
@@ -413,6 +417,8 @@ class RentalOrderServiceIntegrationTest {
                     userId,
                     DisputeResolutionOption.PARTIAL_REFUND,
                     "测试超时",
+                    null,
+                    null,
                     null
             ));
         }
@@ -469,8 +475,10 @@ class RentalOrderServiceIntegrationTest {
             opened = orderDisputeService.create(created.id(), new OrderDisputeCreateRequest(
                     userId,
                     DisputeResolutionOption.REDELIVER,
-                    "配件缺失",
-                    null
+                                        "配件缺失",
+                                        null,
+                                        null,
+                                        null
             ));
         }
 
@@ -479,7 +487,9 @@ class RentalOrderServiceIntegrationTest {
                     vendorAccountId,
                     DisputeResolutionOption.PARTIAL_REFUND,
                     false,
-                    "可提供折扣"
+                                        "可提供折扣",
+                                        null,
+                                        null
             ));
         }
 
@@ -489,7 +499,9 @@ class RentalOrderServiceIntegrationTest {
                     userId,
                     DisputeResolutionOption.PARTIAL_REFUND,
                     true,
-                    "接受折扣"
+                    "接受折扣",
+                    null,
+                    null
             ));
         }
         assertThat(userResponse.status()).isEqualTo(OrderDisputeStatus.RESOLVED);
@@ -499,7 +511,9 @@ class RentalOrderServiceIntegrationTest {
                     userId,
                     DisputeResolutionOption.RETURN_WITH_DEPOSIT_DEDUCTION,
                     true,
-                    "重复提交"
+                    "重复提交",
+                    null,
+                    null
             ))).isInstanceOf(BusinessException.class);
         }
     }
@@ -544,6 +558,8 @@ class RentalOrderServiceIntegrationTest {
                                         userId,
                                         DisputeResolutionOption.RETURN_WITH_DEPOSIT_DEDUCTION,
                                         "设备严重受损",
+                                        null,
+                                        null,
                                         null
                         ));
                 }
@@ -553,7 +569,9 @@ class RentalOrderServiceIntegrationTest {
                                         vendorAccountId,
                                         DisputeResolutionOption.REDELIVER,
                                         false,
-                                        "建议换新"
+                                        "建议换新",
+                                        null,
+                                        null
                         ));
                 }
 

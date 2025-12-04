@@ -38,6 +38,7 @@ public class AdminOrderController {
     public ApiResponse<PagedResponse<RentalOrderSummaryResponse>> listOrders(@RequestParam(required = false) String userId,
                                                                              @RequestParam(required = false) String vendorId,
                                                                              @RequestParam(required = false) String status,
+                                                                             @RequestParam(required = false) Boolean manualReviewOnly,
                                                                              @RequestParam(defaultValue = "1") int page,
                                                                              @RequestParam(defaultValue = "10") int size) {
         UUID userUuid = parseUuid(userId, "userId");
@@ -45,7 +46,7 @@ public class AdminOrderController {
         OrderStatus statusEnum = parseStatus(status);
         SecurityUtils.requireRole("ADMIN");
         Pageable pageable = PageRequest.of(Math.max(page - 1, 0), Math.max(1, Math.min(size, 100)), Sort.by(Sort.Direction.DESC, "createdAt"));
-        return ApiResponse.success(rentalOrderService.listOrdersForAdmin(userUuid, vendorUuid, statusEnum, pageable));
+        return ApiResponse.success(rentalOrderService.listOrdersForAdmin(userUuid, vendorUuid, statusEnum, manualReviewOnly, pageable));
     }
 
     @GetMapping("/{orderId}")

@@ -67,6 +67,18 @@ public class OrderDispute {
     @Column(name = "responded_at")
     private OffsetDateTime respondedAt;
 
+    @Column(name = "initiator_phone_memo", length = 1000)
+    private String initiatorPhoneMemo;
+
+    @Column(name = "respondent_phone_memo", length = 1000)
+    private String respondentPhoneMemo;
+
+    @Column(name = "initiator_attachment_ids")
+    private String initiatorAttachmentIds;
+
+    @Column(name = "respondent_attachment_ids")
+    private String respondentAttachmentIds;
+
     @Column(name = "deadline_at")
     private OffsetDateTime deadlineAt;
 
@@ -182,6 +194,22 @@ public class OrderDispute {
         return initiatorRemark;
     }
 
+    public String getInitiatorPhoneMemo() {
+        return initiatorPhoneMemo;
+    }
+
+    public void setInitiatorPhoneMemo(String phoneMemo) {
+        this.initiatorPhoneMemo = phoneMemo;
+    }
+
+    public java.util.List<java.util.UUID> getInitiatorAttachmentProofIds() {
+        return decodeAttachmentIds(initiatorAttachmentIds);
+    }
+
+    public void setInitiatorAttachments(java.util.List<java.util.UUID> attachmentIds) {
+        this.initiatorAttachmentIds = encodeAttachmentIds(attachmentIds);
+    }
+
     public UUID getRespondentId() {
         return respondentId;
     }
@@ -196,6 +224,22 @@ public class OrderDispute {
 
     public String getRespondentRemark() {
         return respondentRemark;
+    }
+
+    public String getRespondentPhoneMemo() {
+        return respondentPhoneMemo;
+    }
+
+    public void setRespondentPhoneMemo(String phoneMemo) {
+        this.respondentPhoneMemo = phoneMemo;
+    }
+
+    public java.util.List<java.util.UUID> getRespondentAttachmentProofIds() {
+        return decodeAttachmentIds(respondentAttachmentIds);
+    }
+
+    public void setRespondentAttachments(java.util.List<java.util.UUID> attachmentIds) {
+        this.respondentAttachmentIds = encodeAttachmentIds(attachmentIds);
     }
 
     public OffsetDateTime getRespondedAt() {
@@ -340,5 +384,33 @@ public class OrderDispute {
         this.countdownReminderLevel = targetLevel;
         this.countdownNotifiedAt = OffsetDateTime.now();
         return true;
+    }
+
+    private static String encodeAttachmentIds(java.util.List<java.util.UUID> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return null;
+        }
+        return ids.stream()
+                .map(java.util.UUID::toString)
+                .collect(java.util.stream.Collectors.joining(","));
+    }
+
+    private static java.util.List<java.util.UUID> decodeAttachmentIds(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return java.util.Collections.emptyList();
+        }
+        String[] parts = raw.split(",");
+        java.util.List<java.util.UUID> result = new java.util.ArrayList<>(parts.length);
+        for (String part : parts) {
+            if (part == null || part.isBlank()) {
+                continue;
+            }
+            try {
+                result.add(java.util.UUID.fromString(part.trim()));
+            } catch (IllegalArgumentException ignored) {
+                // skip malformed entry to avoid breaking remaining ids
+            }
+        }
+        return java.util.Collections.unmodifiableList(result);
     }
 }

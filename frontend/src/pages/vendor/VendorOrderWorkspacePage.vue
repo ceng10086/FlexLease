@@ -330,10 +330,44 @@
               <p class="dispute-item__reason">
                 <strong>诉求：</strong>{{ resolutionLabel(item.initiatorOption) }} | {{ item.initiatorReason }}
               </p>
+              <p v-if="item.initiatorPhoneMemo" class="dispute-item__line">
+                电话纪要（用户）：{{ item.initiatorPhoneMemo }}
+              </p>
+              <div
+                v-if="resolveAttachmentProofs(item.initiatorAttachmentProofIds).length"
+                class="dispute-attachments"
+              >
+                <span>附件（用户）：</span>
+                <a
+                  v-for="proof in resolveAttachmentProofs(item.initiatorAttachmentProofIds)"
+                  :key="proof.id"
+                  href="#"
+                  @click.prevent="handleDownloadProof(proof)"
+                >
+                  {{ attachmentLabel(proof) }}
+                </a>
+              </div>
               <p v-if="item.respondentOption" class="dispute-item__line">
                 我方建议：{{ resolutionLabel(item.respondentOption) }}
                 <span v-if="item.respondentRemark">（{{ item.respondentRemark }}）</span>
               </p>
+              <p v-if="item.respondentPhoneMemo" class="dispute-item__line">
+                电话纪要（厂商）：{{ item.respondentPhoneMemo }}
+              </p>
+              <div
+                v-if="resolveAttachmentProofs(item.respondentAttachmentProofIds).length"
+                class="dispute-attachments"
+              >
+                <span>附件（厂商）：</span>
+                <a
+                  v-for="proof in resolveAttachmentProofs(item.respondentAttachmentProofIds)"
+                  :key="proof.id"
+                  href="#"
+                  @click.prevent="handleDownloadProof(proof)"
+                >
+                  {{ attachmentLabel(proof) }}
+                </a>
+              </div>
               <p v-if="item.adminDecisionOption" class="dispute-item__line">
                 平台裁决：{{ resolutionLabel(item.adminDecisionOption) }}
                 <span v-if="item.adminDecisionRemark">（{{ item.adminDecisionRemark }}）</span>
@@ -431,6 +465,20 @@
         <a-form-item label="补充说明">
           <a-textarea v-model:value="vendorDisputeModal.remark" :rows="2" placeholder="可选" />
         </a-form-item>
+        <a-form-item label="电话纪要">
+          <a-textarea
+            v-model:value="vendorDisputeModal.phoneMemo"
+            :rows="2"
+            placeholder="可选：记录与用户或平台的电话沟通"
+          />
+        </a-form-item>
+        <a-form-item label="上传附件">
+          <input type="file" multiple @change="handleVendorDisputeAttachmentChange" />
+          <p class="dispute-attachment-hint">最多 {{ MAX_DISPUTE_ATTACHMENTS }} 个</p>
+          <ul v-if="vendorDisputeModal.attachments.length" class="attachment-list">
+            <li v-for="file in vendorDisputeModal.attachments" :key="file.name">{{ file.name }}</li>
+          </ul>
+        </a-form-item>
       </a-form>
     </a-modal>
 
@@ -456,6 +504,20 @@
         </a-form-item>
         <a-form-item label="补充说明">
           <a-textarea v-model:value="vendorRespondModal.remark" :rows="2" placeholder="可选" />
+        </a-form-item>
+        <a-form-item label="电话纪要">
+          <a-textarea
+            v-model:value="vendorRespondModal.phoneMemo"
+            :rows="2"
+            placeholder="可选：记录与用户沟通"
+          />
+        </a-form-item>
+        <a-form-item label="上传附件">
+          <input type="file" multiple @change="handleVendorRespondAttachmentChange" />
+          <p class="dispute-attachment-hint">最多 {{ MAX_DISPUTE_ATTACHMENTS }} 个</p>
+          <ul v-if="vendorRespondModal.attachments.length" class="attachment-list">
+            <li v-for="file in vendorRespondModal.attachments" :key="file.name">{{ file.name }}</li>
+          </ul>
         </a-form-item>
       </a-form>
     </a-modal>
@@ -555,6 +617,7 @@ const {
   requireVendorId
 } = useVendorContext();
 const auth = useAuthStore();
+const MAX_DISPUTE_ATTACHMENTS = 5;
 
 const loading = ref(false);
 const orders = ref<RentalOrderSummary[]>([]);
@@ -590,6 +653,8 @@ const vendorDisputeModal = reactive({
   reason: '',
   option: 'REDELIVER' as DisputeResolutionOption,
   remark: '',
+  phoneMemo: '',
+  attachments: [] as File[],
   loading: false
 });
 const vendorRespondModal = reactive({
@@ -598,6 +663,8 @@ const vendorRespondModal = reactive({
   option: 'REDELIVER' as DisputeResolutionOption,
   accept: true,
   remark: '',
+  phoneMemo: '',
+  attachments: [] as File[],
   loading: false
 });
 const surveyModal = reactive({
@@ -678,6 +745,20 @@ const conversationEvents = computed(() =>
   detail.order?.events?.filter((item) => item.eventType === 'COMMUNICATION_NOTE') ?? []
 );
 const proofList = computed(() => detail.order?.proofs ?? []);
+const proofMap = computed(() => {
+  const map = new Map<string, OrderProof>();
+  proofList.value.forEach((item) => map.set(item.id, item));
+  return map;
+});
+const resolveAttachmentProofs = (ids?: string[] | null) => {
+  if (!ids?.length) {
+    return [] as OrderProof[];
+  }
+  return ids
+    .map((id) => proofMap.value.get(id))
+    .filter((item): item is OrderProof => Boolean(item));
+};
+const attachmentLabel = (proof: OrderProof) => proof.description || proof.proofType || '附件';
 const proofTypeLabel = (type: OrderProofType) => proofTypeMap[type] ?? type;
 
 const normalizeString = (value?: string | null) => value?.toLowerCase() ?? '';
@@ -1158,6 +1239,11 @@ const openVendorDisputeModal = () => {
     message.error('请先登录');
     return;
   }
+  vendorDisputeModal.reason = '';
+  vendorDisputeModal.remark = '';
+  vendorDisputeModal.option = 'REDELIVER';
+  vendorDisputeModal.phoneMemo = '';
+  vendorDisputeModal.attachments = [];
   vendorDisputeModal.open = true;
 };
 
@@ -1165,6 +1251,8 @@ const resetVendorDisputeModal = () => {
   vendorDisputeModal.reason = '';
   vendorDisputeModal.remark = '';
   vendorDisputeModal.option = 'REDELIVER';
+  vendorDisputeModal.phoneMemo = '';
+  vendorDisputeModal.attachments = [];
 };
 
 const handleVendorSubmitDispute = async () => {
@@ -1178,11 +1266,14 @@ const handleVendorSubmitDispute = async () => {
   }
   vendorDisputeModal.loading = true;
   try {
+    const attachmentProofIds = await uploadVendorAttachments(vendorDisputeModal.attachments);
     await createOrderDispute(detail.order.id, {
       actorId: auth.user.id,
       option: vendorDisputeModal.option,
       reason,
-      remark: vendorDisputeModal.remark?.trim() || undefined
+      remark: vendorDisputeModal.remark?.trim() || undefined,
+      phoneMemo: vendorDisputeModal.phoneMemo?.trim() || undefined,
+      attachmentProofIds: attachmentProofIds.length ? attachmentProofIds : undefined
     });
     message.success('纠纷已创建');
     vendorDisputeModal.open = false;
@@ -1196,6 +1287,42 @@ const handleVendorSubmitDispute = async () => {
   }
 };
 
+const syncAttachmentSelection = (event: Event, target: { attachments: File[] }) => {
+  const input = event.target as HTMLInputElement;
+  const files = input.files ? Array.from(input.files) : [];
+  if (!files.length) {
+    target.attachments = [];
+    return;
+  }
+  if (files.length > MAX_DISPUTE_ATTACHMENTS) {
+    message.warning(`最多选择 ${MAX_DISPUTE_ATTACHMENTS} 个附件，已自动截取前 ${MAX_DISPUTE_ATTACHMENTS} 个`);
+  }
+  target.attachments = files.slice(0, MAX_DISPUTE_ATTACHMENTS);
+};
+
+const handleVendorDisputeAttachmentChange = (event: Event) => syncAttachmentSelection(event, vendorDisputeModal);
+const handleVendorRespondAttachmentChange = (event: Event) => syncAttachmentSelection(event, vendorRespondModal);
+
+const uploadVendorAttachments = async (files: File[]) => {
+  if (!detail.order || !files.length) {
+    return [] as string[];
+  }
+  if (!auth.user?.id) {
+    message.error('请先登录');
+    throw new Error('未登录');
+  }
+  const ids: string[] = [];
+  for (const file of files) {
+    const proof = await uploadOrderProof(detail.order.id, {
+      actorId: auth.user.id,
+      proofType: 'OTHER',
+      description: '纠纷附件',
+      file
+    });
+    ids.push(proof.id);
+  }
+  return ids;
+};
 const handleVendorCloseDisputeModal = () => {
   vendorDisputeModal.open = false;
   resetVendorDisputeModal();
@@ -1210,6 +1337,8 @@ const openVendorRespondModal = (dispute: OrderDispute) => {
   vendorRespondModal.option = dispute.respondentOption ?? dispute.initiatorOption;
   vendorRespondModal.accept = false;
   vendorRespondModal.remark = '';
+  vendorRespondModal.phoneMemo = '';
+  vendorRespondModal.attachments = [];
   vendorRespondModal.open = true;
 };
 
@@ -1219,11 +1348,14 @@ const handleVendorSubmitRespond = async () => {
   }
   vendorRespondModal.loading = true;
   try {
+    const attachmentProofIds = await uploadVendorAttachments(vendorRespondModal.attachments);
     await respondOrderDispute(detail.order.id, vendorRespondModal.disputeId, {
       actorId: auth.user.id,
       option: vendorRespondModal.option,
       accept: vendorRespondModal.accept,
-      remark: vendorRespondModal.remark?.trim() || undefined
+      remark: vendorRespondModal.remark?.trim() || undefined,
+      phoneMemo: vendorRespondModal.phoneMemo?.trim() || undefined,
+      attachmentProofIds: attachmentProofIds.length ? attachmentProofIds : undefined
     });
     message.success('已提交回应');
     handleVendorCloseRespondModal();
@@ -1280,6 +1412,8 @@ const handleVendorCloseRespondModal = () => {
   vendorRespondModal.open = false;
   vendorRespondModal.disputeId = null;
   vendorRespondModal.remark = '';
+  vendorRespondModal.phoneMemo = '';
+  vendorRespondModal.attachments = [];
 };
 
 const confirmVendorEscalate = (dispute: OrderDispute) => {
@@ -1553,6 +1687,31 @@ watch(
 .dispute-item__line {
   margin: 4px 0;
   color: #334155;
+}
+
+.dispute-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 12px;
+  color: #475569;
+}
+
+.dispute-attachments a {
+  color: #2563eb;
+}
+
+.attachment-list {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+  color: #475569;
+}
+
+.dispute-attachment-hint {
+  margin: 4px 0;
+  font-size: 12px;
+  color: #94a3b8;
 }
 
 .dispute-meta {

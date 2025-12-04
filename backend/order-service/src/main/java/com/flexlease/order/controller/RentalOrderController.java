@@ -86,6 +86,7 @@ public class RentalOrderController {
     public ApiResponse<PagedResponse<RentalOrderSummaryResponse>> listOrders(@RequestParam(required = false) UUID userId,
                                                                              @RequestParam(required = false) UUID vendorId,
                                                                              @RequestParam(required = false) OrderStatus status,
+                                                                             @RequestParam(required = false) Boolean manualReviewOnly,
                                                                              @RequestParam(defaultValue = "1") int page,
                                                                              @RequestParam(defaultValue = "10") int size) {
         FlexleasePrincipal principal = SecurityUtils.requirePrincipal();
@@ -95,7 +96,7 @@ public class RentalOrderController {
             }
             Pageable adminPageable = PageRequest.of(Math.max(page - 1, 0), Math.max(1, Math.min(size, 100)),
                     Sort.by(Sort.Direction.DESC, "createdAt"));
-            return ApiResponse.success(rentalOrderService.listOrdersForAdmin(userId, vendorId, status, adminPageable));
+            return ApiResponse.success(rentalOrderService.listOrdersForAdmin(userId, vendorId, status, manualReviewOnly, adminPageable));
         }
 
         UUID effectiveUserId = null;

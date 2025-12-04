@@ -66,6 +66,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -252,26 +253,43 @@ public class RentalOrderService {
         return toPagedResponse(page);
     }
 
-    public PagedResponse<RentalOrderSummaryResponse> listOrdersForAdmin(UUID userId, UUID vendorId, OrderStatus status, Pageable pageable) {
+    public PagedResponse<RentalOrderSummaryResponse> listOrdersForAdmin(UUID userId,
+                                                                        UUID vendorId,
+                                                                        OrderStatus status,
+                                                                        Boolean manualReviewOnly,
+                                                                        Pageable pageable) {
         ensureAdminAccess();
         if (userId != null && vendorId != null) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "userId 与 vendorId 不能同时提供");
         }
-        Page<RentalOrder> page;
+        Specification<RentalOrder> specification = Specification.where(null);
         if (userId != null) {
-            page = status == null
-                    ? rentalOrderRepository.findByUserId(userId, pageable)
-                    : rentalOrderRepository.findByUserIdAndStatus(userId, status, pageable);
-        } else if (vendorId != null) {
-            page = status == null
-                    ? rentalOrderRepository.findByVendorId(vendorId, pageable)
-                    : rentalOrderRepository.findByVendorIdAndStatus(vendorId, status, pageable);
-        } else if (status != null) {
-            page = rentalOrderRepository.findByStatus(status, pageable);
-        } else {
-            page = rentalOrderRepository.findAll(pageable);
+            specification = combine(specification, (root, query, cb) -> cb.equal(root.get("userId"), userId));
         }
+        if (vendorId != null) {
+            specification = combine(specification, (root, query, cb) -> cb.equal(root.get("vendorId"), vendorId));
+        }
+        if (status != null) {
+            specification = combine(specification, (root, query, cb) -> cb.equal(root.get("status"), status));
+        }
+        if (Boolean.TRUE.equals(manualReviewOnly)) {
+            specification = combine(specification, (root, query, cb) -> cb.isTrue(root.get("requiresManualReview")));
+        }
+        Page<RentalOrder> page = specification == null
+                ? rentalOrderRepository.findAll(pageable)
+                : rentalOrderRepository.findAll(specification, pageable);
         return toPagedResponse(page);
+    }
+
+    private Specification<RentalOrder> combine(Specification<RentalOrder> base,
+                                               Specification<RentalOrder> next) {
+        if (base == null) {
+            return next;
+        }
+        if (next == null) {
+            return base;
+        }
+        return base.and(next);
     }
 
     public RentalOrderResponse confirmPayment(UUID orderId, OrderPaymentRequest request) {

@@ -106,7 +106,8 @@ public class OrderAssembler {
                 order.getDepositAmount(),
                 order.getRentAmount(),
                 order.getCreatedAt(),
-                order.getLeaseEndAt()
+                                order.getLeaseEndAt(),
+                                order.isRequiresManualReview()
         );
     }
 
@@ -188,10 +189,14 @@ public class OrderAssembler {
                 dispute.getInitiatorOption(),
                 dispute.getInitiatorReason(),
                 dispute.getInitiatorRemark(),
+                dispute.getInitiatorPhoneMemo(),
+                dispute.getInitiatorAttachmentProofIds(),
                 dispute.getRespondentId(),
                 dispute.getRespondentRole(),
                 dispute.getRespondentOption(),
                 dispute.getRespondentRemark(),
+                dispute.getRespondentPhoneMemo(),
+                dispute.getRespondentAttachmentProofIds(),
                 dispute.getRespondedAt(),
                 dispute.getDeadlineAt(),
                 dispute.getEscalatedBy(),

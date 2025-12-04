@@ -15,6 +15,7 @@ public record RentalOrderSummaryResponse(
         BigDecimal depositAmount,
         BigDecimal rentAmount,
         OffsetDateTime createdAt,
-        OffsetDateTime leaseEndAt
+        OffsetDateTime leaseEndAt,
+        boolean requiresManualReview
 ) {
 }

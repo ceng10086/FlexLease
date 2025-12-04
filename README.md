@@ -39,7 +39,7 @@ FlexLease 面向 B2C 场景，为厂商与消费者提供从入驻、商品配�
 - **商品域**
   - 商品 CRUD、租赁方案/租期/押金配置、SKU 库存流水（预占/释放/入库/出库）。
   - 商品提交→审核→上/下架，前台目录查询及媒体资源上传（本地文件系统托管）。
-  - 新增“下单前咨询”通道：消费者可在详情页提交 72 小时有效的咨询，`ProductInquiryService` 会通知厂商并在工作台集中展示/回复。
+  - 新增“下单前咨询”通道：消费者可在详情页提交 72 小时有效的咨询，`ProductInquiryService` 会通知厂商并在工作台集中展示/回复，并在回复前再次校验过期状态，超过窗口会自动标记为 `EXPIRED` 并拒绝响应。
 - **订单域**
   - 购物车增删改查，订单预览、下单（支持从购物车导入）、支付确认、发货、确认收货。
   - 订单试算自动根据用户信用档案调整押金（优享减免、预警上浮、受限拦截），并写入订单快照供履约审核。
@@ -47,7 +47,7 @@ FlexLease 面向 B2C 场景，为厂商与消费者提供从入驻、商品配�
   - 续租/退租/买断流程及审批、自动库存处理、订单合同生成与签署。
   - `/orders/{id}/messages` 支持用户与厂商在订单抽屉直接沟通（自动写入时间线），`OrderProofService`（`backend/order-service/src/main/java/com/flexlease/order/service/OrderProofService.java`）提供发货/收货/退租/巡检/其他凭证上传、`/proofs/{fileName}` 下载以及和 Notification Service 的互通提醒。
   - `ProofPolicyService` 对外暴露 `/api/v1/proof-policy`，统一告知各阶段最小凭证数量与拍摄角度，并由 `ProofStorageService` 对图片自动打水印；`CreditRewardService` 根据支付/退租/纠纷结果触发信用事件（含恶意行为 -30 分并冻结账号 30 天）。
-  - `OrderDisputeService`（`backend/order-service/src/main/java/com/flexlease/order/service/OrderDisputeService.java`）封装纠纷创建→协商→升级仲裁→平台裁决→信用扣分→满意度调查的全流程，管理员可在 `/api/v1/admin/orders/{id}/disputes/{disputeId}/resolve` 直接裁决，并支持 `maliciousBehavior` 标志自动触发恶意行为惩罚。
+  - `OrderDisputeService`（`backend/order-service/src/main/java/com/flexlease/order/service/OrderDisputeService.java`）封装纠纷创建→协商→升级仲裁→平台裁决→信用扣分→满意度调查的全流程，管理员可在 `/api/v1/admin/orders/{id}/disputes/{disputeId}/resolve` 直接裁决，并支持 `maliciousBehavior` 标志自动触发恶意行为惩罚；双方在发起/回应纠纷时可同步上传多媒体附件与电话纪要，信息将写入时间线与抽屉附件列表。
   - 纠纷调度新增多阶段倒计时提醒（24小时、6小时、1小时前各提醒一次）与超时自动升级逻辑；用户二次申诉进入 `PENDING_REVIEW_PANEL` 状态需 `REVIEW_PANEL` 角色裁决，实现复核组权限区分。
   - 满意度调研由 `OrderSurveyService` 定时激活 `/orders/{id}/surveys` 调查，支持双方打分与评价，并追加时间线+站内信提醒。
   - 平台/厂商运营指标、管理员强制关闭、待支付订单自动取消调度。
@@ -66,6 +66,7 @@ FlexLease 面向 B2C 场景，为厂商与消费者提供从入驻、商品配�
   - 单点登录 + 多角色工作台：消费者覆盖商品目录/详情、购物车、结算、订单详情（含支付、续租/退租/买断、电子合同）与通知中心；厂商拥有商品/媒体工作台、库存流水、订单履约抽屉、运营指标与结算看板；管理员负责入驻审核、商品审核与订单监控（含合同预览、强制关闭）。
   - 仪表盘提供平台/厂商双视角 GMV、订单状态与 7 日趋势，同步呈现租赁模式构成、信用分布、纠纷态势与满意度调研待办，并暴露订单沟通/凭证/纠纷抽屉。
   - 商品详情页新增“下单前咨询”表单，可在 72 小时有效期内被厂商回复；订单详情/履约抽屉根据 `/proof-policy` 动态展示拍摄指引与水印示例，厂商指标/结算页面同步展示抽成基准与实时佣金。
+  - 纠纷面板可以直接上传图片/视频附件并记录电话纪要，消费者、厂商与管理员在抽屉内即可查看并下载所有取证材料。
   - 自动支付模拟、`useVendorContext` 厂商身份刷新、Ant Design Vue + Pinia + Vue Router 组合支撑桌面级交互，Playwright 覆盖仪表盘渲染。
 - **系统保障**
   - `platform-common` 内置轻量级 `IdempotencyService`，`/orders`、`/payments` 等写操作支持 `Idempotency-Key` 防重复提交。
@@ -97,7 +98,7 @@ FlexLease 面向 B2C 场景，为厂商与消费者提供从入驻、商品配�
 - **平台管理员**
   - 入驻审核：`/app/admin/vendor-review` 通过 `user-service` 审核接口激活厂商账号并回写认证中心。
   - 商品审核：`/app/admin/product-review` 直连 `product-service` 的 `/api/v1/admin/products/**`。
-  - 订单监控：`/app/admin/orders` 支持按用户/厂商/状态过滤，抽屉内嵌电子合同查看、操作时间线与 `/admin/orders/{id}/force-close`。
+  - 订单监控：`/app/admin/orders` 支持按用户/厂商/状态过滤，并新增“仅人工审核”筛选（`manualReviewOnly`）用于快速定位信用预警订单，抽屉内嵌电子合同查看、操作时间线与 `/admin/orders/{id}/force-close`。
 - **厂商**
   - 商品与库存：`VendorProductWorkspace` 绑定 `vendorId`，可配置方案、SKU、媒体并调用 `/inventory/adjust`。
   - 履约操作：`VendorOrderWorkspace` 针对 `/orders/{id}/ship`、续租/退租/买断审批、订单留言、凭证上传、纠纷响应等动作提供抽屉，内置库存出入库补偿。

@@ -194,7 +194,7 @@
 ### 5.4 管理侧订单（已实现）
 | 方法 | URL | 描述 | 请求要点 |
 | ---- | --- | ---- | -------- |
-| GET | `/admin/orders` | 分页检索订单 | 支持 `userId`、`vendorId`、`status`、`page`、`size`；未带过滤条件时返回全量分页 |
+| GET | `/admin/orders` | 分页检索订单 | 支持 `userId`、`vendorId`、`status`、`manualReviewOnly`、`page`、`size`；`manualReviewOnly=true` 时仅返回需人工审核的订单 |
 | GET | `/admin/orders/{orderId}` | 查看详情 | 返回与 `/orders/{id}` 相同的订单详情 |
 | POST | `/admin/orders/{orderId}/force-close` | 强制关闭订单 | `{ "adminId", "reason?" }`，将订单置为 `EXCEPTION_CLOSED` 并追加事件记录 |
 
@@ -228,8 +228,8 @@
 | 方法 | URL | 角色 | 描述 | 备注 |
 | ---- | --- | ---- | ---- | ---- |
 | GET | `/orders/{orderId}/disputes` | USER/VENDOR/ADMIN | 查看纠纷列表 | 自动按时间排序，返回 `OrderDisputeResponse` |
-| POST | `/orders/{orderId}/disputes` | USER/VENDOR | 发起纠纷 | `{ actorId, option, reason, remark? }`，`option` 为预设方案枚举 |
-| POST | `/orders/{orderId}/disputes/{disputeId}/responses` | USER/VENDOR | 针对纠纷给出方案或确认 | `{ actorId, option, accept, remark? }`，双方轮流响应 |
+| POST | `/orders/{orderId}/disputes` | USER/VENDOR | 发起纠纷 | `{ actorId, option, reason, remark?, phoneMemo?, attachmentProofIds? }`；`attachmentProofIds` 为引用 `OrderProof` ID 的数组，最多 5 个 |
+| POST | `/orders/{orderId}/disputes/{disputeId}/responses` | USER/VENDOR | 针对纠纷给出方案或确认 | `{ actorId, option, accept, remark?, phoneMemo?, attachmentProofIds? }`，双方轮流响应，附件规则同上 |
 | POST | `/orders/{orderId}/disputes/{disputeId}/escalate` | USER/VENDOR | 升级平台仲裁 | `{ actorId, reason? }`，系统也会在截止时间到期后自动升级 |
 | POST | `/orders/{orderId}/disputes/{disputeId}/appeal` | USER/VENDOR | 对已结案纠纷发起申诉 | `{ actorId, reason? }`，最多一次 |
 | POST | `/admin/orders/{orderId}/disputes/{disputeId}/resolve` | ADMIN | 平台裁决 | `{ decision, penalizeUserDelta?, remark? }`；`penalizeUserDelta` 为信用扣分，正数代表扣减 |
