@@ -126,6 +126,7 @@ class RentalOrderServiceIntegrationTest {
                     return new UserProfileClient.UserCreditView(userId, 60, CreditTier.STANDARD);
                 });
         Mockito.doNothing().when(userProfileClient).adjustCredit(Mockito.any(), Mockito.anyInt(), Mockito.anyString());
+        Mockito.doNothing().when(userProfileClient).recordCreditEvent(Mockito.any(), Mockito.anyString(), Mockito.any());
     }
 
     @Test

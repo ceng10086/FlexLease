@@ -44,6 +44,8 @@ flexlease:
     concurrency:
       max-attempts: ${FLEXLEASE_INVENTORY_MAX_ATTEMPTS:40}
       backoff: ${FLEXLEASE_INVENTORY_BACKOFF:2ms}
+  notification-service:
+    base-url: ${FLEXLEASE_NOTIFICATION_SERVICE_BASE_URL:http://notification-service/api/v1}
 security:
   jwt:
     secret: ${SECURITY_JWT_SECRET:flexlease-default-secret-please-change}

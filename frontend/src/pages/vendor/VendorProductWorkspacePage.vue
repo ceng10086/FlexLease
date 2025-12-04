@@ -29,6 +29,7 @@
           <template #default="{ record }">
             <a-space size="small">
               <a-button size="small" @click="openDetail(record.id)">查看</a-button>
+              <a-button size="small" @click="openInquiryDrawer(record)">咨询</a-button>
               <a-button
                 size="small"
                 type="primary"
@@ -227,6 +228,66 @@
         </a-form-item>
       </a-form>
     </a-modal>
+
+    <a-drawer v-model:open="inquiryDrawer.open" :width="520" title="商品咨询" destroy-on-close>
+      <a-spin :spinning="inquiryDrawer.loading">
+        <template v-if="currentInquiryProduct">
+          <p class="page-header__meta">当前商品：{{ currentInquiryProduct.name }}</p>
+          <a-empty v-if="!currentProductInquiries.length" description="暂无咨询" />
+          <div v-else class="inquiry-list">
+            <a-card
+              v-for="item in currentProductInquiries"
+              :key="item.id"
+              class="inquiry-card"
+              :title="item.contactName || '访客'"
+            >
+              <template #extra>
+                <a-tag v-if="item.status === 'OPEN'" color="blue">待回复</a-tag>
+                <a-tag v-else-if="item.status === 'RESPONDED'" color="green">已回复</a-tag>
+                <a-tag v-else color="default">已过期</a-tag>
+              </template>
+              <p class="inquiry-card__content">{{ item.message }}</p>
+              <p class="inquiry-card__meta">
+                {{ item.contactMethod ? `联系方式：${item.contactMethod}` : '未留下联系方式' }}
+                · 提交时间：{{ formatDate(item.createdAt) }}
+              </p>
+              <p class="inquiry-card__meta">
+                有效期至：{{ formatDate(item.expiresAt) }}
+              </p>
+              <div v-if="item.reply" class="inquiry-card__reply">
+                <strong>已回复：</strong>
+                <p>{{ item.reply }}</p>
+              </div>
+              <div v-else-if="item.status === 'OPEN'" class="inquiry-card__reply">
+                <a-textarea
+                  v-model:value="inquiryDrawer.replyMap[item.id]"
+                  :rows="2"
+                  placeholder="输入回复内容"
+                />
+                <a-button
+                  type="primary"
+                  size="small"
+                  class="mt-8"
+                  :loading="inquiryDrawer.loading"
+                  @click="handleReplyInquiry(item.id)"
+                >
+                  发送回复
+                </a-button>
+              </div>
+              <a-alert
+                v-else
+                type="info"
+                show-icon
+                message="该咨询已结束，无需回复。"
+              />
+            </a-card>
+          </div>
+        </template>
+        <template v-else>
+          <a-empty description="请选择商品查看咨询" />
+        </template>
+      </a-spin>
+    </a-drawer>
   </div>
 
   <div v-else class="page-container">
@@ -239,7 +300,7 @@
 </template>
 
 <script lang="ts" setup>
-import { reactive, ref, watch } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import { message } from 'ant-design-vue';
 import { useVendorContext } from '../../composables/useVendorContext';
 import {
@@ -261,6 +322,11 @@ import {
   type RentalSku,
   type ProductStatus
 } from '../../services/productService';
+import {
+  listVendorInquiries,
+  replyVendorInquiry,
+  type ProductInquiry
+} from '../../services/vendorService';
 
 type UploadDisplayFile = {
   uid: string;
@@ -287,6 +353,28 @@ const loading = ref(false);
 const products = ref<ProductSummary[]>([]);
 const pagination = reactive({ page: 1, size: 10, total: 0 });
 
+const inquiryDrawer = reactive<{
+  open: boolean;
+  loading: boolean;
+  productId: string;
+  inquiries: ProductInquiry[];
+  replyMap: Record<string, string>;
+}>({
+  open: false,
+  loading: false,
+  productId: '',
+  inquiries: [],
+  replyMap: {}
+});
+
+const currentInquiryProduct = computed(() =>
+  products.value.find((product) => product.id === inquiryDrawer.productId) ?? null
+);
+
+const currentProductInquiries = computed(() =>
+  inquiryDrawer.inquiries.filter((item) => item.productId === inquiryDrawer.productId)
+);
+
 const modal = reactive({
   open: false,
   submitting: false,
@@ -308,6 +396,52 @@ const resetCoverUpload = () => {
   coverUpload.fileList = [];
   coverUpload.fileName = '';
   modal.form.coverImageUrl = '';
+};
+
+const loadVendorInquiries = async () => {
+  const vendorId = requireVendorId(true);
+  if (!vendorId) {
+    return;
+  }
+  inquiryDrawer.loading = true;
+  try {
+    inquiryDrawer.inquiries = await listVendorInquiries(vendorId);
+  } catch (error) {
+    console.error('加载咨询失败', error);
+    message.error('加载咨询失败，请稍后重试');
+  } finally {
+    inquiryDrawer.loading = false;
+  }
+};
+
+const openInquiryDrawer = async (product: ProductSummary) => {
+  inquiryDrawer.productId = product.id;
+  inquiryDrawer.open = true;
+  await loadVendorInquiries();
+};
+
+const handleReplyInquiry = async (inquiryId: string) => {
+  const vendorId = requireVendorId(true);
+  if (!vendorId) {
+    return;
+  }
+  const reply = inquiryDrawer.replyMap[inquiryId];
+  if (!reply || !reply.trim()) {
+    message.warning('请输入回复内容');
+    return;
+  }
+  try {
+    inquiryDrawer.loading = true;
+    await replyVendorInquiry(vendorId, inquiryId, reply);
+    message.success('已发送回复');
+    inquiryDrawer.replyMap[inquiryId] = '';
+    await loadVendorInquiries();
+  } catch (error) {
+    console.error('回复咨询失败', error);
+    message.error('回复失败，请稍后重试');
+  } finally {
+    inquiryDrawer.loading = false;
+  }
 };
 
 const handleCoverUpload = async (options: UploadRequestOption) => {
@@ -813,5 +947,25 @@ watch(
   margin-top: 4px;
   font-size: 12px;
   color: #94a3b8;
+}
+
+.inquiry-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.inquiry-card__content {
+  margin-bottom: 8px;
+  white-space: pre-wrap;
+}
+
+.inquiry-card__meta {
+  color: #64748b;
+  margin-bottom: 4px;
+}
+
+.inquiry-card__reply {
+  margin-top: 8px;
 }
 </style>

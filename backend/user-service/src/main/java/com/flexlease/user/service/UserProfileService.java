@@ -3,6 +3,7 @@ package com.flexlease.user.service;
 import com.flexlease.common.exception.BusinessException;
 import com.flexlease.common.exception.ErrorCode;
 import com.flexlease.common.user.CreditTierRules;
+import com.flexlease.user.domain.CreditEventType;
 import com.flexlease.user.domain.UserProfile;
 import com.flexlease.user.domain.UserProfileGender;
 import com.flexlease.user.dto.PagedResponse;
@@ -10,6 +11,7 @@ import com.flexlease.user.dto.UserCreditResponse;
 import com.flexlease.user.dto.UserProfileResponse;
 import com.flexlease.user.dto.UserProfileUpdateRequest;
 import com.flexlease.user.repository.UserProfileRepository;
+import java.util.Map;
 import java.util.Locale;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -27,9 +29,12 @@ public class UserProfileService {
     private static final Logger LOG = LoggerFactory.getLogger(UserProfileService.class);
 
     private final UserProfileRepository userProfileRepository;
+    private final CreditEventService creditEventService;
 
-    public UserProfileService(UserProfileRepository userProfileRepository) {
+    public UserProfileService(UserProfileRepository userProfileRepository,
+                              CreditEventService creditEventService) {
         this.userProfileRepository = userProfileRepository;
+        this.creditEventService = creditEventService;
     }
 
     @Transactional
@@ -43,6 +48,11 @@ public class UserProfileService {
     public UserProfileResponse update(UUID userId, UserProfileUpdateRequest request) {
         UserProfile profile = userProfileRepository.findByUserId(userId)
                 .orElseGet(() -> UserProfile.create(userId));
+        boolean eligibleForKyc = !profile.isKycVerified()
+                && request.fullName() != null
+                && !request.fullName().isBlank()
+                && request.phone() != null
+                && !request.phone().isBlank();
         profile.updateProfile(
                 request.fullName(),
                 parseGender(request.gender()),
@@ -51,6 +61,14 @@ public class UserProfileService {
                 request.address()
         );
         UserProfile saved = userProfileRepository.save(profile);
+        if (eligibleForKyc) {
+            try {
+                creditEventService.applyEvent(userId, CreditEventType.KYC_VERIFIED, Map.of("source", "profile"));
+                saved = userProfileRepository.findByUserId(userId).orElse(saved);
+            } catch (RuntimeException ex) {
+                LOG.warn("Failed to grant KYC credit bonus for user {}: {}", userId, ex.getMessage());
+            }
+        }
         return toResponse(saved);
     }
 
@@ -111,6 +129,9 @@ public class UserProfileService {
                 profile.getAddress(),
                 profile.getCreditScore() == null ? CreditTierRules.defaultScore() : profile.getCreditScore(),
                 profile.getCreditTier(),
+                profile.isKycVerified(),
+                profile.getKycVerifiedAt(),
+                profile.getPaymentStreak(),
                 profile.getCreatedAt(),
                 profile.getUpdatedAt()
         );

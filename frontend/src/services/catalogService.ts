@@ -161,3 +161,16 @@ const mapToDetail = (product: ApiCatalogProduct): CatalogProductDetail => ({
     }))
   }))
 });
+
+export type ProductInquiryPayload = {
+  contactName?: string;
+  contactMethod?: string;
+  message: string;
+};
+
+export const submitProductInquiry = async (productId: string, payload: ProductInquiryPayload) => {
+  await http.post<ApiResponse<ProductInquiryPayload>>(
+    `/catalog/products/${productId}/inquiries`,
+    payload
+  );
+};

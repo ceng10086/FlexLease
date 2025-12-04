@@ -49,6 +49,16 @@ public interface OrderDisputeRepository extends JpaRepository<OrderDispute, UUID
     List<UUID> findIdsByStatusAndDeadlineAtBefore(@Param("status") OrderDisputeStatus status,
                                                   @Param("deadline") OffsetDateTime deadline);
 
+    @Query("""
+            select d.id from OrderDispute d
+            where d.status = :status
+              and d.deadlineAt between :from and :to
+              and d.countdownNotifiedAt is null
+            """)
+    List<UUID> findIdsByStatusAndDeadlineBetween(@Param("status") OrderDisputeStatus status,
+                                                 @Param("from") OffsetDateTime from,
+                                                 @Param("to") OffsetDateTime to);
+
     interface ResolutionMetric {
         OffsetDateTime getCreatedAt();
 

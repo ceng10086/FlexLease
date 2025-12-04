@@ -8,6 +8,15 @@
       <a-button type="primary" @click="loadSettlements(true)" :loading="loading">刷新</a-button>
     </div>
 
+    <a-alert
+      v-if="vendorProfile?.commissionProfile"
+      type="info"
+      show-icon
+      class="mb-12"
+      :message="`当前抽成 ${formatRate(vendorProfile.commissionProfile.commissionRate)}，行业基准 ${formatRate(vendorProfile.commissionProfile.baseRate)}。`"
+      description="平台会根据信用与 SLA 表现自动调整抽成比例，最新结果已体现在表格数据中。"
+    />
+
     <a-card>
       <a-form layout="inline" class="filter-form" @submit.prevent>
         <a-form-item label="开始日期">
@@ -61,11 +70,12 @@
 </template>
 
 <script lang="ts" setup>
-import { reactive, ref, watch } from 'vue';
+import { onMounted, reactive, ref, watch } from 'vue';
 import { message } from 'ant-design-vue';
 import dayjs, { type Dayjs } from 'dayjs';
 import { useVendorContext } from '../../composables/useVendorContext';
 import { listSettlements, type PaymentSettlementResponse } from '../../services/paymentService';
+import { fetchVendor, type Vendor } from '../../services/vendorService';
 
 const loading = ref(false);
 const records = ref<PaymentSettlementResponse[]>([]);
@@ -75,9 +85,16 @@ const {
 } = useVendorContext();
 
 const filters = reactive<{ from?: Dayjs; to?: Dayjs }>({});
+const vendorProfile = ref<Vendor | null>(null);
 
 const formatCurrency = (value: number) => value.toFixed(2);
 const formatDate = (value: string) => new Date(value).toLocaleString();
+const formatRate = (value?: number | null) => {
+  if (value === undefined || value === null) {
+    return '—';
+  }
+  return `${(value * 100).toFixed(2)}%`;
+};
 
 const loadSettlements = async (notify = false) => {
   const vendorId = currentVendorId.value;
@@ -103,17 +120,35 @@ const loadSettlements = async (notify = false) => {
   }
 };
 
+const loadVendorProfile = async () => {
+  const vendorId = currentVendorId.value;
+  if (!vendorId) {
+    vendorProfile.value = null;
+    return;
+  }
+  try {
+    vendorProfile.value = await fetchVendor(vendorId);
+  } catch (error) {
+    console.error('加载厂商资料失败', error);
+  }
+};
+
 watch(
   vendorReady,
   (ready) => {
     if (ready) {
       loadSettlements();
+      loadVendorProfile();
     } else {
       records.value = [];
     }
   },
   { immediate: true }
 );
+
+onMounted(() => {
+  loadVendorProfile();
+});
 </script>
 
 <style scoped>

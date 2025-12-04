@@ -217,6 +217,19 @@ export type OrderProof = {
   uploadedAt: string;
 };
 
+export type ProofPolicySummary = {
+  shipment: ProofStagePolicy;
+  receive: ProofStagePolicy;
+  returns: ProofStagePolicy;
+};
+
+export type ProofStagePolicy = {
+  photosRequired: number;
+  videosRequired: number;
+  guidance: string[];
+  watermarkExample: string;
+};
+
 export type DisputeResolutionOption =
   | 'REDELIVER'
   | 'PARTIAL_REFUND'
@@ -525,6 +538,11 @@ export const uploadOrderProof = async (
   }
   formData.append('file', payload.file);
   const response = await http.post<ApiResponse<OrderProof>>(`/orders/${orderId}/proofs`, formData);
+  return response.data.data;
+};
+
+export const fetchProofPolicy = async (): Promise<ProofPolicySummary> => {
+  const response = await http.get<ApiResponse<ProofPolicySummary>>('/proof-policy');
   return response.data.data;
 };
 

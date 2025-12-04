@@ -4,6 +4,12 @@ import com.flexlease.common.exception.BusinessException;
 import com.flexlease.common.exception.ErrorCode;
 import com.flexlease.order.config.ProofStorageProperties;
 import jakarta.annotation.PostConstruct;
+import java.awt.AlphaComposite;
+import java.awt.Color;
+import java.awt.Font;
+import java.awt.FontMetrics;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.nio.file.Files;
@@ -18,6 +24,8 @@ import org.springframework.core.io.UrlResource;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
 
 @Component
 public class ProofStorageService {
@@ -90,6 +98,41 @@ public class ProofStorageService {
             Files.deleteIfExists(path);
         } catch (IOException ex) {
             LOG.warn("Failed to delete proof file {}: {}", fileName, ex.getMessage());
+        }
+    }
+
+    public void applyWatermark(String storedName, String contentType, String watermarkText) {
+        if (!StringUtils.hasText(storedName) || !StringUtils.hasText(watermarkText)) {
+            return;
+        }
+        if (contentType == null || (!contentType.startsWith("image/png") && !contentType.startsWith("image/jpeg"))) {
+            return;
+        }
+        Path path = rootLocation.resolve(storedName).normalize();
+        try {
+            if (!Files.exists(path)) {
+                return;
+            }
+            BufferedImage image = ImageIO.read(path.toFile());
+            if (image == null) {
+                return;
+            }
+            Graphics2D graphics = image.createGraphics();
+            graphics.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+            graphics.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.35f));
+            graphics.setColor(Color.WHITE);
+            int fontSize = Math.max(20, image.getWidth() / 25);
+            graphics.setFont(new Font(Font.SANS_SERIF, Font.BOLD, fontSize));
+            FontMetrics metrics = graphics.getFontMetrics();
+            int x = Math.max(10, image.getWidth() - metrics.stringWidth(watermarkText) - 20);
+            int y = Math.max(metrics.getHeight(), image.getHeight() - metrics.getDescent() - 20);
+            graphics.drawString(watermarkText, x, y);
+            graphics.dispose();
+            String extension = resolveExtension(storedName);
+            String format = "png".equals(extension) ? "png" : "jpg";
+            ImageIO.write(image, format, path.toFile());
+        } catch (IOException ex) {
+            LOG.warn("Failed to apply watermark to proof {}: {}", storedName, ex.getMessage());
         }
     }
 

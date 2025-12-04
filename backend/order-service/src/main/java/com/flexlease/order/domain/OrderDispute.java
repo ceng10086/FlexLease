@@ -95,6 +95,9 @@ public class OrderDispute {
     @Column(name = "appeal_count", nullable = false)
     private int appealCount;
 
+    @Column(name = "countdown_notified_at")
+    private OffsetDateTime countdownNotifiedAt;
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
@@ -240,6 +243,10 @@ public class OrderDispute {
         return updatedAt;
     }
 
+    public OffsetDateTime getCountdownNotifiedAt() {
+        return countdownNotifiedAt;
+    }
+
     public void recordResponse(OrderActorRole role,
                                UUID responderId,
                                DisputeResolutionOption option,
@@ -299,5 +306,13 @@ public class OrderDispute {
         this.adminDecisionBy = adminId;
         this.adminDecisionAt = OffsetDateTime.now();
         this.userCreditDelta = creditDelta;
+    }
+
+    public boolean markCountdownNotified() {
+        if (this.countdownNotifiedAt != null) {
+            return false;
+        }
+        this.countdownNotifiedAt = OffsetDateTime.now();
+        return true;
     }
 }

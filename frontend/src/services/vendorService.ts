@@ -77,3 +77,65 @@ export const rejectVendorApplication = async (
   const response = await http.post<ApiResponse<VendorApplication>>(`/vendors/applications/${id}/reject`, payload);
   return response.data.data;
 };
+
+export type Vendor = {
+  id: string;
+  ownerUserId: string;
+  companyName: string;
+  contactName: string;
+  contactPhone: string;
+  contactEmail?: string | null;
+  province?: string | null;
+  city?: string | null;
+  address?: string | null;
+  status: string;
+  commissionProfile?: VendorCommissionProfile | null;
+};
+
+export type VendorCommissionProfile = {
+  industryCategory: string;
+  baseRate: number;
+  creditTier: string;
+  slaScore: number;
+  commissionRate: number;
+};
+
+export const fetchVendor = async (vendorId: string): Promise<Vendor> => {
+  const response = await http.get<ApiResponse<Vendor>>(`/vendors/${vendorId}`);
+  return response.data.data;
+};
+
+export type ProductInquiry = {
+  id: string;
+  productId: string;
+  vendorId: string;
+  requesterId?: string | null;
+  contactName?: string | null;
+  contactMethod?: string | null;
+  message: string;
+  status: 'OPEN' | 'RESPONDED' | 'EXPIRED';
+  reply?: string | null;
+  expiresAt: string;
+  respondedAt?: string | null;
+  createdAt: string;
+};
+
+export const listVendorInquiries = async (
+  vendorId: string,
+  params?: { status?: ProductInquiry['status'] }
+): Promise<ProductInquiry[]> => {
+  const response = await http.get<ApiResponse<ProductInquiry[]>>(`/vendors/${vendorId}/inquiries`, { params });
+  return response.data.data;
+};
+
+export const replyVendorInquiry = async (
+  vendorId: string,
+  inquiryId: string,
+  reply: string
+): Promise<ProductInquiry> => {
+  const response = await http.post<ApiResponse<ProductInquiry>>(
+    `/vendors/${vendorId}/inquiries/${inquiryId}/reply`,
+    { reply }
+  );
+  return response.data.data;
+};

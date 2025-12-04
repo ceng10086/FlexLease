@@ -15,6 +15,9 @@ public record UserProfileResponse(
         String address,
         Integer creditScore,
         CreditTier creditTier,
+        boolean kycVerified,
+        OffsetDateTime kycVerifiedAt,
+        int paymentStreak,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt
 ) {

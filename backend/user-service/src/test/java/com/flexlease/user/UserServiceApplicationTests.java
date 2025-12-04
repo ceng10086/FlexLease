@@ -47,6 +47,9 @@ class UserServiceApplicationTests {
     @MockBean
     private com.flexlease.user.integration.AuthServiceClient authServiceClient;
 
+    @MockBean
+    private com.flexlease.user.integration.NotificationClient notificationClient;
+
     @Autowired
     private VendorRepository vendorRepository;
 
@@ -190,6 +193,8 @@ class UserServiceApplicationTests {
         assertThat(initialNode.at("/data/fullName").isNull()).isTrue();
         assertThat(initialNode.at("/data/creditScore").asInt()).isEqualTo(60);
         assertThat(initialNode.at("/data/creditTier").asText()).isEqualTo("STANDARD");
+        assertThat(initialNode.at("/data/kycVerified").asBoolean()).isFalse();
+        assertThat(initialNode.at("/data/paymentStreak").asInt()).isEqualTo(0);
 
         var updatePayload = java.util.Map.of(
             "fullName", "李四",
@@ -212,7 +217,8 @@ class UserServiceApplicationTests {
         assertThat(updateNode.at("/data/phone").asText()).isEqualTo("13800001111");
         assertThat(updateNode.at("/data/email").asText()).isEqualTo("lisi@example.com");
         assertThat(updateNode.at("/data/address").asText()).isEqualTo("北京市朝阳区望京");
-        assertThat(updateNode.at("/data/creditScore").asInt()).isEqualTo(60);
+        assertThat(updateNode.at("/data/creditScore").asInt()).isEqualTo(70);
+        assertThat(updateNode.at("/data/kycVerified").asBoolean()).isTrue();
     }
 
     @Test
@@ -232,6 +238,33 @@ class UserServiceApplicationTests {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(updatePayload)))
             .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void internalCreditEventEndpointUpdatesScore() throws Exception {
+        UUID userId = UUID.randomUUID();
+        String internalToken = TestJwtTokens.bearerToken(UUID.randomUUID(), "scheduler", "INTERNAL");
+
+        // ensure profile exists
+        mockMvc.perform(get("/api/v1/customers/profile")
+                .header(HttpHeaders.AUTHORIZATION, TestJwtTokens.bearerToken(userId, "user", "USER")))
+            .andExpect(status().isOk());
+
+        var eventPayload = java.util.Map.of(
+                "eventType", "LATE_PAYMENT",
+                "attributes", java.util.Map.of("orderNo", "O123456")
+        );
+
+        MvcResult result = mockMvc.perform(post("/api/v1/internal/users/" + userId + "/credit-events")
+                .header(HttpHeaders.AUTHORIZATION, internalToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(eventPayload)))
+            .andExpect(status().isOk())
+            .andReturn();
+
+        JsonNode node = readJson(result);
+        assertThat(node.at("/data/creditScore").asInt()).isEqualTo(52);
+        assertThat(node.at("/data/creditTier").asText()).isEqualTo("WARNING");
     }
 
     @Test

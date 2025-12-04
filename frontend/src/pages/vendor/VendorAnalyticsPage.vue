@@ -5,7 +5,7 @@
         <h2>运营指标</h2>
         <p class="page-header__meta">实时查看 GMV、活跃订单等核心指标，辅助库存与策略决策。</p>
       </div>
-      <a-button type="default" @click="loadMetrics(true)" :loading="loading">刷新</a-button>
+      <a-button type="default" @click="handleRefresh" :loading="loading">刷新</a-button>
     </div>
 
     <a-row :gutter="16">
@@ -30,6 +30,26 @@
         </a-card>
       </a-col>
     </a-row>
+
+    <a-card v-if="commissionProfile" class="mt-16">
+      <div class="commission-card">
+        <div>
+          <p class="commission-card__label">当前抽成</p>
+          <p class="commission-card__value">{{ formatRate(commissionProfile.commissionRate) }}</p>
+        </div>
+        <div>
+          <p class="commission-card__label">行业基准</p>
+          <p class="commission-card__value">{{ formatRate(commissionProfile.baseRate) }}</p>
+        </div>
+        <div>
+          <p class="commission-card__label">信用档位</p>
+          <p class="commission-card__value">{{ commissionProfile.creditTier }}</p>
+        </div>
+      </div>
+      <p class="insight">
+        基于行业 {{ commissionProfile.industryCategory }} 与 SLA/信用表现，平台自动调整抽成比例，可在结算中心查看计算明细。
+      </p>
+    </a-card>
 
     <a-row v-if="metrics" :gutter="16" class="mt-16">
       <a-col :xs="24" :lg="16">
@@ -102,9 +122,11 @@ import { useVendorContext } from '../../composables/useVendorContext';
 import { fetchVendorMetrics, type VendorMetrics } from '../../services/analyticsService';
 import TrendChart from '../../components/analytics/TrendChart.vue';
 import PlanBreakdownCard from '../../components/analytics/PlanBreakdownCard.vue';
+import { fetchVendor, type Vendor } from '../../services/vendorService';
 
 const loading = ref(false);
 const metrics = ref<VendorMetrics | null>(null);
+const vendorProfile = ref<Vendor | null>(null);
 const {
   vendorId: currentVendorId,
   vendorReady
@@ -195,6 +217,15 @@ const trendDelta = computed<TrendDelta | null>(() => {
   };
 });
 
+const commissionProfile = computed(() => vendorProfile.value?.commissionProfile ?? null);
+
+const formatRate = (value?: number | null) => {
+  if (value === null || value === undefined) {
+    return '—';
+  }
+  return `${(value * 100).toFixed(2)}%`;
+};
+
 const loadMetrics = async (notify = false) => {
   const vendorId = currentVendorId.value;
   if (!vendorId) {
@@ -215,13 +246,39 @@ const loadMetrics = async (notify = false) => {
   }
 };
 
+const loadVendorProfile = async (notify = false) => {
+  const vendorId = currentVendorId.value;
+  if (!vendorId) {
+    vendorProfile.value = null;
+    if (notify) {
+      message.warning('缺少厂商身份，请重新登录后重试');
+    }
+    return;
+  }
+  try {
+    vendorProfile.value = await fetchVendor(vendorId);
+  } catch (error) {
+    console.error('加载厂商资料失败', error);
+    if (notify) {
+      message.error('加载厂商资料失败，请稍后重试');
+    }
+  }
+};
+
+const handleRefresh = () => {
+  loadMetrics(true);
+  loadVendorProfile(true);
+};
+
 watch(
   vendorReady,
   (ready) => {
     if (ready) {
       loadMetrics();
+      loadVendorProfile();
     } else {
       metrics.value = null;
+      vendorProfile.value = null;
     }
   },
   { immediate: true }
@@ -274,5 +331,23 @@ watch(
   margin-left: 8px;
   font-weight: 400;
   color: #94a3b8;
+}
+
+.commission-card {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.commission-card__label {
+  color: #94a3b8;
+  margin-bottom: 4px;
+}
+
+.commission-card__value {
+  font-size: 20px;
+  font-weight: 600;
+  color: #0f172a;
 }
 </style>

@@ -55,6 +55,7 @@ import com.flexlease.order.repository.RentalOrderRepository;
 import jakarta.transaction.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.OffsetDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -86,6 +87,7 @@ public class RentalOrderService {
     private final ProductCatalogClient productCatalogClient;
     private final ObjectMapper objectMapper;
     private final CreditAssessmentService creditAssessmentService;
+    private final CreditRewardService creditRewardService;
     private final ProofPolicyProperties proofPolicyProperties;
 
     public RentalOrderService(RentalOrderRepository rentalOrderRepository,
@@ -100,6 +102,7 @@ public class RentalOrderService {
                               ProductCatalogClient productCatalogClient,
                               ObjectMapper objectMapper,
                               CreditAssessmentService creditAssessmentService,
+                              CreditRewardService creditRewardService,
                               ProofPolicyProperties proofPolicyProperties) {
         this.rentalOrderRepository = rentalOrderRepository;
         this.extensionRequestRepository = extensionRequestRepository;
@@ -113,6 +116,7 @@ public class RentalOrderService {
         this.productCatalogClient = productCatalogClient;
         this.objectMapper = objectMapper;
         this.creditAssessmentService = creditAssessmentService;
+        this.creditRewardService = creditRewardService;
         this.proofPolicyProperties = proofPolicyProperties;
     }
 
@@ -276,7 +280,10 @@ public class RentalOrderService {
         UUID transactionId = parseTransactionId(request.paymentReference());
         PaymentTransactionView transaction = paymentClient.loadTransaction(transactionId);
         ensurePaymentMatches(order, transaction, request);
-        finalizePayment(order, transaction, request.userId(), request.paymentReference(), request.paidAmount());
+        boolean finalized = finalizePayment(order, transaction, request.userId(), request.paymentReference(), request.paidAmount());
+        if (finalized) {
+            creditRewardService.rewardOnTimePayment(order);
+        }
         return assembler.toOrderResponse(order);
     }
 
@@ -293,7 +300,10 @@ public class RentalOrderService {
         PaymentTransactionView transaction = paymentClient.loadTransaction(transactionId);
         if (currentTransaction == null) {
             ensurePaymentMatches(order, transaction);
-            finalizePayment(order, transaction, transaction.userId(), transaction.transactionNo(), transaction.amount());
+            boolean finalized = finalizePayment(order, transaction, transaction.userId(), transaction.transactionNo(), transaction.amount());
+            if (finalized) {
+                creditRewardService.rewardOnTimePayment(order);
+            }
         } else {
             ensureSupplementalPayment(order, transaction);
             recordSupplementalPayment(order, transaction);
@@ -533,6 +543,7 @@ public class RentalOrderService {
         boolean inboundDone = false;
         BigDecimal refundedAmount = BigDecimal.ZERO;
         BigDecimal requestedRefundAmount = normalizeRefundAmount(order, request.refundAmount());
+        OffsetDateTime plannedLeaseEnd = order.getLeaseEndAt();
         try {
             if (!commands.isEmpty()) {
                 inventoryReservationClient.inbound(order.getId(), commands);
@@ -566,6 +577,7 @@ public class RentalOrderService {
                 request.vendorId(),
                 attributes);
         notifyUser(order, "退租已完成", "订单 %s 的退租已完成。".formatted(order.getOrderNo()));
+        creditRewardService.rewardEarlyReturn(order, plannedLeaseEnd);
         return assembler.toOrderResponse(order);
     }
 

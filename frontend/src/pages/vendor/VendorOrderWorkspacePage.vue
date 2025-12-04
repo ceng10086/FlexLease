@@ -234,6 +234,22 @@
 
           <a-divider />
           <h5>取证资料</h5>
+          <a-alert
+            v-if="shipmentGuidance"
+            type="info"
+            show-icon
+            class="mb-12 proof-guidance"
+          >
+            <template #message>
+              <div class="proof-guidance__title">发货取证指引</div>
+              <ul class="proof-guidance__list">
+                <li v-for="tip in shipmentGuidance.guidance" :key="tip">{{ tip }}</li>
+              </ul>
+              <p class="proof-guidance__meta">
+                建议照片 {{ shipmentGuidance.photosRequired }} 张、视频 {{ shipmentGuidance.videosRequired }} 段。
+              </p>
+            </template>
+          </a-alert>
           <div v-if="!proofList.length">
             <a-empty description="暂无取证资料" />
           </div>
@@ -478,7 +494,7 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, reactive, ref, watch } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { message, Modal } from 'ant-design-vue';
 import { useVendorContext } from '../../composables/useVendorContext';
 import {
@@ -491,6 +507,7 @@ import {
   decideOrderBuyout,
   postOrderMessage,
   uploadOrderProof,
+  fetchProofPolicy,
   createOrderDispute,
   respondOrderDispute,
   escalateOrderDispute,
@@ -504,7 +521,8 @@ import {
   type OrderProofType,
   type OrderDispute,
   type DisputeResolutionOption,
-  type OrderSurvey
+  type OrderSurvey,
+  type ProofPolicySummary
 } from '../../services/orderService';
 import {
   resolveItemDeposit,
@@ -558,6 +576,8 @@ const extensionDecisionForm = reactive({ remark: '', loading: false });
 const buyoutDecisionForm = reactive({ remark: '', loading: false });
 const contractDrawerOpen = ref(false);
 const conversationForm = reactive({ message: '', loading: false });
+const shipmentGuidance = computed(() => proofPolicy.value?.shipment ?? null);
+const proofPolicy = ref<ProofPolicySummary | null>(null);
 const proofForm = reactive({
   type: 'SHIPMENT' as OrderProofType,
   description: '',
@@ -1329,6 +1349,18 @@ watch(
   { immediate: true }
 );
 
+const loadProofPolicy = async () => {
+  try {
+    proofPolicy.value = await fetchProofPolicy();
+  } catch (error) {
+    console.warn('加载取证策略失败', error);
+  }
+};
+
+onMounted(() => {
+  loadProofPolicy();
+});
+
 watch(
   () => detail.open,
   (open) => {
@@ -1371,6 +1403,26 @@ watch(
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.proof-guidance__title {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.proof-guidance__list {
+  margin: 4px 0 8px 18px;
+  padding: 0;
+}
+
+.proof-guidance__list li {
+  line-height: 1.5;
+}
+
+.proof-guidance__meta {
+  margin: 0;
+  color: #475569;
+  font-size: 13px;
 }
 
 .proof-grid {

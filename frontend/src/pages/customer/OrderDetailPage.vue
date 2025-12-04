@@ -65,6 +65,22 @@
         </a-card>
 
         <a-card title="取证资料" class="mt-16">
+          <a-alert
+            v-if="proofGuidance"
+            type="info"
+            show-icon
+            class="mb-12 proof-guidance"
+          >
+            <template #message>
+              <div class="proof-guidance__title">{{ proofGuidance.title }}</div>
+              <ul class="proof-guidance__list">
+                <li v-for="tip in proofGuidance.policy.guidance" :key="tip">{{ tip }}</li>
+              </ul>
+              <p class="proof-guidance__meta">
+                建议照片 {{ proofGuidance.policy.photosRequired }} 张、视频 {{ proofGuidance.policy.videosRequired }} 段。
+              </p>
+            </template>
+          </a-alert>
           <template v-if="!proofList.length">
             <a-empty description="暂未上传取证资料" />
           </template>
@@ -432,7 +448,7 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, reactive, ref, watch } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { message, Modal } from 'ant-design-vue';
 import { useAuthStore } from '../../stores/auth';
@@ -444,6 +460,7 @@ import {
   applyOrderBuyout,
   postOrderMessage,
   uploadOrderProof,
+  fetchProofPolicy,
   createOrderDispute,
   respondOrderDispute,
   escalateOrderDispute,
@@ -455,7 +472,8 @@ import {
   type OrderProof,
   type OrderDispute,
   type DisputeResolutionOption,
-  type OrderSurvey
+  type OrderSurvey,
+  type ProofPolicySummary
 } from '../../services/orderService';
 import { initPayment, type PaymentSplitPayload } from '../../services/paymentService';
 import {
@@ -491,6 +509,7 @@ const returnForm = reactive({ reason: '', loading: false });
 const buyoutForm = reactive({ loading: false });
 const contractDrawerOpen = ref(false);
 const conversationForm = reactive({ message: '', loading: false });
+const proofPolicy = ref<ProofPolicySummary | null>(null);
 const proofForm = reactive({
   type: 'RECEIVE' as OrderProofType,
   description: '',
@@ -503,6 +522,19 @@ const returnProofForm = reactive({
   file: null as File | null,
   uploading: false,
   inputKey: Date.now()
+});
+
+const proofGuidance = computed(() => {
+  if (!proofPolicy.value) {
+    return null;
+  }
+  if (proofForm.type === 'RETURN') {
+    return { title: '退租取证指引', policy: proofPolicy.value.returns };
+  }
+  if (proofForm.type === 'RECEIVE') {
+    return { title: '收货取证指引', policy: proofPolicy.value.receive };
+  }
+  return null;
 });
 
 const disputeModal = reactive({
@@ -795,6 +827,10 @@ watch(
   { immediate: true }
 );
 
+onMounted(() => {
+  loadProofPolicy();
+});
+
 const loadOrder = async () => {
   loading.value = true;
   try {
@@ -805,6 +841,14 @@ const loadOrder = async () => {
     router.replace({ name: 'orders' });
   } finally {
     loading.value = false;
+  }
+};
+
+const loadProofPolicy = async () => {
+  try {
+    proofPolicy.value = await fetchProofPolicy();
+  } catch (error) {
+    console.warn('加载取证指引失败', error);
   }
 };
 
@@ -1336,6 +1380,26 @@ const handleContractSigned = async () => {
   margin-top: 8px;
   font-size: 12px;
   color: #64748b;
+}
+
+.proof-guidance__title {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.proof-guidance__list {
+  margin: 4px 0 8px 18px;
+  padding: 0;
+}
+
+.proof-guidance__list li {
+  line-height: 1.5;
+}
+
+.proof-guidance__meta {
+  margin: 0;
+  color: #475569;
+  font-size: 13px;
 }
 
 .order-guidance {

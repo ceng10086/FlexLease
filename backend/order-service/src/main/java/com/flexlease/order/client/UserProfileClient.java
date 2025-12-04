@@ -28,6 +28,9 @@ public class UserProfileClient {
     private static final ParameterizedTypeReference<ApiResponse<Map<String, Object>>> ADJUST_RESPONSE_TYPE =
             new ParameterizedTypeReference<>() {
             };
+    private static final ParameterizedTypeReference<ApiResponse<Map<String, Object>>> EVENT_RESPONSE_TYPE =
+            new ParameterizedTypeReference<>() {
+            };
 
     private final RestTemplate restTemplate;
     private final String baseUrl;
@@ -92,10 +95,36 @@ public class UserProfileClient {
         }
     }
 
+    public void recordCreditEvent(UUID userId, String eventType, Map<String, Object> attributes) {
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            if (internalToken != null && !internalToken.isBlank()) {
+                headers.set("X-Internal-Token", internalToken);
+            }
+            CreditEventPayload payload = new CreditEventPayload(eventType, attributes);
+            ResponseEntity<ApiResponse<Map<String, Object>>> response = restTemplate.exchange(
+                    baseUrl + "/internal/users/{userId}/credit-events",
+                    HttpMethod.POST,
+                    new HttpEntity<>(payload, headers),
+                    EVENT_RESPONSE_TYPE,
+                    userId
+            );
+            ApiResponse<Map<String, Object>> body = response.getBody();
+            if (body != null && body.code() != ErrorCode.SUCCESS.code()) {
+                throw new BusinessException(ErrorCode.INTERNAL_ERROR, "用户服务处理信用事件失败: " + body.message());
+            }
+        } catch (RestClientException ex) {
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "信用事件上报失败");
+        }
+    }
+
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record UserCreditView(UUID userId, Integer creditScore, CreditTier creditTier) {
     }
 
     private record CreditAdjustmentPayload(Integer delta, String reason) {
+    }
+
+    private record CreditEventPayload(String eventType, Map<String, Object> attributes) {
     }
 }

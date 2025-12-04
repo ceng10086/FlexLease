@@ -47,6 +47,18 @@ public class UserProfile {
     @Column(name = "credit_tier", nullable = false, length = 30)
     private CreditTier creditTier;
 
+    @Column(name = "kyc_verified", nullable = false)
+    private boolean kycVerified;
+
+    @Column(name = "kyc_verified_at")
+    private OffsetDateTime kycVerifiedAt;
+
+    @Column(name = "payment_streak", nullable = false)
+    private int paymentStreak;
+
+    @Column(name = "payment_streak_milestone", nullable = false)
+    private int paymentStreakMilestone;
+
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;
 
@@ -65,7 +77,11 @@ public class UserProfile {
                         String email,
                         String address,
                         Integer creditScore,
-                        CreditTier creditTier) {
+                        CreditTier creditTier,
+                        boolean kycVerified,
+                        OffsetDateTime kycVerifiedAt,
+                        int paymentStreak,
+                        int paymentStreakMilestone) {
         this.id = id;
         this.userId = userId;
         this.fullName = fullName;
@@ -75,6 +91,10 @@ public class UserProfile {
         this.address = address;
         this.creditScore = CreditTierRules.clampScore(creditScore);
         this.creditTier = creditTier == null ? CreditTierRules.tierForScore(this.creditScore) : creditTier;
+        this.kycVerified = kycVerified;
+        this.kycVerifiedAt = kycVerifiedAt;
+        this.paymentStreak = paymentStreak;
+        this.paymentStreakMilestone = paymentStreakMilestone;
     }
 
     public static UserProfile create(UUID userId) {
@@ -87,7 +107,11 @@ public class UserProfile {
                 null,
                 null,
                 CreditTierRules.defaultScore(),
-                CreditTier.STANDARD
+                CreditTier.STANDARD,
+                false,
+                null,
+                0,
+                0
         );
     }
 
@@ -147,6 +171,22 @@ public class UserProfile {
         return updatedAt;
     }
 
+    public boolean isKycVerified() {
+        return kycVerified;
+    }
+
+    public OffsetDateTime getKycVerifiedAt() {
+        return kycVerifiedAt;
+    }
+
+    public int getPaymentStreak() {
+        return paymentStreak;
+    }
+
+    public int getPaymentStreakMilestone() {
+        return paymentStreakMilestone;
+    }
+
     public void updateProfile(String fullName,
                               UserProfileGender gender,
                               String phone,
@@ -170,6 +210,36 @@ public class UserProfile {
 
     public void setCreditScore(int newScore) {
         setCreditScoreInternal(CreditTierRules.clampScore(newScore));
+    }
+
+    public boolean markKycVerified() {
+        if (this.kycVerified) {
+            return false;
+        }
+        this.kycVerified = true;
+        this.kycVerifiedAt = OffsetDateTime.now();
+        return true;
+    }
+
+    public int incrementPaymentStreak() {
+        this.paymentStreak = Math.max(0, this.paymentStreak) + 1;
+        return this.paymentStreak;
+    }
+
+    public void resetPaymentStreak() {
+        this.paymentStreak = 0;
+    }
+
+    public boolean advancePaymentMilestoneIfNeeded(int window) {
+        if (window <= 0) {
+            return false;
+        }
+        int currentMilestone = this.paymentStreak / window;
+        if (currentMilestone > this.paymentStreakMilestone) {
+            this.paymentStreakMilestone = currentMilestone;
+            return true;
+        }
+        return false;
     }
 
     private void setCreditScoreInternal(int newScore) {

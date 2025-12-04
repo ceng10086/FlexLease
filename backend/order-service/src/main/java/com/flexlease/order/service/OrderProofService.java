@@ -92,6 +92,7 @@ public class OrderProofService {
         OrderActorRole actorRole = resolveActorRole(order, actorId);
         ensureProofTypeAllowed(actorRole, proofType);
         StoredFile stored = proofStorageService.store(file);
+        proofStorageService.applyWatermark(stored.storedName(), stored.contentType(), "订单 " + order.getOrderNo());
         try {
             OrderProof proof = OrderProof.create(
                     proofType,

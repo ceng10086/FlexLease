@@ -23,6 +23,7 @@ import com.flexlease.order.dto.OrderDisputeResponseRequest;
 import com.flexlease.order.repository.OrderDisputeRepository;
 import com.flexlease.order.repository.RentalOrderRepository;
 import jakarta.transaction.Transactional;
+import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -49,6 +50,7 @@ public class OrderDisputeService {
     private final NotificationClient notificationClient;
     private final UserProfileClient userProfileClient;
     private final OrderSurveyService orderSurveyService;
+    private final CreditRewardService creditRewardService;
 
     public OrderDisputeService(RentalOrderRepository rentalOrderRepository,
                                OrderDisputeRepository orderDisputeRepository,
@@ -56,7 +58,8 @@ public class OrderDisputeService {
                                OrderTimelineService timelineService,
                                NotificationClient notificationClient,
                                UserProfileClient userProfileClient,
-                               OrderSurveyService orderSurveyService) {
+                               OrderSurveyService orderSurveyService,
+                               CreditRewardService creditRewardService) {
         this.rentalOrderRepository = rentalOrderRepository;
         this.orderDisputeRepository = orderDisputeRepository;
         this.orderAssembler = orderAssembler;
@@ -64,6 +67,7 @@ public class OrderDisputeService {
         this.notificationClient = notificationClient;
         this.userProfileClient = userProfileClient;
         this.orderSurveyService = orderSurveyService;
+        this.creditRewardService = creditRewardService;
     }
 
     public List<OrderDisputeResponse> list(UUID orderId) {
@@ -143,7 +147,9 @@ public class OrderDisputeService {
                         : "订单 %s 对方建议方案 %s，请及时处理。"
                                 .formatted(order.getOrderNo(), request.option().name()));
         if (request.accept()) {
+            creditRewardService.rewardFriendlyDispute(order, dispute);
             orderSurveyService.scheduleForDispute(order, dispute);
+            notifyResolutionTemplate(order, "协商达成一致", dispute.getId());
         }
         return orderAssembler.toDisputeResponse(dispute);
     }
@@ -243,6 +249,7 @@ public class OrderDisputeService {
             dispute,
             "纠纷裁决结果",
             "订单 %s 纠纷裁决：%s".formatted(order.getOrderNo(), summary));
+        notifyResolutionTemplate(order, summary, dispute.getId());
         orderSurveyService.scheduleForDispute(order, dispute);
         return orderAssembler.toDisputeResponse(dispute);
     }
@@ -278,6 +285,25 @@ public class OrderDisputeService {
             "纠纷自动进入仲裁",
             "订单 %s 因协商超时已自动升级平台仲裁，请关注仲裁通知。".formatted(order.getOrderNo()));
         return true;
+    }
+
+    public void sendCountdownReminder(UUID disputeId) {
+        OrderDispute dispute = orderDisputeRepository.findById(disputeId).orElse(null);
+        if (dispute == null || dispute.getStatus() != OrderDisputeStatus.OPEN || dispute.getDeadlineAt() == null) {
+            return;
+        }
+        if (!dispute.markCountdownNotified()) {
+            return;
+        }
+        orderDisputeRepository.save(dispute);
+        long hoursLeft = Math.max(1, Duration.between(OffsetDateTime.now(), dispute.getDeadlineAt()).toHours());
+        RentalOrder order = dispute.getOrder();
+        Map<String, Object> variables = Map.of(
+                "orderNo", order.getOrderNo(),
+                "hoursLeft", hoursLeft
+        );
+        sendTemplateNotification(order.getUserId(), "DISPUTE_COUNTDOWN", variables, dispute.getId().toString());
+        sendTemplateNotification(order.getVendorId(), "DISPUTE_COUNTDOWN", variables, dispute.getId().toString());
     }
 
     private String buildDecisionMessage(OrderDisputeResolveRequest request, Integer normalizedDelta) {
@@ -327,6 +353,36 @@ public class OrderDisputeService {
             notificationClient.send(request);
         } catch (RuntimeException ex) {
             LOG.warn("Failed to notify user {} of credit change: {}", order.getUserId(), ex.getMessage());
+        }
+    }
+
+    private void notifyResolutionTemplate(RentalOrder order, String summary, UUID disputeId) {
+        Map<String, Object> vars = Map.of(
+                "orderNo", order.getOrderNo(),
+                "result", summary
+        );
+        sendTemplateNotification(order.getUserId(), "DISPUTE_RESOLVED", vars, disputeId.toString());
+        sendTemplateNotification(order.getVendorId(), "DISPUTE_RESOLVED", vars, disputeId.toString());
+    }
+
+    private void sendTemplateNotification(UUID recipient,
+                                          String templateCode,
+                                          Map<String, Object> variables,
+                                          String reference) {
+        NotificationSendRequest request = new NotificationSendRequest(
+                templateCode,
+                NotificationChannel.IN_APP,
+                recipient.toString(),
+                null,
+                null,
+                variables,
+                DISPUTE_CONTEXT,
+                reference
+        );
+        try {
+            notificationClient.send(request);
+        } catch (RuntimeException ex) {
+            LOG.warn("Failed to send template {} for recipient {}: {}", templateCode, recipient, ex.getMessage());
         }
     }
 

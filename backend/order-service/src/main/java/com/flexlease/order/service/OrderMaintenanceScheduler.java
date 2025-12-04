@@ -30,6 +30,7 @@ public class OrderMaintenanceScheduler {
     private final InventoryReservationClient inventoryReservationClient;
     private final NotificationClient notificationClient;
     private final OrderEventPublisher orderEventPublisher;
+    private final CreditRewardService creditRewardService;
     private final OrderMaintenanceProperties properties;
     private final TransactionTemplate transactionTemplate;
 
@@ -37,12 +38,14 @@ public class OrderMaintenanceScheduler {
                                      InventoryReservationClient inventoryReservationClient,
                                      NotificationClient notificationClient,
                                      OrderEventPublisher orderEventPublisher,
+                                     CreditRewardService creditRewardService,
                                      OrderMaintenanceProperties properties,
                                      TransactionTemplate transactionTemplate) {
         this.rentalOrderRepository = rentalOrderRepository;
         this.inventoryReservationClient = inventoryReservationClient;
         this.notificationClient = notificationClient;
         this.orderEventPublisher = orderEventPublisher;
+        this.creditRewardService = creditRewardService;
         this.properties = properties;
         this.transactionTemplate = transactionTemplate;
     }
@@ -90,6 +93,7 @@ public class OrderMaintenanceScheduler {
         order.addEvent(event);
         orderEventPublisher.publish(order, OrderEventType.ORDER_CANCELLED, event.getDescription(), null, Map.of("reason", "PAYMENT_TIMEOUT"));
         rentalOrderRepository.save(order);
+        creditRewardService.penalizeLatePayment(order);
 
         if (!commands.isEmpty()) {
             try {

@@ -52,6 +52,7 @@
 | ---- | --- | ---- | ---- |
 | PATCH | `/internal/users/{userId}/status` | 更新指定账号状态 | 典型用例：厂商入驻审核通过后将账号从 `PENDING_REVIEW` 调整为 `ENABLED`；支持 `ENABLED`/`DISABLED`，请求体 `{ "status": "ENABLED" }` |
 | PATCH | `/internal/users/{userId}/vendor` | 绑定认证账号与厂商 ID | 审核通过后由用户服务调用，确保 JWT 与 `/auth/me` 返回 `vendorId`，请求体 `{ "vendorId": "UUID" }` |
+| POST | `/internal/users/{userId}/credit-events` | 记录信用事件，`eventType` 取值 `KYC_VERIFIED/ON_TIME_PAYMENT/EARLY_RETURN/LATE_PAYMENT/FRIENDLY_DISPUTE`，`attributes` 可携带 `orderNo/disputeId` 等上下文 | 仅 `INTERNAL` 角色可调用，用于触发信用分加减与站内信提醒 |
 
 ## 3. 用户 & 厂商管理（user-service）
 ### 3.1 厂商入驻
@@ -143,6 +144,13 @@
 
 > 请求需由内部服务发起并在 Header 附带 `X-Internal-Token`；接口会以数据库锁保证库存一致性，并在 `inventory_snapshot` 中记录流水。
 
+### 4.7 商品咨询
+| 方法 | URL | 角色 | 描述 | 请求/响应要点 |
+| ---- | --- | ---- | ---- | ------------- |
+| POST | `/catalog/products/{productId}/inquiries` | USER | 消费者在下单前提问，系统记录 72 小时有效的咨询 | `{ contactName?, contactMethod?, message }`，服务端自动带上 `requesterId` 并设置过期时间 |
+| GET | `/vendors/{vendorId}/inquiries` | VENDOR | 厂商查看咨询列表 | 支持 `status`（`OPEN/RESPONDED/EXPIRED`）过滤；返回数组包含 `reply/expiresAt` |
+| POST | `/vendors/{vendorId}/inquiries/{inquiryId}/reply` | VENDOR | 厂商回复咨询 | `{ reply }`，仅 `OPEN` 状态可回复，成功后触发通知 |
+
 ## 5. 订单与租赁流程（order-service，已实现）
 ### 5.1 下单与草稿
 | 方法 | URL | 描述 | 请求体要点 | 响应要点 |
@@ -198,6 +206,11 @@
 | PUT | `/cart/items/{itemId}` | 更新数量 | `{ userId, quantity }` | 数量需 ≥1 |
 | DELETE | `/cart/items/{itemId}` | 删除条目 | `userId`（query 参数） | - |
 | DELETE | `/cart` | 清空购物车 | `userId`（query 参数） | - |
+
+### 5.6 取证策略与指导
+| 方法 | URL | 描述 | 备注 |
+| ---- | --- | ---- | ---- |
+| GET | `/proof-policy` | 返回发货、收货、退租阶段的最小照片/视频数量、拍摄指引、水印示例 | 前端基于该接口在订单详情/履约抽屉动态展示提醒；配置来源于 `flexlease.order.proof-policy.*` |
 
 > 下单传入 `cartItemIds` 后端会自动加载并移除对应购物车条目，同时触发库存预占。
 

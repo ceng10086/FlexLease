@@ -2,6 +2,7 @@ package com.flexlease.order.service;
 
 import com.flexlease.order.domain.OrderDisputeStatus;
 import com.flexlease.order.repository.OrderDisputeRepository;
+import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Service;
 public class OrderDisputeMaintenanceScheduler {
 
     private static final Logger LOG = LoggerFactory.getLogger(OrderDisputeMaintenanceScheduler.class);
+    private static final Duration COUNTDOWN_WINDOW = Duration.ofHours(12);
 
     private final OrderDisputeRepository orderDisputeRepository;
     private final OrderDisputeService orderDisputeService;
@@ -26,6 +28,7 @@ public class OrderDisputeMaintenanceScheduler {
 
     @Scheduled(fixedDelayString = "${flexlease.order.dispute.scan-interval-ms:300000}")
     public void escalateOverdueDisputes() {
+        sendCountdownReminders();
         List<UUID> overdueIds = orderDisputeRepository.findIdsByStatusAndDeadlineAtBefore(
                 OrderDisputeStatus.OPEN,
                 OffsetDateTime.now()
@@ -36,5 +39,16 @@ public class OrderDisputeMaintenanceScheduler {
                 LOG.info("Auto escalated dispute {} due to timeout", id);
             }
         });
+    }
+
+    private void sendCountdownReminders() {
+        OffsetDateTime now = OffsetDateTime.now();
+        OffsetDateTime windowEnd = now.plus(COUNTDOWN_WINDOW);
+        List<UUID> ids = orderDisputeRepository.findIdsByStatusAndDeadlineBetween(
+                OrderDisputeStatus.OPEN,
+                now,
+                windowEnd
+        );
+        ids.forEach(orderDisputeService::sendCountdownReminder);
     }
 }

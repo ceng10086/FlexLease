@@ -31,6 +31,33 @@
           <p v-if="product.description">{{ product.description }}</p>
           <a-empty v-else description="暂无描述" />
         </a-card>
+
+        <a-card title="下单前咨询" class="mt-16">
+          <a-form layout="vertical">
+            <a-form-item label="您的称呼">
+              <a-input v-model:value="inquiryForm.contactName" placeholder="选填，便于厂商称呼您" />
+            </a-form-item>
+            <a-form-item label="联系方式">
+              <a-input v-model:value="inquiryForm.contactMethod" placeholder="邮箱/手机号（选填）" />
+            </a-form-item>
+            <a-form-item label="咨询内容" required>
+              <a-textarea
+                v-model:value="inquiryForm.message"
+                :rows="3"
+                maxlength="300"
+                show-count
+                placeholder="描述租赁场景、交付时间或特殊需求"
+              />
+            </a-form-item>
+            <a-alert
+              message="咨询会同步到厂商工作台，72 小时内有效，请勿填写敏感信息。"
+              type="info"
+              show-icon
+              class="mb-12"
+            />
+            <a-button type="primary" :loading="inquirySubmitting" @click="handleSubmitInquiry">发送咨询</a-button>
+          </a-form>
+        </a-card>
       </a-col>
       <a-col :xs="24" :lg="10">
         <a-card title="选择配置">
@@ -85,7 +112,7 @@ import { computed, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { message } from 'ant-design-vue';
 import dayjs, { type Dayjs } from 'dayjs';
-import { fetchCatalogProduct, type CatalogProductDetail } from '../../services/catalogService';
+import { fetchCatalogProduct, submitProductInquiry, type CatalogProductDetail } from '../../services/catalogService';
 import { addCartItem } from '../../services/cartService';
 import { useAuthStore } from '../../stores/auth';
 import { serializePlanSnapshot } from '../../utils/planSnapshot';
@@ -102,6 +129,7 @@ const currentProductId = ref<string | null>(typeof route.params.productId === 's
 
 const form = reactive<{ quantity: number; leaseStart?: Dayjs; leaseEnd?: Dayjs }>({ quantity: 1 });
 const addingToCart = ref(false);
+const inquirySubmitting = ref(false);
 
 const currentPlan = computed(() => product.value?.rentalPlans.find((plan) => plan.id === selectedPlanId.value));
 const currentSku = computed(() => currentPlan.value?.skus.find((sku) => sku.id === selectedSkuId.value));
@@ -117,6 +145,12 @@ const resetSelections = () => {
   form.leaseStart = undefined;
   form.leaseEnd = undefined;
 };
+
+const inquiryForm = reactive<{ contactName: string; contactMethod: string; message: string }>({
+  contactName: '',
+  contactMethod: '',
+  message: ''
+});
 
 const loadProduct = async (id: string) => {
   loading.value = true;
@@ -191,6 +225,36 @@ const handleAddToCart = async () => {
     message.error('加入购物车失败，请稍后重试');
   } finally {
     addingToCart.value = false;
+  }
+};
+
+const handleSubmitInquiry = async () => {
+  if (!auth.user?.id) {
+    message.error('请先登录后再咨询');
+    router.replace({ name: 'login', query: { redirect: route.fullPath } });
+    return;
+  }
+  if (!product.value) {
+    return;
+  }
+  if (!inquiryForm.message.trim()) {
+    message.warning('请填写咨询内容');
+    return;
+  }
+  inquirySubmitting.value = true;
+  try {
+    await submitProductInquiry(product.value.id, {
+      contactName: inquiryForm.contactName || undefined,
+      contactMethod: inquiryForm.contactMethod || undefined,
+      message: inquiryForm.message
+    });
+    message.success('已发送咨询，厂商会尽快回复');
+    inquiryForm.message = '';
+  } catch (error) {
+    console.error('发送咨询失败', error);
+    message.error('发送咨询失败，请稍后重试');
+  } finally {
+    inquirySubmitting.value = false;
   }
 };
 
