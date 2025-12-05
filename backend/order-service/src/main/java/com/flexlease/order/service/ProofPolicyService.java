@@ -28,8 +28,8 @@ public class ProofPolicyService {
                         "WATERMARK: 订单号 + 发货时间"
                 ),
                 new ProofStagePolicy(
-                        2,
-                        1,
+                        properties.getReceivePhotoRequired(),
+                        properties.getReceiveVideoRequired(),
                         List.of(
                                 "拆箱过程视频：保证运输过程未被替换",
                                 "签收页面或物流单据照片：标注签收人和时间"

@@ -399,12 +399,7 @@ public class RentalOrderService {
     public RentalOrderResponse confirmReceive(UUID orderId, OrderActorRequest request) {
         RentalOrder order = getOrderForUpdate(orderId);
         ensureUser(order, request.actorId());
-        boolean hasReceiveProof = order.getProofs().stream()
-            .anyMatch(proof -> proof.getProofType() == OrderProofType.RECEIVE
-                && proof.getActorRole() == OrderActorRole.USER);
-        if (!hasReceiveProof) {
-            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "请先上传收货凭证后再确认收货");
-        }
+        ensureReceiveProofBundle(order, request.actorId());
         try {
             order.confirmReceive();
         } catch (IllegalStateException ex) {
@@ -1422,6 +1417,31 @@ public class RentalOrderService {
                 .count();
         if (photoCount < minPhotos || videoCount < minVideos) {
             String message = "退租凭证不足，需至少上传 %d 张照片和 %d 段视频"
+                    .formatted(minPhotos, minVideos);
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, message);
+        }
+    }
+
+    private void ensureReceiveProofBundle(RentalOrder order, UUID userId) {
+        int minPhotos = Math.max(0, proofPolicyProperties.getReceivePhotoRequired());
+        int minVideos = Math.max(0, proofPolicyProperties.getReceiveVideoRequired());
+        if (minPhotos == 0 && minVideos == 0) {
+            return;
+        }
+        long photoCount = order.getProofs().stream()
+                .filter(proof -> proof.getProofType() == OrderProofType.RECEIVE)
+                .filter(proof -> proof.getActorRole() == OrderActorRole.USER)
+                .filter(proof -> userId == null || userId.equals(proof.getUploadedBy()))
+                .filter(this::isImageProof)
+                .count();
+        long videoCount = order.getProofs().stream()
+                .filter(proof -> proof.getProofType() == OrderProofType.RECEIVE)
+                .filter(proof -> proof.getActorRole() == OrderActorRole.USER)
+                .filter(proof -> userId == null || userId.equals(proof.getUploadedBy()))
+                .filter(this::isVideoProof)
+                .count();
+        if (photoCount < minPhotos || videoCount < minVideos) {
+            String message = "收货凭证不足，需至少上传 %d 张照片和 %d 段视频"
                     .formatted(minPhotos, minVideos);
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, message);
         }

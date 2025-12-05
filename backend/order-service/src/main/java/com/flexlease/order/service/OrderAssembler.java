@@ -27,12 +27,16 @@ public class OrderAssembler {
 
         private final int shipmentPhotoRequired;
         private final int shipmentVideoRequired;
+        private final int receivePhotoRequired;
+        private final int receiveVideoRequired;
         private final int returnPhotoRequired;
         private final int returnVideoRequired;
 
         public OrderAssembler(ProofPolicyProperties proofPolicyProperties) {
                 this.shipmentPhotoRequired = Math.max(0, proofPolicyProperties.getShipmentPhotoRequired());
                 this.shipmentVideoRequired = Math.max(0, proofPolicyProperties.getShipmentVideoRequired());
+                this.receivePhotoRequired = Math.max(0, proofPolicyProperties.getReceivePhotoRequired());
+                this.receiveVideoRequired = Math.max(0, proofPolicyProperties.getReceiveVideoRequired());
                 this.returnPhotoRequired = Math.max(0, proofPolicyProperties.getReturnPhotoRequired());
                 this.returnVideoRequired = Math.max(0, proofPolicyProperties.getReturnVideoRequired());
         }
@@ -90,6 +94,8 @@ public class OrderAssembler {
                         .toList(),
                 shipmentPhotoRequired,
                 shipmentVideoRequired,
+                receivePhotoRequired,
+                receiveVideoRequired,
                 returnPhotoRequired,
                 returnVideoRequired
         );

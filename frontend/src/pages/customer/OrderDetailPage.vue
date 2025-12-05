@@ -321,9 +321,14 @@
           >
             确认收到设备
           </a-button>
-          <p class="form-hint" v-if="!hasReceiveProof">
-            请先在“取证资料”卡片上传收货凭证（开箱视频/签收照片），系统会自动解锁确认按钮。
-          </p>
+          <a-alert
+            v-if="requiresReceiveProof"
+            type="info"
+            show-icon
+            class="mt-12"
+            :message="receiveProofHint"
+          />
+          <p class="form-hint" v-else>{{ receiveProofHint }}</p>
         </a-card>
 
         <a-card title="续租" class="mt-16">
@@ -669,9 +674,6 @@ const userSurveys = computed(() =>
 );
 const canCreateDispute = computed(() => !!order.value && order.value.userId === auth.user?.id);
 const proofList = computed(() => order.value?.proofs ?? []);
-const hasReceiveProof = computed(() =>
-  proofList.value.some((item) => item.proofType === 'RECEIVE' && item.actorRole === 'USER')
-);
 const proofMap = computed(() => {
   const map = new Map<string, OrderProof>();
   proofList.value.forEach((item) => map.set(item.id, item));
@@ -717,11 +719,42 @@ const returnProofHint = computed(() => {
   }
   return `需至少上传${returnRequirement.value.photos}张照片和${returnRequirement.value.videos}段视频（当前 ${returnProofStats.value.photos}/${returnRequirement.value.photos} 张、${returnProofStats.value.videos}/${returnRequirement.value.videos} 段）`;
 });
+const receiveRequirement = computed(() => ({
+  photos: order.value?.receivePhotoRequired ?? 0,
+  videos: order.value?.receiveVideoRequired ?? 0
+}));
+const requiresReceiveProof = computed(
+  () => receiveRequirement.value.photos > 0 || receiveRequirement.value.videos > 0
+);
+const receiveProofStats = computed(() => {
+  const proofs = proofList.value.filter(
+    (item) => item.proofType === 'RECEIVE' && item.actorRole === 'USER'
+  );
+  return {
+    photos: proofs.filter(isImageProof).length,
+    videos: proofs.filter(isVideoProof).length
+  };
+});
+const meetsReceiveProofRequirement = computed(() => {
+  if (!requiresReceiveProof.value) {
+    return true;
+  }
+  return (
+    receiveProofStats.value.photos >= receiveRequirement.value.photos &&
+    receiveProofStats.value.videos >= receiveRequirement.value.videos
+  );
+});
+const receiveProofHint = computed(() => {
+  if (!requiresReceiveProof.value) {
+    return '上传任意收货凭证后即可确认收货';
+  }
+  return `需至少上传${receiveRequirement.value.photos}张照片和${receiveRequirement.value.videos}段视频（当前 ${receiveProofStats.value.photos}/${receiveRequirement.value.photos} 张、${receiveProofStats.value.videos}/${receiveRequirement.value.videos} 段）`;
+});
 const canConfirmReceive = computed(() => {
   if (!order.value) {
     return false;
   }
-  return order.value.status === 'AWAITING_RECEIPT' && hasReceiveProof.value;
+  return order.value.status === 'AWAITING_RECEIPT' && meetsReceiveProofRequirement.value;
 });
 
 const disputeOptions: { label: string; value: DisputeResolutionOption }[] = [
@@ -998,8 +1031,8 @@ const handleCreatePayment = async () => {
 };
 
 const confirmReceive = () => {
-  if (!hasReceiveProof.value) {
-    message.warning('请先上传收货凭证后再确认收货');
+  if (!meetsReceiveProofRequirement.value) {
+    message.warning('请先补齐收货凭证后再确认收货');
     return;
   }
   Modal.confirm({

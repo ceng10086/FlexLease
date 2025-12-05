@@ -7,6 +7,8 @@ public class ProofPolicyProperties {
 
     private int shipmentPhotoRequired = 3;
     private int shipmentVideoRequired = 1;
+    private int receivePhotoRequired = 2;
+    private int receiveVideoRequired = 1;
     private int returnPhotoRequired = 2;
     private int returnVideoRequired = 1;
 
@@ -40,5 +42,21 @@ public class ProofPolicyProperties {
 
     public void setReturnVideoRequired(int returnVideoRequired) {
         this.returnVideoRequired = returnVideoRequired;
+    }
+
+    public int getReceivePhotoRequired() {
+        return receivePhotoRequired;
+    }
+
+    public void setReceivePhotoRequired(int receivePhotoRequired) {
+        this.receivePhotoRequired = receivePhotoRequired;
+    }
+
+    public int getReceiveVideoRequired() {
+        return receiveVideoRequired;
+    }
+
+    public void setReceiveVideoRequired(int receiveVideoRequired) {
+        this.receiveVideoRequired = receiveVideoRequired;
     }
 }

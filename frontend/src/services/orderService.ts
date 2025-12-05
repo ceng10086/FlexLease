@@ -365,6 +365,8 @@ export type RentalOrderDetail = {
   customerRemark?: string | null;
   shipmentPhotoRequired: number;
   shipmentVideoRequired: number;
+  receivePhotoRequired: number;
+  receiveVideoRequired: number;
   returnPhotoRequired: number;
   returnVideoRequired: number;
   createdAt: string;

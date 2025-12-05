@@ -224,15 +224,12 @@ class RentalOrderServiceIntegrationTest {
         assertThat(shipped.status()).isEqualTo(OrderStatus.AWAITING_RECEIPT);
         assertThat(shipped.shippingCarrier()).isEqualTo("SF");
 
-        try (SecurityContextHandle ignored = withPrincipal(userId, "customer", "USER")) {
-            MockMultipartFile receiveFile = new MockMultipartFile(
-                    "file",
-                    "receive.jpg",
-                    "image/jpeg",
-                    new byte[]{4, 5, 6}
-            );
-            orderProofService.upload(created.id(), userId, OrderProofType.RECEIVE, "收货取证", receiveFile);
-        }
+        assertThatThrownBy(() -> rentalOrderService.confirmReceive(created.id(),
+                new OrderActorRequest(userId)))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("收货凭证不足");
+
+        uploadReceiveProofBundle(created.id(), userId);
 
         RentalOrderResponse received = rentalOrderService.confirmReceive(created.id(),
                 new OrderActorRequest(userId));
@@ -1227,6 +1224,27 @@ class RentalOrderServiceIntegrationTest {
                                         new byte[]{7, 7, 7}
                         );
                         orderProofService.upload(orderId, userId, OrderProofType.RETURN, "退租视频", video);
+                }
+        }
+
+        private void uploadReceiveProofBundle(UUID orderId, UUID userId) {
+                try (SecurityContextHandle ignored = withPrincipal(userId, "customer", "USER")) {
+                        for (int i = 0; i < 2; i++) {
+                                MockMultipartFile photo = new MockMultipartFile(
+                                                "file",
+                                                "receive-%d.jpg".formatted(i + 1),
+                                                "image/jpeg",
+                                                new byte[]{(byte) (i + 7)}
+                                );
+                                orderProofService.upload(orderId, userId, OrderProofType.RECEIVE, "收货凭证" + (i + 1), photo);
+                        }
+                        MockMultipartFile video = new MockMultipartFile(
+                                        "file",
+                                        "receive-proof.mp4",
+                                        "video/mp4",
+                                        new byte[]{1, 2, 3}
+                        );
+                        orderProofService.upload(orderId, userId, OrderProofType.RECEIVE, "收货视频", video);
                 }
         }
 

@@ -41,6 +41,8 @@ public record RentalOrderResponse(
         List<OrderSurveyResponse> surveys,
         int shipmentPhotoRequired,
         int shipmentVideoRequired,
+        int receivePhotoRequired,
+        int receiveVideoRequired,
         int returnPhotoRequired,
         int returnVideoRequired
 ) {
