@@ -34,8 +34,9 @@ FlexLease 面向 B2C 场景，为厂商与消费者提供从入驻、商品配�
 - **厂商与用户**
   - 厂商入驻申请、管理员审核（自动回写认证中心并创建 vendor 资料）。
   - 厂商资料分页与状态管控、消费者档案（含管理员冻结）。
-  - `CreditEventService` 暴露 `/api/v1/internal/users/{id}/credit-events`，支持实名认证奖励、按时支付/提前归还奖励（连续履约达标额外 +5 分）、逾期惩罚、友好协商加分等自动信用事件，并同步站内信提示。
+  - `CreditEventService` 暴露 `/api/v1/internal/users/{id}/credit-events`，支持实名认证奖励、按时支付/提前归还奖励（连续履约达标额外 +5 分）、逾期惩罚、友好协商加分、恶意行为冻结等自动信用事件，并同步站内信提示；管理员亦可经 `/api/v1/admin/users/{id}/credit-adjustments` 人工干预信用分并记录原因。
   - `AccountUnfreezeScheduler` 每小时自动检查并解冻到期账号（恶意行为冻结 30 天后自动恢复），确保账号生命周期完整闭环。
+  - `VendorService` 为支付/订单服务提供 `/api/v1/internal/vendors/{id}/commission-profile` 内部接口与 `/vendors/{id}/commission-profile` 管理入口，管理员可直接维护行业基准费率、信用档位及最近一次 SLA 评分。
 - **商品域**
   - 商品 CRUD、租赁方案/租期/押金配置、SKU 库存流水（预占/释放/入库/出库）。
   - 商品提交→审核→上/下架，前台目录查询及媒体资源上传（本地文件系统托管）。
@@ -52,6 +53,7 @@ FlexLease 面向 B2C 场景，为厂商与消费者提供从入驻、商品配�
   - 满意度调研由 `OrderSurveyService` 定时激活 `/orders/{id}/surveys` 调查，支持双方打分与评价，并追加时间线+站内信提醒。
   - 平台/厂商运营指标、管理员强制关闭、待支付订单自动取消调度。
   - RabbitMQ 事件总线 + Notification-Service 异步告警。
+  - `VendorPerformanceService` 聚合发货准时率、纠纷友好解决率与取消率，并通过 `/api/v1/internal/vendors/{id}/performance-metrics` 暴露给用户服务，驱动 SLA 评分与抽成档位的自动调整。
 - **支付与结算**
   - 支付流水初始化、模拟自动确认与回调、手工确认、退款、押金/租金/买断分账。
   - 厂商结算汇总 API（按支付/退款时间窗口过滤），结算明细会携带 `commissionRate/platformCommissionAmount`，与 `users.vendor` 上的行业/信用/SLA 抽成配置联动。
@@ -66,6 +68,7 @@ FlexLease 面向 B2C 场景，为厂商与消费者提供从入驻、商品配�
   - 单点登录 + 多角色工作台：消费者覆盖商品目录/详情、购物车、结算、订单详情（含支付、续租/退租/买断、电子合同）与通知中心；厂商拥有商品/媒体工作台、库存流水、订单履约抽屉、运营指标与结算看板；管理员负责入驻审核、商品审核与订单监控（含合同预览、强制关闭）。
   - 仪表盘提供平台/厂商双视角 GMV、订单状态与 7 日趋势，同步呈现租赁模式构成、信用分布、纠纷态势与满意度调研待办，并暴露订单沟通/凭证/纠纷抽屉。
   - 商品详情页新增“下单前咨询”表单，可在 72 小时有效期内被厂商回复；订单详情/履约抽屉根据 `/proof-policy` 动态展示拍摄指引与水印示例，厂商指标/结算页面同步展示抽成基准与实时佣金。
+  - `ProfilePage` 在首次进入时自动触发档案创建，展示信用档位与冻结状态，并允许用户更新联系方式供通知/合同使用。
   - 纠纷面板可以直接上传图片/视频附件并记录电话纪要，消费者、厂商与管理员在抽屉内即可查看并下载所有取证材料。
   - 自动支付模拟、`useVendorContext` 厂商身份刷新、Ant Design Vue + Pinia + Vue Router 组合支撑桌面级交互，Playwright 覆盖仪表盘渲染。
 - **系统保障**
@@ -77,13 +80,13 @@ FlexLease 面向 B2C 场景，为厂商与消费者提供从入驻、商品配�
 ## 微服务实现要点
 
 - **auth-service**：`backend/auth-service/src/main/java/com/flexlease/auth/config/DataInitializer.java` 会根据 `flexlease.bootstrap.admin.*` 环境变量初始化管理员账号并写入 `ADMIN/VENDOR/USER` 三种角色，账号状态使用 `ENABLED/DISABLED/PENDING_REVIEW` 枚举，`/api/v1/internal/users/**` 以内置 `X-Internal-Token` 保护供其它服务启停账号或绑定 `vendorId`。
-- **user-service**：`VendorApplicationController` 支持厂商反复提交/查看申请，`VendorService` 统一维护 `users.vendor` 表，管理员在 `/vendors/applications/{id}/approve` 触发 `AuthServiceClient` 激活账号；`CustomerProfileController` 会在首次访问时自动建档，管理员可通过 `/admin/users/**` 远程调用认证服务冻结账号，同时 `CreditEventController` 面向内部服务开放 `/credit-events` 用于记录实名认证、按时支付、提前归还、友好协商、恶意行为（扣 30 分+冻结 30 天）等信用事件并推送提醒；`CommissionReviewScheduler` 季度自动评估厂商 SLA 并调整抽成档位。
+- **user-service**：`VendorApplicationController` 支持厂商反复提交/查看申请，`VendorService` 统一维护 `users.vendor` 表并暴露 `/api/v1/internal/vendors/{id}/commission-profile` 供支付服务读取抽成策略；管理员在 `/vendors/applications/{id}/approve` 触发 `AuthServiceClient` 激活账号。`CustomerProfileController` 会在首次访问时自动建档，管理员可通过 `/admin/users/**` 远程调用认证服务冻结账号，并在 `/api/v1/admin/users/{id}/credit-adjustments` 中记录人工信用调整。`CreditEventController` 面向内部服务开放 `/credit-events` 用于记录实名认证、按时支付、提前归还、友好协商、恶意行为（扣 30 分+冻结 30 天）等信用事件并推送提醒。`CommissionReviewScheduler` 定期调用订单服务 `/api/v1/internal/vendors/{id}/performance-metrics` 计算 SLA，并据此调整 `commissionCreditTier` 与通知厂商费率变化。
 - **product-service**：`VendorProductController` 暴露商品/方案/SKU 以及库存调整 API，`InventoryChangeType` 支持 `INBOUND/OUTBOUND/RESERVE/RELEASE`，并通过 `InventoryReservationService` 处理 `/api/v1/internal/inventory/reservations` 批量预占；`ProductMediaController` 以上传到 `FLEXLEASE_STORAGE_ROOT` 目录为中心，返回媒体的 `fileName/fileUrl/contentType/fileSize/sortOrder`；`ProductInquiryService` 用于处理消费者咨询、72 小时过期策略与厂商回复通知。
-- **order-service**：`RentalOrderService` 会读取 `product-service` Catalog 验证计划与 SKU，支持 `cartItemIds` 合并下单、生成 `OrderContract` 并同步 `order_event`、续租/退租/买断审批、押金自动退款以及 `CartService` 的访问控制；`OrderMaintenanceScheduler` 根据 `flexlease.order.maintenance.*` 周期取消 `PENDING_PAYMENT` 订单；`OrderAnalyticsService` 聚合平台与厂商指标供 `/analytics/**` 使用；`CreditRewardService` 负责调用 `/credit-events` 奖惩信用，`ProofPolicyController` 暴露多阶段凭证规范，`OrderDisputeMaintenanceScheduler` 则具备倒计时提醒与自动升级仲裁能力。
+- **order-service**：`RentalOrderService` 会读取 `product-service` Catalog 验证计划与 SKU，支持 `cartItemIds` 合并下单、生成 `OrderContract` 并同步 `order_event`、续租/退租/买断审批、押金自动退款以及 `CartService` 的访问控制；`OrderMaintenanceScheduler` 根据 `flexlease.order.maintenance.*` 周期取消 `PENDING_PAYMENT` 订单；`OrderAnalyticsService` 聚合平台与厂商指标供 `/analytics/**` 使用；`CreditRewardService` 负责调用 `/credit-events` 奖惩信用，`ProofPolicyController` 暴露多阶段凭证规范，`OrderDisputeMaintenanceScheduler` 则具备倒计时提醒与自动升级仲裁能力；`VendorPerformanceService` 将履约/纠纷/取消数据抽象为 SLA 指标并通过 `/api/v1/internal/vendors/{id}/performance-metrics` 提供给用户服务。
 - **payment-service**：`PaymentTransactionService` 结合 `IdempotencyService` 限制同一订单/场景只存在一条待支付流水，`flexlease.payment.auto-confirm` 为真时自动将状态切换为 `SUCCEEDED` 并调用 `order-service` `/internal/orders/{id}/payment-success`；退款通过 `PaymentClient.createRefund` 回流，结算接口会统计押金/租金/买断/违约金及退款窗口。
 - **notification-service**：开启 `flexlease.redis.enabled=true` 时通过 `NotificationTemplateProvider` + Spring Cache 缓存模板，`NotificationService` 根据角色自动收敛 `/notifications/logs` 查询范围，`OrderEventListener` 监听 `order.events.notification` 队列对厂商推送“新订单”站内信。
 - **gateway-service / registry-service**：Gateway 依据 `backend/gateway-service/src/main/resources/application.yml` 中的路由表把 `/api/v1/**` 映射到各微服务，Eureka 负责注册发现，所有服务默认以 `prefer-ip-address=true` 注册节点。
-- **frontend**：Vite + Vue 3 + Ant Design Vue。`pages/overview/OverviewPage.vue` 同时拉取 `/analytics/dashboard`、`/analytics/vendor/{id}`、`/notifications/logs` 与最新订单，消费者端通过 `CartPage.vue` + `autoCompleteInitialPayment` 与 `/payments/{orderId}/init` 形成“下单即付”的体验，厂商端通过 `useVendorContext` 读取登录会话中的 `vendorId`（若缺失请退出并重新登录），并新增 `ProductDetailPage` 咨询表单、`VendorProductWorkspace` 的咨询抽屉、订单详情中的凭证指引组件及厂商指标页的抽成洞察。
+- **frontend**：Vite + Vue 3 + Ant Design Vue。`pages/overview/OverviewPage.vue` 同时拉取 `/analytics/dashboard`、`/analytics/vendor/{id}`、`/notifications/logs` 与最新订单，消费者端通过 `CartPage.vue` + `autoCompleteInitialPayment` 与 `/payments/{orderId}/init` 形成“下单即付”的体验，厂商端通过 `useVendorContext` 读取登录会话中的 `vendorId`（若缺失请退出并重新登录），并新增 `ProductDetailPage` 咨询表单、`VendorProductWorkspace` 的咨询抽屉、订单详情中的凭证指引组件及厂商指标页的抽成洞察；`ProfilePage` 集成信用展示与资料编辑，与 user-service 的信用/冻结逻辑实时同步。
 
 ## 配置要点
 
@@ -153,6 +156,19 @@ docker compose up --build
 5. 在订单详情体验续租/退租/买断、支付回执与电子合同签署，并查看凭证卡片展示的 `/proof-policy` 拍摄指引与水印示例，同时打开通知中心验证 `/notifications/logs` 的最新日志。
 6. 切换到厂商角色，在订单履约抽屉中完成发货/审批，接着打开运营指标（含抽成洞察）与结算页面（若缺少 `vendorId`，请退出账号后重新登录）。
 7. 切换管理员查看订单监控列表、过滤条件与合同抽屉，并使用强制关闭演练补偿流程；如需纯 API 调试可导入 `docs/postman/cart-api.postman_collection.json`。
+
+## 辅助脚本
+
+- `scripts/dashboard-report.mjs`：调用 `/analytics/dashboard` 生成 Markdown 报表，默认写入 `reports/`。运行前请准备管理员或 INTERNAL 角色 token，并按需覆盖环境变量：
+
+  ```bash
+  FLEXLEASE_API_BASE=http://localhost:8080/api/v1 \
+  FLEXLEASE_API_TOKEN=<JWT> \
+  FLEXLEASE_REPORT_DIR=reports \
+  node scripts/dashboard-report.mjs
+  ```
+
+  报表会输出核心 GMV/订单指标、信用分布、纠纷耗时与满意度情况，可直接作为周报/复盘附件。
 
 ## 测试与质量
 

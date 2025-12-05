@@ -1,6 +1,38 @@
 # 数据库迁移说明
 
-- 采用 Flyway 进行数据库版本管理，初始版本为 `V000__create_schema.sql`。
-- 不同业务域分别维护独立的 PostgreSQL schema：`auth`、`user`、`product`、`order`、`payment`、`notification`。
-- 后续迁移文件命名规则：`V<版本号>__<描述>.sql`，版本号递增，三位填充，例如 `V001__create_user_tables.sql`。
-- 执行顺序由文件名决定，所有迁移脚本应幂等，并包含必要的回滚说明（如需）。
+FlexLease 采用 **Flyway + PostgreSQL** 管理多租户 schema。每个微服务在启动时都会校验/创建自身 schema 与表结构，根目录下的 `db/` 目录则用于集中存放示例脚本及跨服务协作时的基线设计。
+
+## 拆分策略
+
+- 业务域与 schema 一一对应：`auth`、`users`、`product`、`order`、`payment`、`notification`。
+- 所有主键使用 `UUID`，时间采用 `TIMESTAMP WITH TIME ZONE`，金额统一 `NUMERIC(18,2)`。
+- 公共 schema（如 `platform-common`）仅包含视图/序列，不直接建表。
+
+## 目录布局
+
+- `db/migration/<schema>/Vxxx__*.sql`：面向竞赛/文档的示例脚本，便于快速回顾当前 schema 的最新结构。
+- `backend/<service>/src/main/resources/db/migration`：服务内实际执行的 Flyway 脚本，包含 DDL、种子数据及热修复脚本。
+- 迁移命名规则：`V<版本号>__<描述>.sql`，版本号递增、三位补零，例如 `V003__add_order_dispute_tables.sql`。执行顺序完全由文件名决定。
+
+> 提交新特性时，请同时在对应服务的 `db/migration` 中新增脚本，并按需在根目录 `db/migration/<schema>` 下更新文档用示例，保证两侧结构一致。
+
+## 执行方式
+
+1. **服务启动自动迁移**：`backend/*-service` 的 `application.yml` 已开启 `spring.flyway.enabled=true`，本地/Compose 环境下拉起服务即会迁移。
+2. **手动迁移示例**（以 order-service 为例）：
+
+   ```bash
+   SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/flexlease \
+   SPRING_DATASOURCE_USERNAME=flexlease \
+   SPRING_DATASOURCE_PASSWORD=flexlease \
+   ./mvnw -pl backend/order-service -am flyway:migrate
+   ```
+
+   当需要在 CI 或独立数据库上执行迁移时，可通过上述方式显式运行。
+
+## 注意事项
+
+- 所有脚本需保持幂等（避免重复创建资源），必要时可补充数据修复语句。
+- 优先使用约束/索引命名规范：`idx_<table>_<column>`、`fk_<from>_<to>` 等，便于排查。
+- 对历史数据有破坏性的迁移请在脚本顶部写明背景与回滚方式，并在 PR 描述中同步。
+- 生成表结构示意或对外分享时，优先引用 `db/migration/` 中的脚本，以确保与代码实现一致。

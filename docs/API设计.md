@@ -52,7 +52,7 @@
 | ---- | --- | ---- | ---- |
 | PATCH | `/internal/users/{userId}/status` | 更新指定账号状态 | 典型用例：厂商入驻审核通过后将账号从 `PENDING_REVIEW` 调整为 `ENABLED`；支持 `ENABLED`/`DISABLED`，请求体 `{ "status": "ENABLED" }` |
 | PATCH | `/internal/users/{userId}/vendor` | 绑定认证账号与厂商 ID | 审核通过后由用户服务调用，确保 JWT 与 `/auth/me` 返回 `vendorId`，请求体 `{ "vendorId": "UUID" }` |
-| POST | `/internal/users/{userId}/credit-events` | 记录信用事件，`eventType` 取值 `KYC_VERIFIED/ON_TIME_PAYMENT/EARLY_RETURN/LATE_PAYMENT/FRIENDLY_DISPUTE`，`attributes` 可携带 `orderNo/disputeId` 等上下文 | 仅 `INTERNAL` 角色可调用，用于触发信用分加减与站内信提醒 |
+| POST | `/internal/users/{userId}/credit-events` | 记录信用事件，`eventType` 取值 `KYC_VERIFIED/ON_TIME_PAYMENT/EARLY_RETURN/LATE_PAYMENT/FRIENDLY_DISPUTE/MALICIOUS_BEHAVIOR`，`attributes` 可携带 `orderNo/disputeId/reason` 等上下文 | 仅 `INTERNAL` 角色可调用，用于触发信用分加减与站内信提醒，恶意行为会附带冻结信息 |
 
 ## 3. 用户 & 厂商管理（user-service）
 ### 3.1 厂商入驻
@@ -73,6 +73,7 @@
 | GET | `/vendors/{vendorId}` | ADMIN/VENDOR | 查看详情 | 返回公司资料、联系人、地址、状态等 |
 | PUT | `/vendors/{vendorId}` | VENDOR | 更新资料 | 请求体 `{ contactName, contactPhone, contactEmail?, province?, city?, address? }` |
 | POST | `/vendors/{vendorId}/suspend` | ADMIN | 更新厂商状态 | 请求体 `{ status }`，支持 `ACTIVE`/`SUSPENDED` |
+| PUT | `/vendors/{vendorId}/commission-profile` | ADMIN | 配置抽成策略（行业、基准费率、信用档位、SLA） | 请求体 `{ industryCategory, commissionBaseRate, commissionCreditTier, commissionSlaScore }` |
 
 > 厂商账号需携带 JWT 中的 `vendorId` 才能访问；当账号仍在审批或尚未重新登录导致令牌缺少 `vendorId` 时，仅申请人本人可以继续查看/更新该厂商资料，其它厂商成员会被拒绝。
 
@@ -83,8 +84,14 @@
 | PUT | `/customers/profile` | USER | 编辑个人资料 | 请求体 `{ fullName, gender, phone, email, address }`，`gender` 取值 `UNKNOWN/MALE/FEMALE` |
 | GET | `/admin/users` | ADMIN | 查询用户列表 | 支持 `keyword` 模糊搜索姓名，返回分页 |
 | PUT | `/admin/users/{userId}/status` | ADMIN | 启用/禁用用户 | 请求体 `{ status }`，通过认证服务内部接口生效 |
+| POST | `/admin/users/{userId}/credit-adjustments` | ADMIN | 管理员人工调整信用分 | `{ delta, reason }`，同时写入信用历史并下发通知 |
 
 > `/customers/profile` 在首次访问时会自动补建档案；`/admin/users/{userId}/status` 实际由 user-service 代为调用认证服务 `/api/v1/internal/users/{id}/status`，请求头需携带 `X-Internal-Token`。
+
+### 3.4 内部接口
+| 方法 | URL | 角色 | 描述 | 备注 |
+| ---- | --- | ---- | ---- | ---- |
+| GET | `/api/v1/internal/vendors/{vendorId}/commission-profile` | INTERNAL | 供支付/订单等服务读取厂商当前抽成配置 | 返回行业分类、基准费率、信用档、最近一次 SLA 评分等字段，调用方根据该信息计算 `commissionRate` |
 
 ## 4. 商品与租赁方案（product-service）
 ### 4.1 商品管理（B 端）
@@ -244,6 +251,11 @@
 
 > `OrderSurveyScheduler` 会根据 `flexlease.order.survey.*` 定时激活状态为 `PENDING` 的调查并发送邀请，问卷完成后附加时间线事件与感谢通知。
 
+### 5.9 内部数据接口
+| 方法 | URL | 角色 | 描述 | 响应要点 |
+| ---- | --- | ---- | ---- | -------- |
+| GET | `/api/v1/internal/vendors/{vendorId}/performance-metrics` | INTERNAL | user-service 读取厂商履约指标（SLA 计算） | `onTimeShipmentRate`、`totalDisputes`、`friendlyDisputes`、`cancellationRate`；返回 0~1 的比率值 |
+
 ## 6. 支付与结算（payment-service）
 > 枚举说明：`scene` 取值 `DEPOSIT`/`RENT`/`BUYOUT`/`PENALTY`；`channel` 取值 `MOCK`/`ALIPAY`/`WECHAT`/`BANK_TRANSFER`；`status` 取值 `PENDING`/`SUCCEEDED`/`FAILED`。
 
@@ -266,10 +278,10 @@
 | 方法 | URL | 描述 | 请求体要点 | 响应 |
 | ---- | --- | ---- | -------- | ---- |
 | POST | `/notifications/send` | 发送单条通知，支持模板渲染或自定义内容 | `{ templateCode?, channel?, recipient, subject?, content?, variables? }`<br>当 `templateCode` 指定时，可省略 `channel/subject/content`，系统按模板渲染；`variables` 为键值对用于替换 `{{key}}` 占位符。 | `NotificationLogResponse`（包含通知 ID、渠道、状态、发送时间等）|
-| GET | `/notifications/logs` | 查询最近 50 条通知记录，可按状态/接收方过滤 | `status?=PENDING|SENT|FAILED`、`recipient?=<userId/vendorId>` | `List<NotificationLogResponse>` |
+| GET | `/notifications/logs` | 查询最近 50 条通知记录，可按状态/接收方/上下文过滤 | `status?=PENDING|SENT|FAILED`、`recipient?=<userId/vendorId>`、`contextType?`、`channel?` | `List<NotificationLogResponse>` |
 | GET | `/notifications/templates` | 查看系统内置模板 | - | `List<NotificationTemplateResponse>` |
 
-> 目前通知发送为模拟实现：若渠道为 `EMAIL` 且收件人不为合法邮箱格式，将返回校验错误；其它渠道默认视为发送成功并写入通知日志。`/notifications/logs` 会根据当前角色自动收敛可见范围——消费者仅能查看自身 `userId`，厂商仅能查看其 `vendorId`，管理员/内部可查看任何 `recipient` 或省略参数获取全局 Top 50。
+> 目前通知发送为模拟实现：若渠道为 `EMAIL` 且收件人不为合法邮箱格式，将返回校验错误；其它渠道默认视为发送成功并写入通知日志。`/notifications/logs` 会根据当前角色自动收敛可见范围——消费者仅能查看自身 `userId`，厂商仅能查看其 `vendorId`，管理员/内部可查看任何 `recipient` 或省略参数获取全局 Top 50。可结合 `contextType`（如 `DISPUTE`、`CREDIT`）与 `channel` 精确过滤。
 
 > 说明：运营指标接口实际由订单服务提供，仍透出在 `/api/v1/analytics/**` 路径下，网关/前端需路由至 `order-service`。
 

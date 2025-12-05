@@ -8,6 +8,7 @@
 - 🛒 商品目录 & 购物车：`CatalogPage`、`ProductDetailPage`、`CartPage` 与 `CheckoutPage` 直连 `/catalog/products`、`/cart`、`/orders/preview`，支持多方案对比、购物车合并及结算预估。
 - 📃 订单详情与合同：`OrdersPage` 与 `OrderDetailPage` 统一展示订单、合同抽屉和续租/退租/买断/确认收货等操作，自动刷新 `/orders/{id}` 与 `/orders/{id}/contract`。
 - 🔔 通知中心：`NotificationCenterPage` 调用 `/notifications/logs` 显示时间轴，便于验证订单事件与手动发送的站内信。
+- 👤 个人资料：`ProfilePage` 首次访问即触发 `/customers/profile` 建档，展示信用档位/冻结状态并允许修改姓名、联系方式与地址，保存后实时同步 user-service。
 - 🧾 厂商工作台：`VendorProductWorkspacePage`、`components/vendor` 抽屉支持商品/方案/SKU CRU、库存调整与媒体上传，配合 `/vendors/{vendorId}/products/**`。
 - 🚚 厂商履约 & 结算：`VendorOrderWorkspacePage` 提供发货、续租/退租/买断审批表单，`VendorAnalyticsPage`、`VendorSettlementPage` 调用 `/analytics/vendor/{id}` 与 `/payments/settlements`，依赖登录会话中的 `vendorId`（缺少时需重新登录）。
 - 🛂 管理员运营：`AdminVendorReviewPage` 与 `AdminProductReviewPage` 审核入驻/商品；`AdminOrderMonitorPage` 具备过滤、抽屉详情、电子合同预览与 `/admin/orders/{id}/force-close` 按钮。
