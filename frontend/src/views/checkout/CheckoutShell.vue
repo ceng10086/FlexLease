@@ -259,7 +259,16 @@ const handleCreate = async () => {
       cartItemIds: cartItemIds.value
     };
     const order = await createOrder(payload as any, { idempotencyKey });
-    await autoCompleteInitialPayment(order);
+    await autoCompleteInitialPayment({
+      orderId: order.id,
+      vendorId: order.vendorId,
+      userId: order.userId,
+      amount: order.totalAmount,
+      depositAmount: order.depositAmount,
+      rentAmount: order.rentAmount,
+      buyoutAmount: order.buyoutAmount ?? undefined,
+      description: '订单首付款'
+    });
     message.success('订单创建成功，正在跳转');
     router.replace({ name: 'order-overview', params: { orderId: order.id } });
   } catch (error) {

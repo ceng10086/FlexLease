@@ -17,7 +17,7 @@ import { useRouter } from 'vue-router';
 const router = useRouter();
 
 const goHome = () => {
-  router.replace({ name: 'overview' });
+  router.replace({ name: 'dashboard' });
 };
 
 const goLogin = () => {

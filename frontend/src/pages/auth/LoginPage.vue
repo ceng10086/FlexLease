@@ -70,7 +70,7 @@ const form = reactive({
   password: ''
 });
 
-const targetPath = () => (route.query.redirect as string) || '/app/overview';
+const targetPath = () => (route.query.redirect as string) || '/app/dashboard';
 
 const handleSubmit = async () => {
   try {

@@ -29,6 +29,15 @@
         @buyout="showBuyoutModal = true"
         @chat="goChat"
       />
+      <div class="contract-entry">
+        <div>
+          <p>电子合同 · 已同步订单条款</p>
+          <small>签署完成后会写入时间线并触发通知</small>
+        </div>
+        <a-button type="link" size="small" @click="showContractDrawer = true">
+          查看 / 签署
+        </a-button>
+      </div>
     </PageSection>
 
     <PageSection title="物流 / 履约">
@@ -102,6 +111,16 @@
       </a-form-item>
     </a-form>
   </a-modal>
+
+  <OrderContractDrawer
+    v-if="order"
+    v-model:open="showContractDrawer"
+    :order-id="order.id"
+    :user-id="auth.user?.id ?? null"
+    :allow-sign="order.userId === auth.user?.id"
+    :default-signature="defaultSignature"
+    @signed="handleContractSigned"
+  />
 </template>
 
 <script lang="ts" setup>
@@ -111,6 +130,7 @@ import { message, Modal } from 'ant-design-vue';
 import PageSection from '../../../components/layout/PageSection.vue';
 import OrderProgressPill from '../../../components/orders/OrderProgressPill.vue';
 import OrderActionBar from '../../../components/orders/OrderActionBar.vue';
+import OrderContractDrawer from '../../../components/orders/OrderContractDrawer.vue';
 import { useOrderDetail } from '../../../composables/useOrderDetail';
 import { useAuthStore } from '../../../stores/auth';
 import {
@@ -128,6 +148,8 @@ const { order: getOrder, updateOrder, refresh } = useOrderDetail();
 const auth = useAuthStore();
 const router = useRouter();
 const order = computed(() => getOrder());
+const showContractDrawer = ref(false);
+const defaultSignature = computed(() => auth.user?.username ?? '');
 
 const showExtendModal = ref(false);
 const showReturnModal = ref(false);
@@ -269,6 +291,10 @@ const handleBuyout = async () => {
 const goChat = () => {
   router.push({ name: 'order-chat', params: { orderId: order.value?.id } });
 };
+
+const handleContractSigned = async () => {
+  await refresh();
+};
 </script>
 
 <style scoped>
@@ -295,5 +321,20 @@ const goChat = () => {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: var(--space-3);
+}
+
+.contract-entry {
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  background: var(--color-surface-muted);
+  border-radius: var(--radius-card);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.contract-entry small {
+  color: var(--color-text-secondary);
 }
 </style>
