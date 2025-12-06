@@ -8,7 +8,7 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      redirect: '/app/overview'
+      redirect: '/app/dashboard'
     },
     {
       path: '/login',
@@ -28,106 +28,146 @@ const router = createRouter({
       meta: { requiresAuth: true },
       children: [
         {
-          path: 'overview',
-          name: 'overview',
-          component: () => import('../pages/overview/OverviewPage.vue'),
-          meta: { navKey: 'overview' }
+          path: 'dashboard',
+          name: 'dashboard',
+          component: () => import('../views/dashboard/DashboardHome.vue'),
+          meta: { navKey: 'dashboard-home' }
         },
         {
           path: 'catalog',
-          name: 'catalog',
-          component: () => import('../pages/customer/CatalogPage.vue'),
-          meta: { navKey: 'catalog', roles: ['USER'] }
-        },
-        {
-          path: 'cart',
-          name: 'cart',
-          component: () => import('../pages/customer/CartPage.vue'),
-          meta: { navKey: 'cart', roles: ['USER'] }
+          name: 'catalog-feed',
+          component: () => import('../views/catalog/ProductFeedView.vue'),
+          meta: { navKey: 'catalog-feed', roles: ['USER'] }
         },
         {
           path: 'catalog/:productId',
           name: 'catalog-product',
-          component: () => import('../pages/customer/ProductDetailPage.vue'),
-          meta: { navKey: 'catalog', roles: ['USER'] }
+          component: () => import('../views/catalog/ProductDetailShell.vue'),
+          meta: { navKey: 'catalog-feed', roles: ['USER'] }
         },
         {
           path: 'checkout',
           name: 'checkout',
-          component: () => import('../pages/customer/CheckoutPage.vue'),
-          meta: { navKey: 'catalog', roles: ['USER'] }
+          component: () => import('../views/checkout/CheckoutShell.vue'),
+          meta: { navKey: 'checkout-flow', roles: ['USER'] }
+        },
+        {
+          path: 'cart',
+          name: 'cart',
+          component: () => import('../views/checkout/CartBoardView.vue'),
+          meta: { navKey: 'checkout-flow', roles: ['USER'] }
         },
         {
           path: 'orders',
           name: 'orders',
-          component: () => import('../pages/customer/OrdersPage.vue'),
-          meta: { navKey: 'orders', roles: ['USER'] }
+          component: () => import('../views/orders/OrderHubView.vue'),
+          meta: { navKey: 'order-hub', roles: ['USER'] }
+        },
+        {
+          path: 'orders/chat-center',
+          name: 'order-chat-center',
+          component: () => import('../views/orders/OrderConversationHubView.vue'),
+          meta: { navKey: 'order-chat-center', roles: ['USER'] }
+        },
+        {
+          path: 'orders/:orderId',
+          component: () => import('../views/orders/detail/OrderDetailShell.vue'),
+          meta: { navKey: 'order-hub', roles: ['USER'] },
+          children: [
+            {
+              path: '',
+              redirect: { name: 'order-overview' }
+            },
+            {
+              path: 'overview',
+              name: 'order-overview',
+              component: () => import('../views/orders/detail/OrderOverviewView.vue'),
+              meta: { navKey: 'order-hub', roles: ['USER'] }
+            },
+            {
+              path: 'chat',
+              name: 'order-chat',
+              component: () => import('../views/orders/detail/OrderChatView.vue'),
+              meta: { navKey: 'order-hub', roles: ['USER'] }
+            },
+            {
+              path: 'proofs',
+              name: 'order-proofs',
+              component: () => import('../views/orders/detail/OrderProofView.vue'),
+              meta: { navKey: 'order-hub', roles: ['USER'] }
+            },
+            {
+              path: 'timeline',
+              name: 'order-timeline',
+              component: () => import('../views/orders/detail/OrderTimelineView.vue'),
+              meta: { navKey: 'order-hub', roles: ['USER'] }
+            }
+          ]
         },
         {
           path: 'profile',
           name: 'profile',
-          component: () => import('../pages/customer/ProfilePage.vue'),
+          component: () => import('../views/profile/ProfileOverviewView.vue'),
           meta: { navKey: 'profile', roles: ['USER', 'ADMIN'] }
-        },
-        {
-          path: 'orders/:orderId',
-          name: 'order-detail',
-          component: () => import('../pages/customer/OrderDetailPage.vue'),
-          meta: { navKey: 'orders', roles: ['USER'] }
         },
         {
           path: 'notifications',
           name: 'notifications',
-          component: () => import('../pages/customer/NotificationCenterPage.vue'),
-          meta: { navKey: 'notifications' }
+          component: () => import('../views/notifications/NotificationCenterView.vue'),
+          meta: { navKey: 'notifications-center' }
         },
         {
-          path: 'admin/vendor-review',
-          name: 'admin-vendor-review',
-          component: () => import('../pages/admin/AdminVendorReviewPage.vue'),
-          meta: { roles: ['ADMIN'], navKey: 'admin-vendor-review' }
-        },
-        {
-          path: 'admin/product-review',
-          name: 'admin-product-review',
-          component: () => import('../pages/admin/AdminProductReviewPage.vue'),
-          meta: { roles: ['ADMIN'], navKey: 'admin-product-review' }
+          path: 'admin/review',
+          name: 'admin-review',
+          component: () => import('../views/admin/AdminReviewSuiteView.vue'),
+          meta: { roles: ['ADMIN'], navKey: 'admin-review' }
         },
         {
           path: 'admin/orders',
           name: 'admin-orders',
-          component: () => import('../pages/admin/AdminOrderMonitorPage.vue'),
+          component: () => import('../views/admin/AdminOrderMonitorView.vue'),
           meta: { roles: ['ADMIN'], navKey: 'admin-orders' }
         },
         {
           path: 'vendor/onboarding',
           name: 'vendor-onboarding',
-          component: () => import('../pages/vendor/VendorOnboardingPage.vue'),
+          component: () => import('../views/vendor/onboarding/VendorOnboardingView.vue'),
           meta: { roles: ['VENDOR'], navKey: 'vendor-onboarding' }
         },
         {
-          path: 'vendor/products',
-          name: 'vendor-products',
-          component: () => import('../pages/vendor/VendorProductWorkspacePage.vue'),
-          meta: { roles: ['VENDOR'], navKey: 'vendor-products' }
-        },
-        {
-          path: 'vendor/orders',
-          name: 'vendor-orders',
-          component: () => import('../pages/vendor/VendorOrderWorkspacePage.vue'),
-          meta: { roles: ['VENDOR'], navKey: 'vendor-orders' }
-        },
-        {
-          path: 'vendor/analytics',
-          name: 'vendor-analytics',
-          component: () => import('../pages/vendor/VendorAnalyticsPage.vue'),
-          meta: { roles: ['VENDOR'], navKey: 'vendor-analytics' }
-        },
-        {
-          path: 'vendor/settlements',
-          name: 'vendor-settlements',
-          component: () => import('../pages/vendor/VendorSettlementPage.vue'),
-          meta: { roles: ['VENDOR'], navKey: 'vendor-settlements' }
+          path: 'vendor/workbench',
+          component: () => import('../views/vendor/workbench/VendorWorkbenchLayout.vue'),
+          meta: { roles: ['VENDOR'] },
+          children: [
+            {
+              path: '',
+              redirect: { name: 'vendor-workbench-products' }
+            },
+            {
+              path: 'products',
+              name: 'vendor-workbench-products',
+              component: () => import('../views/vendor/workbench/ProductBoardView.vue'),
+              meta: { roles: ['VENDOR'], navKey: 'vendor-products' }
+            },
+            {
+              path: 'fulfillment',
+              name: 'vendor-workbench-fulfillment',
+              component: () => import('../views/vendor/workbench/FulfillmentBoardView.vue'),
+              meta: { roles: ['VENDOR'], navKey: 'vendor-fulfillment' }
+            },
+            {
+              path: 'insights',
+              name: 'vendor-workbench-insights',
+              component: () => import('../views/vendor/workbench/InsightsBoardView.vue'),
+              meta: { roles: ['VENDOR'], navKey: 'vendor-insights' }
+            },
+            {
+              path: 'settlement',
+              name: 'vendor-workbench-settlement',
+              component: () => import('../views/vendor/workbench/SettlementBoardView.vue'),
+              meta: { roles: ['VENDOR'], navKey: 'vendor-settlement' }
+            }
+          ]
         }
       ]
     },
@@ -149,7 +189,7 @@ router.beforeEach(async (to: RouteLocationNormalized) => {
 
   if (to.meta.public) {
     if (auth.isAuthenticated && (to.name === 'login' || to.name === 'register')) {
-      return { path: '/app/overview' };
+      return { path: '/app/dashboard' };
     }
     return true;
   }
@@ -163,7 +203,7 @@ router.beforeEach(async (to: RouteLocationNormalized) => {
   if (requiredRoles && requiredRoles.length > 0) {
     const allowed = requiredRoles.some((role) => auth.hasRole(role));
     if (!allowed) {
-      return { path: '/app/overview' };
+      return { path: '/app/dashboard' };
     }
   }
 

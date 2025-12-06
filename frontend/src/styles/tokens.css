@@ -1,0 +1,49 @@
+:root {
+  --color-primary: #2563eb;
+  --color-primary-strong: #1d4ed8;
+  --color-primary-muted: #dbeafe;
+  --color-accent: #ff8a00;
+  --color-success: #10b981;
+  --color-danger: #f43f5e;
+  --color-warning: #f97316;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f7f7f5;
+  --color-surface-card: #ffffff;
+  --color-border: #e2e8f0;
+  --color-border-strong: #cbd5f5;
+  --color-text: #1f2937;
+  --color-text-secondary: #64748b;
+  --color-text-muted: #94a3b8;
+
+  --font-stack: 'Inter', 'PingFang SC', 'Microsoft YaHei', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-size-base: 14px;
+  --font-size-caption: 12px;
+  --font-size-title-md: 18px;
+  --font-size-title-lg: 20px;
+  --font-size-title-xl: 24px;
+
+  --radius-card: 16px;
+  --radius-pill: 999px;
+  --radius-action: 12px;
+
+  --shadow-card: 0 8px 24px rgba(15, 23, 42, 0.08);
+  --shadow-float: 0 18px 40px rgba(15, 23, 42, 0.12);
+
+  --layout-max-width: 1200px;
+  --layout-padding: clamp(16px, 4vw, 32px);
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: light;
+  }
+}

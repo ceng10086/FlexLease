@@ -11,15 +11,15 @@ const theme = computed(() => ({
   token: {
     colorPrimary: '#2563eb',
     colorInfo: '#2563eb',
-    colorSuccess: '#16a34a',
-    colorWarning: '#f97316',
-    colorError: '#dc2626',
-    colorBgLayout: '#eef2ff',
+    colorSuccess: '#10b981',
+    colorWarning: '#ff8a00',
+    colorError: '#f43f5e',
+    colorBgLayout: '#f7f7f5',
     colorBgContainer: '#ffffff',
-    fontFamily: `'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif`,
+    fontFamily: `var(--font-stack)`,
+    fontSize: 14,
     borderRadius: 10,
     borderRadiusLG: 16,
-    fontSize: 14,
     controlHeightLG: 44
   }
 }));
