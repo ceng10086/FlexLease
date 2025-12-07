@@ -20,7 +20,10 @@ const sending = ref(false);
 
 const chatEvents = computed(() => {
   const target = getOrder()?.events ?? [];
-  return target.filter((event) => event.eventType?.toUpperCase().includes('MESSAGE'));
+  return target.filter((event) => {
+    const type = event.eventType?.toUpperCase() ?? '';
+    return type.includes('MESSAGE') || type === 'COMMUNICATION_NOTE';
+  });
 });
 
 const handleSend = async (content: string) => {

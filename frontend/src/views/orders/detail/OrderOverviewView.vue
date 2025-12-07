@@ -92,6 +92,12 @@
       <a-form-item label="退租原因">
         <a-textarea v-model:value="returnForm.reason" :rows="3" />
       </a-form-item>
+      <a-form-item label="物流公司">
+        <a-input v-model:value="returnForm.logisticsCompany" placeholder="如 SF、JD" />
+      </a-form-item>
+      <a-form-item label="运单号">
+        <a-input v-model:value="returnForm.trackingNumber" placeholder="请填写退租寄回单号" />
+      </a-form-item>
     </a-form>
   </a-modal>
 
@@ -157,7 +163,7 @@ const showBuyoutModal = ref(false);
 const modalLoading = ref(false);
 
 const extensionForm = ref({ additionalMonths: 1, remark: '' });
-const returnForm = ref({ reason: '' });
+const returnForm = ref({ reason: '', logisticsCompany: '', trackingNumber: '' });
 const buyoutForm = ref<{ buyoutAmount?: number; remark?: string }>({});
 
 const requireAuthUser = () => {
@@ -250,14 +256,21 @@ const handleReturn = async () => {
     return;
   }
   const user = requireAuthUser();
+  if (!returnForm.value.logisticsCompany.trim() || !returnForm.value.trackingNumber.trim()) {
+    message.warning('请填写物流公司与运单号');
+    return;
+  }
   modalLoading.value = true;
   try {
     const updated = await applyOrderReturn(order.value.id, {
       userId: user.id,
-      reason: returnForm.value.reason
+      reason: returnForm.value.reason,
+      logisticsCompany: returnForm.value.logisticsCompany,
+      trackingNumber: returnForm.value.trackingNumber
     });
     updateOrder(updated);
     showReturnModal.value = false;
+    returnForm.value = { reason: '', logisticsCompany: '', trackingNumber: '' };
     message.success('退租申请已提交');
   } catch (error) {
     message.error(friendlyErrorMessage(error, '退租申请失败'));

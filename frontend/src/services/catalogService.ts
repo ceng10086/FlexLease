@@ -55,6 +55,15 @@ export type CatalogProductDetail = {
   description?: string | null;
   status: string;
   rentalPlans: CatalogRentalPlan[];
+  mediaAssets: CatalogMediaAsset[];
+};
+
+export type CatalogMediaAsset = {
+  id: string;
+  fileName?: string | null;
+  fileUrl: string;
+  contentType?: string | null;
+  sortOrder?: number | null;
 };
 
 type ApiResponse<T> = {
@@ -63,15 +72,31 @@ type ApiResponse<T> = {
   data: T;
 };
 
-export const listCatalogProducts = async (params: {
+type CatalogListParams = {
   keyword?: string;
   categoryCode?: string;
+  planType?: string;
+  minDeposit?: number | null;
+  maxDeposit?: number | null;
+  rentSort?: 'RENT_ASC' | 'RENT_DESC' | null;
   page?: number;
   size?: number;
-} = {}): Promise<PagedResponse<CatalogProductSummary>> => {
+};
+
+export const listCatalogProducts = async (params: CatalogListParams = {}): Promise<PagedResponse<CatalogProductSummary>> => {
+  const query = {
+    keyword: params.keyword,
+    categoryCode: params.categoryCode,
+    planType: params.planType,
+    minDeposit: params.minDeposit ?? undefined,
+    maxDeposit: params.maxDeposit ?? undefined,
+    rentSort: params.rentSort ?? undefined,
+    page: params.page,
+    size: params.size
+  };
   const response = await http.get<ApiResponse<PagedResponse<ApiCatalogProduct>>>(
     '/catalog/products',
-    { params }
+    { params: query }
   );
   const data = response.data.data;
   return {
@@ -94,6 +119,7 @@ type ApiCatalogProduct = {
   coverImageUrl?: string | null;
   status: string;
   rentalPlans: Array<ApiCatalogRentalPlan>;
+  mediaAssets?: Array<ApiCatalogMediaAsset>;
 };
 
 type ApiCatalogRentalPlan = {
@@ -115,6 +141,14 @@ type ApiCatalogSku = {
   attributes?: Record<string, unknown> | null;
   stockTotal: number;
   stockAvailable: number;
+};
+
+type ApiCatalogMediaAsset = {
+  id: string;
+  fileName?: string | null;
+  fileUrl: string;
+  contentType?: string | null;
+  sortOrder?: number | null;
 };
 
 const mapToSummary = (product: ApiCatalogProduct): CatalogProductSummary => ({
@@ -159,6 +193,13 @@ const mapToDetail = (product: ApiCatalogProduct): CatalogProductDetail => ({
       stockAvailable: sku.stockAvailable,
       stockTotal: sku.stockTotal
     }))
+  })),
+  mediaAssets: (product.mediaAssets ?? []).map((asset) => ({
+    id: asset.id,
+    fileName: asset.fileName ?? null,
+    fileUrl: asset.fileUrl,
+    contentType: asset.contentType ?? null,
+    sortOrder: asset.sortOrder ?? null
   }))
 });
 

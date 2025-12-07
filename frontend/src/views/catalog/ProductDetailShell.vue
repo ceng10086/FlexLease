@@ -20,7 +20,7 @@
     </div>
     <div v-else class="detail-grid">
       <PageSection title="媒体">
-        <MediaGallery :cover="product.coverImageUrl" />
+        <MediaGallery :cover="product.coverImageUrl" :media="galleryMedia" />
       </PageSection>
       <PageSection title="方案选择">
         <PlanSelector v-model="selectedPlanId" :plans="product.rentalPlans" />
@@ -126,6 +126,10 @@ const actionLoading = ref(false);
 const selectedPlanId = ref<string | null>(null);
 const selectedSkuId = ref<string | null>(null);
 const quantity = ref(1);
+
+const galleryMedia = computed(() =>
+  product.value?.mediaAssets?.map((asset) => asset.fileUrl) ?? []
+);
 
 const loadProduct = async () => {
   const productId = route.params.productId as string | undefined;

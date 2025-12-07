@@ -127,10 +127,31 @@
                     <a-tag :color="disputeStatusColor(item.status)">{{ item.status }}</a-tag>
                   </div>
                   <p>诉求：{{ disputeOptionLabel(item.initiatorOption) }} · {{ item.initiatorReason }}</p>
-                  <div v-if="canRespondDispute(item)" class="dispute-actions">
-                    <a-select v-model:value="disputeForms[item.id].option" :options="disputeOptions" style="width: 180px" />
-                    <a-input v-model:value="disputeForms[item.id].remark" placeholder="备注" />
-                    <a-button type="primary" :loading="disputeForms[item.id].loading" @click="handleRespondDispute(item)">
+                  <div v-if="canRespondDispute(item) && disputeForms[item.id]" class="dispute-actions">
+                    <a-radio-group
+                      v-model:value="disputeForms[item.id].accept"
+                      size="small"
+                      button-style="solid"
+                      class="dispute-actions__choices"
+                    >
+                      <a-radio-button :value="true">接受方案</a-radio-button>
+                      <a-radio-button :value="false">提出新方案</a-radio-button>
+                    </a-radio-group>
+                    <a-select
+                      v-if="!disputeForms[item.id].accept"
+                      v-model:value="disputeForms[item.id].option"
+                      :options="disputeOptions"
+                      style="width: 200px"
+                    />
+                    <a-input
+                      v-model:value="disputeForms[item.id].remark"
+                      placeholder="补充说明"
+                    />
+                    <a-button
+                      type="primary"
+                      :loading="disputeForms[item.id].loading"
+                      @click="handleRespondDispute(item)"
+                    >
                       回复
                     </a-button>
                     <a-button type="link" @click="handleEscalateDispute(item)">升级平台</a-button>
@@ -219,7 +240,7 @@ const returnCompletion = reactive({ refundAmount: 0, remark: '', loading: false 
 const extensionDecision = reactive({ loading: false });
 const buyoutDecision = reactive({ loading: false });
 const chatSending = ref(false);
-const disputeForms = reactive<Record<string, { option: DisputeResolutionOption; remark: string; loading: boolean }>>({});
+const disputeForms = reactive<Record<string, { option: DisputeResolutionOption; accept: boolean; remark: string; loading: boolean }>>({});
 
 const loadOrder = async () => {
   if (!props.orderId) {
@@ -236,6 +257,7 @@ const loadOrder = async () => {
       if (!disputeForms[item.id]) {
         disputeForms[item.id] = {
           option: item.respondentOption ?? item.initiatorOption,
+          accept: true,
           remark: '',
           loading: false
         };
@@ -342,7 +364,8 @@ const proofPolicyHint = computed(() => {
   if (!proofPolicy.value) {
     return '按阶段上传凭证将自动同步到用户抽屉。';
   }
-  return `平台要求：发货 ${proofPolicy.value.shipments.photosRequired} 张照片、收货 ${proofPolicy.value.receives.photosRequired} 张，退租 ${proofPolicy.value.returns.photosRequired} 张。`;
+  const stage = proofPolicy.value;
+  return `平台要求：发货至少 ${stage.shipment.photosRequired} 张照片 / ${stage.shipment.videosRequired} 段视频，收货 ${stage.receive.photosRequired} 张 / ${stage.receive.videosRequired} 段，退租 ${stage.returns.photosRequired} 张 / ${stage.returns.videosRequired} 段。`;
 });
 
 const handleShip = async () => {
@@ -492,15 +515,22 @@ const handleRespondDispute = async (item: OrderDispute) => {
     return;
   }
   const form = disputeForms[item.id];
+  if (!form) {
+    return;
+  }
+  if (!form.accept && !form.remark.trim()) {
+    message.warning('请填写新方案说明');
+    return;
+  }
   form.loading = true;
   try {
     await respondOrderDispute(order.value.id, item.id, {
       actorId: auth.user.id,
       option: form.option,
-      accept: false,
-      remark: form.remark
+      accept: form.accept,
+      remark: form.remark || undefined
     });
-    message.success('已提交回复');
+    message.success(form.accept ? '已接受用户方案' : '已提交新方案');
     form.remark = '';
     loadOrder();
   } catch (error) {
@@ -600,6 +630,12 @@ fetchProofPolicy()
   gap: var(--space-2);
   flex-wrap: wrap;
   margin-top: var(--space-2);
+}
+
+.dispute-actions__choices {
+  display: flex;
+  gap: var(--space-1);
+  flex-wrap: wrap;
 }
 
 .sheet-side {
