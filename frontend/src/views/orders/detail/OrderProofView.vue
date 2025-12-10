@@ -4,7 +4,12 @@
       <ProofGallery :proofs="order?.proofs ?? []" @preview="handlePreview" />
     </PageSection>
     <PageSection title="上传新凭证">
-      <ProofUploader @upload="handleUpload" />
+      <ProofUploader
+        :allowed-types="consumerProofTypes"
+        :disabled="!auth.user"
+        :disabled-reason="!auth.user ? '请先登录后上传凭证，系统会将凭证与账号绑定。' : null"
+        @upload="handleUpload"
+      />
     </PageSection>
   </div>
 </template>
@@ -15,7 +20,7 @@ import { useOrderDetail } from '../../../composables/useOrderDetail';
 import PageSection from '../../../components/layout/PageSection.vue';
 import ProofGallery from '../../../components/proof/ProofGallery.vue';
 import ProofUploader from '../../../components/proof/ProofUploader.vue';
-import { uploadOrderProof } from '../../../services/orderService';
+import { uploadOrderProof, type OrderProofType } from '../../../services/orderService';
 import { useAuthStore } from '../../../stores/auth';
 import { message } from 'ant-design-vue';
 import { friendlyErrorMessage } from '../../../utils/error';
@@ -23,13 +28,18 @@ import { friendlyErrorMessage } from '../../../utils/error';
 const { order: getOrder, refresh } = useOrderDetail();
 const order = computed(() => getOrder());
 const auth = useAuthStore();
+const consumerProofTypes: OrderProofType[] = ['RECEIVE', 'RETURN', 'INSPECTION', 'OTHER'];
 
 const handlePreview = (proof: { fileUrl: string }) => {
   window.open(proof.fileUrl, '_blank');
 };
 
 const handleUpload = async (payload: { proofType: string; description?: string; file: File }) => {
-  if (!order.value || !auth.user) {
+  if (!order.value) {
+    return;
+  }
+  if (!auth.user) {
+    message.warning('请先登录后再上传凭证');
     return;
   }
   try {

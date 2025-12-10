@@ -189,7 +189,12 @@ const selectedSku = computed(() =>
 const selectReady = computed(() => Boolean(product.value && selectedPlan.value && selectedSku.value));
 
 const handleAddToCart = async () => {
-  if (!selectReady.value || !auth.user) {
+  if (!auth.user) {
+    message.info('请先登录后再加入购物车');
+    router.push({ name: 'login', query: { redirect: route.fullPath } });
+    return;
+  }
+  if (!selectReady.value) {
     message.warning('请选择完整方案和 SKU');
     return;
   }

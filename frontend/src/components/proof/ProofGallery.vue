@@ -11,9 +11,28 @@
           @click="$emit('preview', proof)"
         >
           <template #cover>
-            <img :src="proof.fileUrl" alt="proof" />
+            <img
+              v-if="isImage(proof)"
+              :src="proof.fileUrl"
+              alt="proof"
+              class="proof-cover"
+            />
+            <video
+              v-else-if="isVideo(proof)"
+              :src="proof.fileUrl"
+              class="proof-cover proof-cover--video"
+              controls
+              preload="metadata"
+            />
+            <div v-else class="proof-cover proof-cover--file">
+              <strong>{{ fileBadge(proof) }}</strong>
+              <span>{{ formatSize(proof.fileSize) }}</span>
+            </div>
           </template>
-          <a-card-meta :description="new Date(proof.uploadedAt).toLocaleString()" />
+          <a-card-meta
+            :title="proof.description || fileBadge(proof)"
+            :description="new Date(proof.uploadedAt).toLocaleString()"
+          />
         </a-card>
       </div>
     </div>
@@ -54,6 +73,33 @@ const groupedProofs = computed(() => {
     items
   }));
 });
+
+const isImage = (proof: OrderProof) => (proof.contentType ?? '').startsWith('image/');
+const isVideo = (proof: OrderProof) => (proof.contentType ?? '').startsWith('video/');
+
+const fileBadge = (proof: OrderProof) => {
+  if (proof.contentType) {
+    const [, subtype] = proof.contentType.split('/');
+    if (subtype) {
+      return subtype.toUpperCase();
+    }
+  }
+  const match = proof.fileUrl.split('?')[0].split('.').pop();
+  return match ? match.toUpperCase() : 'FILE';
+};
+
+const formatSize = (bytes: number) => {
+  if (!bytes) {
+    return '';
+  }
+  if (bytes < 1024) {
+    return `${bytes}B`;
+  }
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)}KB`;
+  }
+  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+};
 </script>
 
 <style scoped>
@@ -67,9 +113,24 @@ const groupedProofs = computed(() => {
   gap: var(--space-3);
 }
 
-img {
+.proof-cover {
   width: 100%;
-  height: 140px;
+  height: 160px;
   object-fit: cover;
+}
+
+.proof-cover--video {
+  background: #000;
+}
+
+.proof-cover--file {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-surface-muted);
+  color: var(--color-text-secondary);
+  gap: var(--space-1);
+  font-size: 0.9rem;
 }
 </style>

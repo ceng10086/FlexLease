@@ -1,34 +1,90 @@
 <template>
   <form class="proof-uploader" @submit.prevent="handleUpload">
-    <a-radio-group v-model:value="form.proofType">
-      <a-radio-button value="SHIPMENT">发货</a-radio-button>
-      <a-radio-button value="RECEIVE">收货</a-radio-button>
-      <a-radio-button value="RETURN">退租</a-radio-button>
-      <a-radio-button value="INSPECTION">巡检</a-radio-button>
-      <a-radio-button value="OTHER">其他</a-radio-button>
+    <a-alert
+      v-if="isDisabled && disabledMessage"
+      type="info"
+      show-icon
+      :message="disabledMessage"
+      class="proof-uploader__alert"
+    />
+    <a-radio-group v-model:value="form.proofType" :disabled="isDisabled">
+      <a-radio-button v-for="option in proofTypeOptions" :key="option.value" :value="option.value">
+        {{ option.label }}
+      </a-radio-button>
     </a-radio-group>
-    <a-input v-model:value="form.description" placeholder="补充说明（选填）" />
-    <input ref="fileInput" type="file" @change="handleFileChange" />
-    <a-button type="primary" :loading="uploading" :disabled="!file" @click="handleUpload">
+    <a-input
+      v-model:value="form.description"
+      placeholder="补充说明（选填）"
+      :disabled="isDisabled"
+    />
+    <input ref="fileInput" type="file" :disabled="isDisabled" @change="handleFileChange" />
+    <a-button
+      type="primary"
+      :loading="uploading"
+      :disabled="isDisabled || !file"
+      @click="handleUpload"
+    >
       上传凭证
     </a-button>
   </form>
 </template>
 
 <script lang="ts" setup>
-import { reactive, ref } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import type { OrderProofType } from '../../services/orderService';
+
+const PROOF_TYPE_LABELS: Record<OrderProofType, string> = {
+  SHIPMENT: '发货',
+  RECEIVE: '收货',
+  RETURN: '退租',
+  INSPECTION: '巡检',
+  OTHER: '其他'
+};
+
+const DEFAULT_TYPES: OrderProofType[] = ['SHIPMENT', 'RECEIVE', 'RETURN', 'INSPECTION', 'OTHER'];
+
+const props = defineProps<{
+  allowedTypes?: OrderProofType[];
+  disabled?: boolean;
+  disabledReason?: string | null;
+}>();
 
 const emit = defineEmits<{
   (e: 'upload', payload: { proofType: OrderProofType; description?: string; file: File }): void;
 }>();
 
+const resolvedTypes = computed<OrderProofType[]>(() =>
+  props.allowedTypes && props.allowedTypes.length ? props.allowedTypes : DEFAULT_TYPES
+);
+const isDisabled = computed(() => props.disabled ?? false);
+const disabledMessage = computed(() => (isDisabled.value ? props.disabledReason ?? null : null));
+
 const form = reactive<{ proofType: OrderProofType; description?: string }>({
-  proofType: 'SHIPMENT'
+  proofType: resolvedTypes.value[0] ?? 'OTHER'
 });
 const file = ref<File | null>(null);
 const uploading = ref(false);
 const fileInput = ref<HTMLInputElement | null>(null);
+
+const proofTypeOptions = computed(() =>
+  resolvedTypes.value.map((type) => ({
+    value: type,
+    label: PROOF_TYPE_LABELS[type] ?? type
+  }))
+);
+
+watch(
+  resolvedTypes,
+  (types) => {
+    if (!types.length) {
+      return;
+    }
+    if (!types.includes(form.proofType)) {
+      form.proofType = types[0];
+    }
+  },
+  { immediate: true }
+);
 
 const handleFileChange = (event: Event) => {
   const target = event.target as HTMLInputElement;
@@ -36,7 +92,7 @@ const handleFileChange = (event: Event) => {
 };
 
 const handleUpload = () => {
-  if (!file.value) {
+  if (!file.value || isDisabled.value) {
     return;
   }
   uploading.value = true;
@@ -58,5 +114,9 @@ const handleUpload = () => {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+}
+
+.proof-uploader__alert {
+  margin-bottom: var(--space-2);
 }
 </style>

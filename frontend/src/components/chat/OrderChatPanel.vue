@@ -63,7 +63,7 @@
           auto-size
           placeholder="输入要发送的内容…"
           :disabled="sending"
-          @pressEnter.prevent="handleSend"
+          @pressEnter="handlePressEnter"
         />
         <a-button type="primary" :loading="sending" :disabled="!canSend || sending" @click="handleSend">
           发送
@@ -180,6 +180,14 @@ const handleSend = () => {
   draft.value = '';
   attachedFiles.value = [];
   showPhrases.value = false;
+};
+
+const handlePressEnter = (event: KeyboardEvent) => {
+  if (event.shiftKey) {
+    return;
+  }
+  event.preventDefault();
+  handleSend();
 };
 
 watch(
