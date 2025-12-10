@@ -72,6 +72,8 @@ import { submitOrderSurvey } from '../../services/orderService';
 const props = defineProps<{
   order: RentalOrderDetail;
   currentUserId?: string | null;
+  targetRef?: string | null;
+  targetRole?: string | null;
 }>();
 
 const emit = defineEmits<{ (e: 'updated'): void }>();
@@ -80,11 +82,14 @@ const surveyForms = reactive<Record<string, { rating: number; comment: string }>
 const submitting = ref<string | null>(null);
 
 const currentUserId = computed(() => props.currentUserId ?? null);
+const effectiveTargetRef = computed(() => props.targetRef ?? currentUserId.value);
+const effectiveTargetRole = computed(() => props.targetRole ?? null);
 
 const pendingSurveys = computed(() =>
   props.order.surveys.filter(
     (survey) =>
-      survey.targetRef === currentUserId.value &&
+      (!effectiveTargetRef.value || survey.targetRef === effectiveTargetRef.value) &&
+      (!effectiveTargetRole.value || survey.targetRole === effectiveTargetRole.value) &&
       survey.status !== 'COMPLETED'
   )
 );
@@ -92,7 +97,8 @@ const pendingSurveys = computed(() =>
 const completedSurveys = computed(() =>
   props.order.surveys.filter(
     (survey) =>
-      survey.targetRef === currentUserId.value &&
+      (!effectiveTargetRef.value || survey.targetRef === effectiveTargetRef.value) &&
+      (!effectiveTargetRole.value || survey.targetRole === effectiveTargetRole.value) &&
       survey.status === 'COMPLETED'
   )
 );

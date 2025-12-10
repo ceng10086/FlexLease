@@ -147,6 +147,17 @@
                       v-model:value="disputeForms[item.id].remark"
                       placeholder="补充说明"
                     />
+                    <a-input
+                      v-model:value="disputeForms[item.id].phoneMemo"
+                      placeholder="电话纪要（可选）"
+                    />
+                    <a-select
+                      v-model:value="disputeForms[item.id].attachmentProofIds"
+                      mode="multiple"
+                      :options="proofOptions"
+                      placeholder="关联凭证（可选）"
+                      style="width: 100%"
+                    />
                     <a-button
                       type="primary"
                       :loading="disputeForms[item.id].loading"
@@ -163,6 +174,15 @@
 
             <PageSection title="操作时间线">
               <TimelineList :events="order.events" />
+            </PageSection>
+            <PageSection title="满意度调查">
+              <OrderSurveyPanel
+                :order="order"
+                :current-user-id="auth.user?.id ?? null"
+                :target-role="'VENDOR'"
+                :target-ref="order.vendorId"
+                @updated="loadOrder"
+              />
             </PageSection>
           </div>
           <div class="sheet-side">
@@ -197,6 +217,7 @@ import OrderChatPanel from '../../../components/chat/OrderChatPanel.vue';
 import ProofGallery from '../../../components/proof/ProofGallery.vue';
 import ProofUploader from '../../../components/proof/ProofUploader.vue';
 import TimelineList from '../../../components/timeline/TimelineList.vue';
+import OrderSurveyPanel from '../../../components/orders/OrderSurveyPanel.vue';
 import { useAuthStore } from '../../../stores/auth';
 import {
   fetchOrder,
@@ -242,7 +263,14 @@ const returnCompletion = reactive({ refundAmount: 0, remark: '', loading: false 
 const extensionDecision = reactive({ loading: false });
 const buyoutDecision = reactive({ loading: false });
 const chatSending = ref(false);
-const disputeForms = reactive<Record<string, { option: DisputeResolutionOption; accept: boolean; remark: string; loading: boolean }>>({});
+const disputeForms = reactive<Record<string, {
+  option: DisputeResolutionOption;
+  accept: boolean;
+  remark: string;
+  phoneMemo: string;
+  attachmentProofIds: string[];
+  loading: boolean;
+}>>({});
 
 const vendorQuickPhrases = [
   '已收到您的申请，我们会在 2 小时内回复。',
@@ -267,6 +295,8 @@ const loadOrder = async () => {
           option: item.respondentOption ?? item.initiatorOption,
           accept: true,
           remark: '',
+          phoneMemo: '',
+          attachmentProofIds: [],
           loading: false
         };
       }
@@ -324,6 +354,12 @@ const chatEvents = computed(() => {
 const disputes = computed(() => order.value?.disputes ?? []);
 
 const proofList = computed(() => order.value?.proofs ?? []);
+const proofOptions = computed(() =>
+  proofList.value.map((proof) => ({
+    label: `${proof.proofType} · ${new Date(proof.uploadedAt).toLocaleString()}`,
+    value: proof.id
+  }))
+);
 
 const isImageProof = (url: string, contentType?: string | null) => {
   if (contentType && contentType.startsWith('image/')) return true;
@@ -562,10 +598,14 @@ const handleRespondDispute = async (item: OrderDispute) => {
       actorId: auth.user.id,
       option: form.option,
       accept: form.accept,
-      remark: form.remark || undefined
+      remark: form.remark?.trim() || undefined,
+      phoneMemo: form.phoneMemo?.trim() || undefined,
+      attachmentProofIds: form.attachmentProofIds.length ? form.attachmentProofIds : undefined
     });
     message.success(form.accept ? '已接受用户方案' : '已提交新方案');
     form.remark = '';
+    form.phoneMemo = '';
+    form.attachmentProofIds = [];
     loadOrder();
   } catch (error) {
     message.error(friendlyErrorMessage(error, '回复失败'));
