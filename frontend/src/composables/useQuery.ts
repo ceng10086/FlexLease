@@ -19,6 +19,7 @@ export const useQuery = <T>(
   const error = ref<Error | null>(null);
   const cacheKey = computed(() => (typeof key === 'function' ? key() : key));
   const data = ref<T | null>(null);
+  const shouldAutoRun = options.immediate ?? true;
 
   const enabled = computed(() => {
     if (options.enabled === undefined) {
@@ -60,11 +61,21 @@ export const useQuery = <T>(
       } else {
         data.value = null;
       }
-      if (options.immediate ?? true) {
+      if (shouldAutoRun) {
         execute();
       }
     },
     { immediate: true }
+  );
+
+  watch(
+    enabled,
+    (value, previous) => {
+      if (value && !previous && shouldAutoRun) {
+        execute();
+      }
+    },
+    { immediate: false }
   );
 
   const deps = options.dependencies;

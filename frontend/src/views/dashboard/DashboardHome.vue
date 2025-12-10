@@ -193,14 +193,9 @@ const hasVendor = computed(() => Boolean(vendorId.value));
 const {
   data: platformData,
   loading: platformLoading
-} = useQuery<DashboardMetrics>(
-  'dashboard-metrics',
-  () => fetchDashboardMetrics(),
-  {
-    enabled: canViewPlatform,
-    immediate: false
-  }
-);
+} = useQuery<DashboardMetrics>('dashboard-metrics', () => fetchDashboardMetrics(), {
+  enabled: canViewPlatform
+});
 
 const { data: vendorData } = useQuery<DashboardMetrics>('vendor-metrics', () => {
   if (!vendorId.value) {
@@ -208,8 +203,7 @@ const { data: vendorData } = useQuery<DashboardMetrics>('vendor-metrics', () => 
   }
   return fetchVendorMetrics(vendorId.value);
 }, {
-  enabled: hasVendor,
-  immediate: false
+  enabled: hasVendor
 });
 
 const { data: announcementData } = useQuery<NotificationLog[]>(
