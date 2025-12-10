@@ -49,7 +49,7 @@ const orders = ref<RentalOrderSummary[]>([]);
 const loading = ref(false);
 const statusFilter = ref<OrderStatus | 'ALL'>('ALL');
 const manualReviewOnly = ref(false);
-const pagination = reactive({ page: 1, size: 6, total: 0 });
+const pagination = reactive({ page: 1, size: 6, totalElements: 0, totalPages: 1 });
 const detail = reactive<{ open: boolean; orderId: string | null }>({ open: false, orderId: null });
 
 const statusOptions = [
@@ -60,7 +60,12 @@ const statusOptions = [
   { label: '买断申请', value: 'BUYOUT_REQUESTED' }
 ];
 
-const hasMore = computed(() => orders.value.length < pagination.total);
+const hasMore = computed(() => {
+  if (manualReviewOnly.value) {
+    return pagination.page < pagination.totalPages;
+  }
+  return orders.value.length < pagination.totalElements;
+});
 
 const fetchOrders = async (reset = false) => {
   if (!vendorId.value) {
@@ -70,6 +75,7 @@ const fetchOrders = async (reset = false) => {
   try {
     if (reset) {
       pagination.page = 1;
+      orders.value = [];
     }
     const response = await listOrders({
       vendorId: vendorId.value,
@@ -77,12 +83,11 @@ const fetchOrders = async (reset = false) => {
       page: pagination.page,
       size: pagination.size
     });
+    pagination.totalElements = response.totalElements;
+    pagination.totalPages = response.totalPages || 1;
     let content = response.content;
     if (manualReviewOnly.value) {
       content = content.filter((item) => item.requiresManualReview);
-      pagination.total = content.length;
-    } else {
-      pagination.total = response.totalElements;
     }
     orders.value = reset ? content : [...orders.value, ...content];
   } catch (error) {

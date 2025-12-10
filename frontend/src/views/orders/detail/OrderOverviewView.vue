@@ -256,17 +256,20 @@ const handleReturn = async () => {
     return;
   }
   const user = requireAuthUser();
-  if (!returnForm.value.logisticsCompany.trim() || !returnForm.value.trackingNumber.trim()) {
-    message.warning('请填写物流公司与运单号');
+  const logisticsCompany = returnForm.value.logisticsCompany.trim();
+  const trackingNumber = returnForm.value.trackingNumber.trim();
+  if ((logisticsCompany && !trackingNumber) || (!logisticsCompany && trackingNumber)) {
+    message.warning('请同时填写物流公司与运单号，或暂时留空稍后补充');
     return;
   }
+  const reason = returnForm.value.reason?.trim();
   modalLoading.value = true;
   try {
     const updated = await applyOrderReturn(order.value.id, {
       userId: user.id,
-      reason: returnForm.value.reason,
-      logisticsCompany: returnForm.value.logisticsCompany,
-      trackingNumber: returnForm.value.trackingNumber
+      reason: reason || undefined,
+      logisticsCompany: logisticsCompany || undefined,
+      trackingNumber: trackingNumber || undefined
     });
     updateOrder(updated);
     showReturnModal.value = false;

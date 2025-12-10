@@ -31,6 +31,12 @@ const color = computed(() => orderStatusColor(props.status));
   color: #0f9c68;
 }
 
+.progress-pill--green {
+  background: rgba(34, 197, 94, 0.15);
+  border-color: rgba(34, 197, 94, 0.35);
+  color: #15803d;
+}
+
 .progress-pill--processing {
   background: rgba(37, 99, 235, 0.1);
   border-color: rgba(37, 99, 235, 0.3);
@@ -47,5 +53,11 @@ const color = computed(() => orderStatusColor(props.status));
   background: rgba(129, 140, 248, 0.2);
   border-color: rgba(129, 140, 248, 0.3);
   color: #4338ca;
+}
+
+.progress-pill--default {
+  background: var(--color-surface-muted);
+  border-color: var(--color-border);
+  color: var(--color-text-secondary);
 }
 </style>

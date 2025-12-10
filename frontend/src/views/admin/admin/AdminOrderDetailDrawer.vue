@@ -81,6 +81,7 @@
                 :messages="chatEvents"
                 :sending="chatSending"
                 self-role="ADMIN"
+                :quick-phrases="adminQuickPhrases"
                 @send="handleSendMessage"
               />
             </PageSection>
@@ -107,6 +108,7 @@ import {
   postOrderMessage,
   forceCloseOrder,
   resolveOrderDispute,
+  uploadOrderProof,
   type RentalOrderDetail,
   type OrderDispute,
   type DisputeResolutionOption
@@ -116,6 +118,7 @@ import { message } from 'ant-design-vue';
 import { formatCurrency } from '../../../utils/number';
 import { disputeOptions, disputeOptionLabel, disputeStatusColor, disputeStatusLabel, disputeActorLabel } from '../../../utils/disputes';
 import { useAuthStore } from '../../../stores/auth';
+import type { ChatSendPayload } from '../../../types/chat';
 
 const props = defineProps<{
   open: boolean;
@@ -133,6 +136,11 @@ const loading = ref(false);
 const forceCloseForm = reactive({ reason: '', loading: false });
 const disputeForms = reactive<Record<string, { decision: DisputeResolutionOption; remark: string; penalize: number | null; loading: boolean }>>({});
 const chatSending = ref(false);
+const adminQuickPhrases = [
+  '平台已介入处理，请保持与对方沟通。',
+  '已收到凭证，我们正在核查，请耐心等待。',
+  '如需补充资料，请在凭证区上传以便复核。'
+];
 
 const loadOrder = async () => {
   if (!props.orderId) {
@@ -185,16 +193,42 @@ const chatEvents = computed(() => {
   return events.filter((event) => event.eventType?.includes('MESSAGE') || event.eventType === 'COMMUNICATION_NOTE');
 });
 
-const handleSendMessage = async (content: string) => {
+const handleSendMessage = async (payload: ChatSendPayload) => {
   if (!order.value || !auth.user) {
+    return;
+  }
+  const trimmed = payload.content.trim();
+  const hasAttachments = payload.attachments.length > 0;
+  if (!trimmed && !hasAttachments) {
     return;
   }
   chatSending.value = true;
   try {
+    let attachmentSummary = '';
+    if (hasAttachments) {
+      const uploads = await Promise.all(
+        payload.attachments.map((file) =>
+          uploadOrderProof(order.value!.id, {
+            actorId: auth.user!.id,
+            proofType: 'OTHER',
+            description: trimmed || file.name,
+            file
+          })
+        )
+      );
+      const lines = uploads.map((proof, index) => `• ${payload.attachments[index].name}: ${proof.fileUrl}`);
+      attachmentSummary = [`已附加 ${uploads.length} 个文件`, ...lines].join('\n');
+    }
+    const finalMessage = [trimmed, attachmentSummary].filter((segment) => segment && segment.trim()).join('\n\n');
+    if (!finalMessage) {
+      chatSending.value = false;
+      return;
+    }
     order.value = await postOrderMessage(order.value.id, {
       actorId: auth.user.id,
-      message: content
+      message: finalMessage
     });
+    message.success('已发送');
   } catch (error) {
     message.error(friendlyErrorMessage(error, '发送失败'));
   } finally {

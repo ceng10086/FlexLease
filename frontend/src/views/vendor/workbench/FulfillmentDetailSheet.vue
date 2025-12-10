@@ -171,6 +171,7 @@
                 :messages="chatEvents"
                 :sending="chatSending"
                 self-role="VENDOR"
+                :quick-phrases="vendorQuickPhrases"
                 @send="handleSendMessage"
               />
             </PageSection>
@@ -217,6 +218,7 @@ import {
 import { friendlyErrorMessage } from '../../../utils/error';
 import { formatCurrency } from '../../../utils/number';
 import { disputeOptions, disputeOptionLabel, disputeStatusColor, disputeStatusLabel, disputeActorLabel } from '../../../utils/disputes';
+import type { ChatSendPayload } from '../../../types/chat';
 
 const props = defineProps<{
   open: boolean;
@@ -241,6 +243,12 @@ const extensionDecision = reactive({ loading: false });
 const buyoutDecision = reactive({ loading: false });
 const chatSending = ref(false);
 const disputeForms = reactive<Record<string, { option: DisputeResolutionOption; accept: boolean; remark: string; loading: boolean }>>({});
+
+const vendorQuickPhrases = [
+  '已收到您的申请，我们会在 2 小时内回复。',
+  '货物已安排发出，稍后同步物流单号。',
+  '请按凭证指引补充照片或视频资料，谢谢配合。'
+];
 
 const loadOrder = async () => {
   if (!props.orderId) {
@@ -490,17 +498,43 @@ const handleUploadProof = async (payload: { proofType: string; description?: str
   }
 };
 
-const handleSendMessage = async (content: string) => {
+const handleSendMessage = async (payload: ChatSendPayload) => {
   if (!order.value || !auth.user) {
+    return;
+  }
+  const trimmed = payload.content.trim();
+  const hasAttachments = payload.attachments.length > 0;
+  if (!trimmed && !hasAttachments) {
     return;
   }
   chatSending.value = true;
   try {
+    let attachmentSummary = '';
+    if (hasAttachments) {
+      const uploads = await Promise.all(
+        payload.attachments.map((file) =>
+          uploadOrderProof(order.value!.id, {
+            actorId: auth.user!.id,
+            proofType: 'OTHER',
+            description: trimmed || file.name,
+            file
+          })
+        )
+      );
+      const lines = uploads.map((proof, index) => `• ${payload.attachments[index].name}: ${proof.fileUrl}`);
+      attachmentSummary = [`已附加 ${uploads.length} 个文件`, ...lines].join('\n');
+    }
+    const finalMessage = [trimmed, attachmentSummary].filter((segment) => segment && segment.trim()).join('\n\n');
+    if (!finalMessage) {
+      chatSending.value = false;
+      return;
+    }
     const updated = await postOrderMessage(order.value.id, {
       actorId: auth.user.id,
-      message: content
+      message: finalMessage
     });
     order.value = updated;
+    message.success('已发送');
   } catch (error) {
     message.error(friendlyErrorMessage(error, '发送失败'));
   } finally {
