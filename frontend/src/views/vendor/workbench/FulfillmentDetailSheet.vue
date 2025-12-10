@@ -197,7 +197,7 @@
             </PageSection>
             <PageSection title="凭证">
               <ProofGallery :proofs="order.proofs" @preview="previewProof" />
-              <ProofUploader @upload="handleUploadProof" />
+              <ProofUploader :allowed-types="vendorProofTypes" :upload-handler="handleUploadProof" />
               <p class="hint">{{ proofPolicyHint }}</p>
             </PageSection>
           </div>
@@ -234,7 +234,8 @@ import {
   type RentalOrderDetail,
   type OrderDispute,
   type DisputeResolutionOption,
-  type ProofPolicySummary
+  type ProofPolicySummary,
+  type OrderProofType
 } from '../../../services/orderService';
 import { friendlyErrorMessage } from '../../../utils/error';
 import { formatCurrency } from '../../../utils/number';
@@ -256,6 +257,7 @@ const auth = useAuthStore();
 const order = ref<RentalOrderDetail | null>(null);
 const loading = ref(false);
 const proofPolicy = ref<ProofPolicySummary | null>(null);
+const vendorProofTypes: OrderProofType[] = ['SHIPMENT', 'INSPECTION', 'OTHER'];
 
 const shipForm = reactive({ carrier: '', trackingNumber: '', message: '', loading: false });
 const returnDecision = reactive({ loading: false });
@@ -516,14 +518,14 @@ const handleBuyoutDecision = async (approve: boolean) => {
   }
 };
 
-const handleUploadProof = async (payload: { proofType: string; description?: string; file: File }) => {
+const handleUploadProof = async (payload: { proofType: OrderProofType; description?: string; file: File }) => {
   if (!order.value || !auth.user) {
     return;
   }
   try {
     await uploadOrderProof(order.value.id, {
       actorId: auth.user.id,
-      proofType: payload.proofType as any,
+      proofType: payload.proofType,
       description: payload.description,
       file: payload.file
     });

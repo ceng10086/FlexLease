@@ -8,7 +8,7 @@
         :allowed-types="consumerProofTypes"
         :disabled="!auth.user"
         :disabled-reason="!auth.user ? '请先登录后上传凭证，系统会将凭证与账号绑定。' : null"
-        @upload="handleUpload"
+        :upload-handler="handleUpload"
       />
     </PageSection>
   </div>
@@ -34,7 +34,7 @@ const handlePreview = (proof: { fileUrl: string }) => {
   window.open(proof.fileUrl, '_blank');
 };
 
-const handleUpload = async (payload: { proofType: string; description?: string; file: File }) => {
+const handleUpload = async (payload: { proofType: OrderProofType; description?: string; file: File }) => {
   if (!order.value) {
     return;
   }
@@ -45,7 +45,7 @@ const handleUpload = async (payload: { proofType: string; description?: string; 
   try {
     await uploadOrderProof(order.value!.id, {
       actorId: auth.user.id,
-      proofType: payload.proofType as any,
+      proofType: payload.proofType,
       description: payload.description,
       file: payload.file
     });
