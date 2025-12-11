@@ -49,7 +49,7 @@
   <a-drawer
     v-model:open="vendorDrawer.open"
     title="厂商申请"
-    :width="520"
+    :width="vendorDrawerWidth"
     destroy-on-close
   >
     <template v-if="vendorDrawer.current">
@@ -70,7 +70,7 @@
   <a-drawer
     v-model:open="productDrawer.open"
     title="商品审核"
-    :width="720"
+    :width="productDrawerWidth"
     destroy-on-close
   >
     <template v-if="productDrawer.detail">
@@ -98,7 +98,8 @@
 </template>
 
 <script lang="ts" setup>
-import { reactive, ref } from 'vue';
+import { computed, reactive, ref } from 'vue';
+import { useViewport } from '../../composables/useViewport';
 import PageShell from '../../components/layout/PageShell.vue';
 import PageHeader from '../../components/layout/PageHeader.vue';
 import PageSection from '../../components/layout/PageSection.vue';
@@ -236,6 +237,18 @@ const handleProductDecision = async (approve: boolean) => {
     productDrawer.submitting = false;
   }
 };
+
+const { width: viewportWidth, isMobile } = useViewport();
+
+const vendorDrawerWidth = computed(() => {
+  if (isMobile.value) return '100%';
+  return Math.min(520, viewportWidth.value - 32);
+});
+
+const productDrawerWidth = computed(() => {
+  if (isMobile.value) return '100%';
+  return Math.min(720, viewportWidth.value - 32);
+});
 
 loadVendorApps();
 loadProducts();
