@@ -19,6 +19,21 @@
           <strong>{{ order.leaseStartAt ?? '--' }} ~ {{ order.leaseEndAt ?? '--' }}</strong>
         </div>
       </div>
+      <div class="credit-card">
+        <div class="credit-card__header">
+          <span>信用快照</span>
+          <a-tag :color="creditColor(order.creditTier)">
+            {{ creditLabel(order.creditTier) }} · {{ order.creditScore }} 分
+          </a-tag>
+        </div>
+        <p>押金原价 ¥{{ order.originalDepositAmount.toFixed(2) }}，{{ depositAdjustmentText }}</p>
+        <a-alert
+          v-if="order.requiresManualReview"
+          type="warning"
+          show-icon
+          message="信用预警：该订单需平台人工复核后才会履约"
+        />
+      </div>
       <OrderActionBar
         :order="order"
         @pay="handlePay"
@@ -184,6 +199,7 @@ import {
 } from '../../../services/orderService';
 import { autoCompleteInitialPayment } from '../../../utils/autoPayment';
 import { friendlyErrorMessage } from '../../../utils/error';
+import { creditTierColor, creditTierLabel } from '../../../types/credit';
 
 const { order: getOrder, updateOrder, refresh } = useOrderDetail();
 const auth = useAuthStore();
@@ -200,6 +216,19 @@ const modalLoading = ref(false);
 const extensionForm = ref({ additionalMonths: 1, remark: '' });
 const returnForm = ref({ reason: '', logisticsCompany: '', trackingNumber: '' });
 const buyoutForm = ref<{ buyoutAmount?: number; remark?: string }>({});
+const creditColor = creditTierColor;
+const creditLabel = creditTierLabel;
+const depositAdjustmentText = computed(() => {
+  if (!order.value) {
+    return '押金按标准计算';
+  }
+  const rate = order.value.depositAdjustmentRate ?? 1;
+  if (Math.abs(rate - 1) < 0.001) {
+    return '押金维持原价';
+  }
+  const percent = Math.abs(rate - 1) * 100;
+  return rate < 1 ? `减免 ${percent.toFixed(0)}%` : `上浮 ${percent.toFixed(0)}%`;
+});
 
 const { data: proofPolicyData, loading: proofPolicyLoading } = useQuery<ProofPolicySummary>(
   'order-proof-policy',
@@ -395,6 +424,23 @@ const handleContractSigned = async () => {
   justify-content: space-between;
   align-items: center;
   gap: var(--space-3);
+}
+
+.credit-card {
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-muted);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.credit-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .proof-grid {

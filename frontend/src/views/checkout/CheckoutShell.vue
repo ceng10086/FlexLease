@@ -259,17 +259,26 @@ const handleCreate = async () => {
       cartItemIds: cartItemIds.value
     };
     const order = await createOrder(payload as any, { idempotencyKey });
-    await autoCompleteInitialPayment({
-      orderId: order.id,
-      vendorId: order.vendorId,
-      userId: order.userId,
-      amount: order.totalAmount,
-      depositAmount: order.depositAmount,
-      rentAmount: order.rentAmount,
-      buyoutAmount: order.buyoutAmount ?? undefined,
-      description: '订单首付款'
-    });
-    message.success('订单创建成功，正在跳转');
+    message.success('订单创建成功');
+    try {
+      const result = await autoCompleteInitialPayment({
+        orderId: order.id,
+        vendorId: order.vendorId,
+        userId: order.userId,
+        amount: order.totalAmount,
+        depositAmount: order.depositAmount,
+        rentAmount: order.rentAmount,
+        buyoutAmount: order.buyoutAmount ?? undefined,
+        description: '订单首付款'
+      });
+      if (result.succeeded) {
+        message.success('首付款已自动完成');
+      } else {
+        message.info('已生成支付流水，请在订单详情查看进度');
+      }
+    } catch (paymentError) {
+      message.warning(friendlyErrorMessage(paymentError, '自动支付未完成，请前往订单详情补缴'));
+    }
     router.replace({ name: 'order-overview', params: { orderId: order.id } });
   } catch (error) {
     message.error(friendlyErrorMessage(error, '创建订单失败'));
