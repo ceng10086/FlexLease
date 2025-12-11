@@ -92,35 +92,64 @@
     </PageSection>
 
     <PageSection
-      v-if="vendorMetrics"
+      v-if="showVendorSection"
       title="厂商履约"
-      description="结合 SLA 得分、纠纷与结算情况，评估当前厂商健康度。"
+      :description="vendorSectionDescription"
     >
-      <div class="stat-grid">
-        <StatWidget
-          v-for="stat in vendorStats"
-          :key="stat.label"
-          v-bind="stat"
-        >
-          <template #icon>
-            <component :is="stat.icon" />
+      <template #actions v-if="vendorSelectionEnabled">
+        <div class="vendor-switcher">
+          <span>查看厂商</span>
+          <a-select
+            :value="selectedVendorId ?? undefined"
+            :options="vendorSelectOptions"
+            :loading="vendorDirectoryLoading"
+            show-search
+            allow-clear
+            option-filter-prop="label"
+            placeholder="选择厂商"
+            style="min-width: 240px"
+            @change="handleVendorChange"
+            :filter-option="filterVendorOption"
+          />
+        </div>
+      </template>
+      <a-skeleton :loading="vendorLoading" active>
+        <template #default>
+          <template v-if="vendorMetrics">
+            <div class="stat-grid">
+              <StatWidget
+                v-for="stat in vendorStats"
+                :key="stat.label"
+                v-bind="stat"
+              >
+                <template #icon>
+                  <component :is="stat.icon" />
+                </template>
+              </StatWidget>
+            </div>
+            <div class="dashboard-panels">
+              <div class="dashboard-panel">
+                <h4>我的趋势</h4>
+                <TrendChart :data="vendorMetrics.recentTrend" />
+              </div>
+              <div class="dashboard-panel">
+                <h4>订单状态</h4>
+                <div class="status-pills">
+                  <span v-for="entry in statusEntries(vendorMetrics.ordersByStatus)" :key="entry.status">
+                    {{ entry.label }} · {{ entry.count }}
+                  </span>
+                </div>
+              </div>
+            </div>
           </template>
-        </StatWidget>
-      </div>
-      <div class="dashboard-panels">
-        <div class="dashboard-panel">
-          <h4>我的趋势</h4>
-          <TrendChart :data="vendorMetrics.recentTrend" />
-        </div>
-        <div class="dashboard-panel">
-          <h4>订单状态</h4>
-          <div class="status-pills">
-            <span v-for="entry in statusEntries(vendorMetrics.ordersByStatus)" :key="entry.status">
-              {{ entry.label }} · {{ entry.count }}
-            </span>
-          </div>
-        </div>
-      </div>
+        </template>
+      </a-skeleton>
+      <DataStateBlock
+        v-if="!vendorLoading && !vendorMetrics"
+        type="empty"
+        :title="vendorSelectionEnabled ? '请选择厂商' : '暂无厂商数据'"
+        :description="vendorSelectionEnabled ? '选择厂商后即可查看 GMV、纠纷与状态分布。' : '当前账号未绑定厂商。'"
+      />
     </PageSection>
 
     <PageSection title="公告与提醒" description="统一收敛站内公告、信用提示等消息。">
@@ -150,7 +179,7 @@
 </template>
 
 <script lang="ts" setup>
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import {
   DashboardOutlined,
@@ -180,15 +209,18 @@ import {
   type DashboardMetrics,
   type OrderStatusBreakdown
 } from '../../services/analyticsService';
+import { listVendors, type Vendor, type PagedResponse } from '../../services/vendorService';
 import { listNotificationLogs, type NotificationLog } from '../../services/notificationService';
 import { creditTierLabel, creditTierColor } from '../../types/credit';
 
 const auth = useAuthStore();
 const router = useRouter();
 const vendorId = computed(() => auth.vendorId ?? null);
+const selectedVendorId = ref<string | null>(vendorId.value ?? null);
 
 const canViewPlatform = computed(() => auth.hasRole('ADMIN'));
-const hasVendor = computed(() => Boolean(vendorId.value));
+const showVendorSection = computed(() => auth.hasRole('VENDOR') || auth.hasRole('ADMIN'));
+const vendorSelectionEnabled = computed(() => auth.hasRole('ADMIN'));
 
 const {
   data: platformData,
@@ -197,14 +229,68 @@ const {
   enabled: canViewPlatform
 });
 
-const { data: vendorData } = useQuery<DashboardMetrics>('vendor-metrics', () => {
-  if (!vendorId.value) {
-    throw new Error('缺少厂商身份');
+watch(
+  vendorId,
+  (next) => {
+    if (!auth.hasRole('ADMIN')) {
+      selectedVendorId.value = next ?? null;
+    }
+  },
+  { immediate: true }
+);
+
+const vendorMetricsKey = computed(
+  () => `vendor-metrics-${selectedVendorId.value ?? 'none'}`
+);
+
+const { data: vendorData, loading: vendorLoading } = useQuery<DashboardMetrics>(
+  () => vendorMetricsKey.value,
+  () => fetchVendorMetrics(selectedVendorId.value as string),
+  {
+    enabled: computed(() => Boolean(selectedVendorId.value)),
+    cache: false
   }
-  return fetchVendorMetrics(vendorId.value);
-}, {
-  enabled: hasVendor
+);
+
+const {
+  data: vendorDirectory,
+  loading: vendorDirectoryLoading
+} = useQuery<PagedResponse<Vendor>>(
+  'dashboard-vendor-directory',
+  () => listVendors({ page: 1, size: 40 }),
+  { enabled: vendorSelectionEnabled }
+);
+
+const vendorList = computed(() => vendorDirectory.value?.content ?? []);
+const vendorSelectOptions = computed(() =>
+  vendorList.value.map((vendor) => ({
+    label: vendor.companyName,
+    value: vendor.id
+  }))
+);
+const selectedVendor = computed(() =>
+  vendorList.value.find((item) => item.id === selectedVendorId.value) ?? null
+);
+const vendorSectionDescription = computed(() => {
+  if (selectedVendor.value) {
+    return `当前查看：${selectedVendor.value.companyName} 的 GMV、纠纷与订单状态。`;
+  }
+  if (vendorSelectionEnabled.value) {
+    return '选择任一厂商即可实时查看 SLA、纠纷与在途订单。';
+  }
+  return '结合 SLA 得分、纠纷与结算情况，评估当前厂商健康度。';
 });
+
+const handleVendorChange = (value: string | undefined) => {
+  selectedVendorId.value = value ?? null;
+};
+
+const filterVendorOption = (input: string, option?: { label?: string }) => {
+  if (!option?.label) {
+    return false;
+  }
+  return option.label.toLowerCase().includes(input.toLowerCase());
+};
 
 const { data: announcementData } = useQuery<NotificationLog[]>(
   'dashboard-announcements',
@@ -496,6 +582,17 @@ const disputeStats = (metrics: DashboardMetrics['disputeMetrics']) => [
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
+  color: var(--color-text-secondary);
+}
+
+.vendor-switcher {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.vendor-switcher span {
+  font-size: 12px;
   color: var(--color-text-secondary);
 }
 </style>

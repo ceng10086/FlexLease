@@ -19,6 +19,7 @@ export type UserProfile = {
   address?: string | null;
   creditScore: number;
   creditTier: CreditTier;
+  suspendedUntil?: string | null;
   createdAt?: string;
   updatedAt?: string;
 };

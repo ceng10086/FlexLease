@@ -46,7 +46,7 @@
       <p>自定义备注：{{ order.customerRemark ?? '无' }}</p>
     </PageSection>
 
-    <PageSection title="凭证要求">
+    <PageSection title="凭证要求" description="下单快照 + 最新拍摄指引，确保凭证达标后再提交操作。">
       <div class="proof-grid">
         <div>
           <h4>发货</h4>
@@ -61,6 +61,37 @@
           <p>照片 ≥ {{ order.returnPhotoRequired }} · 视频 ≥ {{ order.returnVideoRequired }}</p>
         </div>
       </div>
+      <a-skeleton :loading="proofPolicyLoading" active>
+        <template #default>
+          <div v-if="proofPolicyStages.length" class="policy-grid">
+            <div v-for="stage in proofPolicyStages" :key="stage.key" class="policy-card">
+              <div class="policy-card__header">
+                <div>
+                  <strong>{{ stage.label }}</strong>
+                  <p>{{ stage.summary }}</p>
+                </div>
+              </div>
+              <ul>
+                <li v-for="(tip, index) in stage.guidance" :key="index">{{ tip }}</li>
+              </ul>
+              <a-button
+                v-if="stage.watermark"
+                type="link"
+                size="small"
+                @click="openWatermarkExample(stage.watermark)"
+              >
+                查看水印示例
+              </a-button>
+            </div>
+          </div>
+          <DataStateBlock
+            v-else
+            type="empty"
+            title="暂无指引"
+            description="稍后刷新即可自动同步最新凭证策略。"
+          />
+        </template>
+      </a-skeleton>
     </PageSection>
   </div>
 
@@ -134,10 +165,12 @@ import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { message, Modal } from 'ant-design-vue';
 import PageSection from '../../../components/layout/PageSection.vue';
+import DataStateBlock from '../../../components/feedback/DataStateBlock.vue';
 import OrderProgressPill from '../../../components/orders/OrderProgressPill.vue';
 import OrderActionBar from '../../../components/orders/OrderActionBar.vue';
 import OrderContractDrawer from '../../../components/orders/OrderContractDrawer.vue';
 import { useOrderDetail } from '../../../composables/useOrderDetail';
+import { useQuery } from '../../../composables/useQuery';
 import { useAuthStore } from '../../../stores/auth';
 import {
   cancelOrder,
@@ -145,7 +178,9 @@ import {
   applyOrderExtension,
   applyOrderReturn,
   applyOrderBuyout,
-  type RentalOrderDetail
+  fetchProofPolicy,
+  type RentalOrderDetail,
+  type ProofPolicySummary
 } from '../../../services/orderService';
 import { autoCompleteInitialPayment } from '../../../utils/autoPayment';
 import { friendlyErrorMessage } from '../../../utils/error';
@@ -165,6 +200,35 @@ const modalLoading = ref(false);
 const extensionForm = ref({ additionalMonths: 1, remark: '' });
 const returnForm = ref({ reason: '', logisticsCompany: '', trackingNumber: '' });
 const buyoutForm = ref<{ buyoutAmount?: number; remark?: string }>({});
+
+const { data: proofPolicyData, loading: proofPolicyLoading } = useQuery<ProofPolicySummary>(
+  'order-proof-policy',
+  () => fetchProofPolicy()
+);
+const proofPolicy = computed(() => proofPolicyData.value);
+const proofPolicyStages = computed(() => {
+  if (!proofPolicy.value) {
+    return [];
+  }
+  return [
+    { key: 'shipment', label: '发货', stage: proofPolicy.value.shipment },
+    { key: 'receive', label: '收货', stage: proofPolicy.value.receive },
+    { key: 'returns', label: '退租', stage: proofPolicy.value.returns }
+  ].map((entry) => ({
+    key: entry.key,
+    label: entry.label,
+    summary: `照片 ${entry.stage.photosRequired} 张 · 视频 ${entry.stage.videosRequired} 段`,
+    guidance: entry.stage.guidance ?? [],
+    watermark: entry.stage.watermarkExample
+  }));
+});
+
+const openWatermarkExample = (url?: string | null) => {
+  if (!url) {
+    return;
+  }
+  window.open(url, '_blank');
+};
 
 const requireAuthUser = () => {
   if (!auth.user) {
@@ -337,6 +401,36 @@ const handleContractSigned = async () => {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: var(--space-3);
+}
+
+.policy-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.policy-card {
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: var(--radius-card);
+  padding: var(--space-3);
+  background: rgba(37, 99, 235, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.policy-card__header p {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
+.policy-card ul {
+  padding-left: 1.2rem;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .contract-entry {

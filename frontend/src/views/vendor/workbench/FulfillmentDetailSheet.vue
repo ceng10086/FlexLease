@@ -1,8 +1,9 @@
 <template>
   <a-drawer
     :open="open"
-    :width="1100"
-    placement="right"
+    :width="drawerWidth"
+    :height="drawerHeight"
+    :placement="drawerPlacement"
     destroy-on-close
     title="订单履约详情"
     @close="emit('close')"
@@ -219,6 +220,7 @@ import ProofUploader from '../../../components/proof/ProofUploader.vue';
 import TimelineList from '../../../components/timeline/TimelineList.vue';
 import OrderSurveyPanel from '../../../components/orders/OrderSurveyPanel.vue';
 import { useAuthStore } from '../../../stores/auth';
+import { useViewport } from '../../../composables/useViewport';
 import {
   fetchOrder,
   shipOrder,
@@ -254,6 +256,7 @@ const emit = defineEmits<{
 }>();
 
 const auth = useAuthStore();
+const { width: viewportWidth, isMobile } = useViewport();
 const order = ref<RentalOrderDetail | null>(null);
 const loading = ref(false);
 const proofPolicy = ref<ProofPolicySummary | null>(null);
@@ -362,6 +365,17 @@ const proofOptions = computed(() =>
     value: proof.id
   }))
 );
+
+const drawerWidth = computed(() => {
+  if (isMobile.value) {
+    return '100%';
+  }
+  const margin = 80;
+  const desired = Math.min(1100, viewportWidth.value - margin);
+  return Math.max(720, desired);
+});
+const drawerPlacement = computed(() => (isMobile.value ? 'bottom' : 'right'));
+const drawerHeight = computed(() => (isMobile.value ? '100%' : undefined));
 
 const isImageProof = (url: string, contentType?: string | null) => {
   if (contentType && contentType.startsWith('image/')) return true;

@@ -32,6 +32,22 @@
           </div>
           <small>信用良好可享押金减免，异常行为会触发人工审核。</small>
         </div>
+        <div
+          class="profile-summary__section suspension-card"
+          :class="isSuspended ? 'suspension-card--alert' : 'suspension-card--ok'"
+        >
+          <div class="suspension-header">
+            <strong>{{ isSuspended ? '账号已冻结' : '账号状态正常' }}</strong>
+            <a-tag :color="isSuspended ? 'red' : 'success'">{{ isSuspended ? '冻结' : '正常' }}</a-tag>
+          </div>
+          <p v-if="isSuspended">
+            将于 {{ suspensionDeadlineText }} 自动解冻，剩余 {{ suspensionCountdown }}。
+          </p>
+          <p v-else>无冻结记录，保持良好信用可享押金减免。</p>
+          <a-button v-if="isSuspended" type="link" size="small" @click="goNotificationCenter">
+            查看通知提醒
+          </a-button>
+        </div>
       </section>
 
       <section class="profile-form surface-card">
@@ -84,7 +100,8 @@
 </template>
 
 <script lang="ts" setup>
-import { onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
+import { useRouter } from 'vue-router';
 import type { FormInstance, FormRules } from 'ant-design-vue';
 import { message } from 'ant-design-vue';
 import PageShell from '../../components/layout/PageShell.vue';
@@ -99,6 +116,7 @@ import {
 import { creditTierColor, creditTierLabel } from '../../types/credit';
 
 const auth = useAuthStore();
+const router = useRouter();
 const profile = ref<UserProfile | null>(null);
 const loading = ref(false);
 const saving = ref(false);
@@ -127,9 +145,43 @@ const rules: FormRules = {
   address: [{ max: 255, message: '地址过长' }]
 };
 
-const formatDate = (value: string) => new Date(value).toLocaleString();
+const formatDate = (value: string | Date) => new Date(value).toLocaleString();
 const creditColor = (tier?: UserProfile['creditTier']) => creditTierColor(tier);
 const creditLabel = (tier?: UserProfile['creditTier']) => creditTierLabel(tier);
+
+const suspensionDeadline = computed(() =>
+  profile.value?.suspendedUntil ? new Date(profile.value.suspendedUntil) : null
+);
+const isSuspended = computed(() => Boolean(suspensionDeadline.value && suspensionDeadline.value.getTime() > Date.now()));
+const suspensionDeadlineText = computed(() =>
+  suspensionDeadline.value ? formatDate(suspensionDeadline.value) : '--'
+);
+const suspensionCountdown = computed(() => {
+  if (!suspensionDeadline.value) {
+    return '--';
+  }
+  const diff = suspensionDeadline.value.getTime() - Date.now();
+  if (diff <= 0) {
+    return '即刻恢复';
+  }
+  const dayMs = 24 * 60 * 60 * 1000;
+  const hourMs = 60 * 60 * 1000;
+  const minuteMs = 60 * 1000;
+  const days = Math.floor(diff / dayMs);
+  const hours = Math.floor((diff % dayMs) / hourMs);
+  const minutes = Math.floor((diff % hourMs) / minuteMs);
+  if (days > 0) {
+    return `${days} 天 ${hours} 小时`;
+  }
+  if (hours > 0) {
+    return `${hours} 小时 ${minutes} 分`;
+  }
+  return `${minutes} 分`;
+});
+
+const goNotificationCenter = () => {
+  router.push({ name: 'notifications' });
+};
 
 const loadProfile = async () => {
   loading.value = true;
@@ -199,6 +251,31 @@ onMounted(() => {
   background: linear-gradient(120deg, rgba(37, 99, 235, 0.12), rgba(16, 185, 129, 0.12));
   border-radius: 16px;
   padding: var(--space-3);
+}
+
+.suspension-card {
+  border-radius: 16px;
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  border: 1px solid transparent;
+}
+
+.suspension-card--alert {
+  background: rgba(244, 63, 94, 0.08);
+  border-color: rgba(244, 63, 94, 0.35);
+}
+
+.suspension-card--ok {
+  background: rgba(16, 185, 129, 0.08);
+  border-color: rgba(16, 185, 129, 0.35);
+}
+
+.suspension-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .profile-form {

@@ -92,6 +92,14 @@ export type Vendor = {
   commissionProfile?: VendorCommissionProfile | null;
 };
 
+export type PagedResponse<T> = {
+  content: T[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+};
+
 export type VendorCommissionProfile = {
   industryCategory: string;
   baseRate: number;
@@ -102,6 +110,15 @@ export type VendorCommissionProfile = {
 
 export const fetchVendor = async (vendorId: string): Promise<Vendor> => {
   const response = await http.get<ApiResponse<Vendor>>(`/vendors/${vendorId}`);
+  return response.data.data;
+};
+
+export const listVendors = async (
+  params: { status?: string; page?: number; size?: number } = {}
+): Promise<PagedResponse<Vendor>> => {
+  const response = await http.get<ApiResponse<PagedResponse<Vendor>>>('/vendors', {
+    params
+  });
   return response.data.data;
 };
 

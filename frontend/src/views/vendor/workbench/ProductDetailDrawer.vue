@@ -1,8 +1,9 @@
 <template>
   <a-drawer
     :open="open"
-    :width="960"
-    placement="right"
+    :width="drawerWidth"
+    :height="drawerHeight"
+    :placement="drawerPlacement"
     :destroyOnClose="true"
     :title="product?.name ?? '商品详情'"
     @close="emit('close')"
@@ -221,6 +222,7 @@
 import { computed, reactive, ref, watch } from 'vue';
 import { message } from 'ant-design-vue';
 import DataStateBlock from '../../../components/feedback/DataStateBlock.vue';
+import { useViewport } from '../../../composables/useViewport';
 import {
   updateVendorProduct,
   submitVendorProduct,
@@ -250,6 +252,18 @@ const emit = defineEmits<{
   (e: 'refresh'): void;
   (e: 'refresh-list'): void;
 }>();
+
+const { width: viewportWidth, isMobile } = useViewport();
+const drawerWidth = computed(() => {
+  if (isMobile.value) {
+    return '100%';
+  }
+  const margin = 64;
+  const desired = Math.min(960, viewportWidth.value - margin);
+  return Math.max(640, desired);
+});
+const drawerPlacement = computed(() => (isMobile.value ? 'bottom' : 'right'));
+const drawerHeight = computed(() => (isMobile.value ? '100%' : undefined));
 
 const activeTab = ref('basic');
 const saving = ref(false);

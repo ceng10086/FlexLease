@@ -1,5 +1,13 @@
 <template>
-  <a-drawer :open="open" :width="1100" title="订单详情" destroy-on-close @close="emit('close')">
+  <a-drawer
+    :open="open"
+    :width="drawerWidth"
+    :height="drawerHeight"
+    :placement="drawerPlacement"
+    title="订单详情"
+    destroy-on-close
+    @close="emit('close')"
+  >
     <a-spin :spinning="loading">
       <template v-if="order">
         <div class="drawer-grid">
@@ -119,6 +127,7 @@ import { formatCurrency } from '../../../utils/number';
 import { disputeOptions, disputeOptionLabel, disputeStatusColor, disputeStatusLabel, disputeActorLabel } from '../../../utils/disputes';
 import { useAuthStore } from '../../../stores/auth';
 import type { ChatSendPayload } from '../../../types/chat';
+import { useViewport } from '../../../composables/useViewport';
 
 const props = defineProps<{
   open: boolean;
@@ -131,6 +140,7 @@ const emit = defineEmits<{
 }>();
 
 const auth = useAuthStore();
+const { width: viewportWidth, isMobile } = useViewport();
 const order = ref<RentalOrderDetail | null>(null);
 const loading = ref(false);
 const forceCloseForm = reactive({ reason: '', loading: false });
@@ -141,6 +151,17 @@ const adminQuickPhrases = [
   '已收到凭证，我们正在核查，请耐心等待。',
   '如需补充资料，请在凭证区上传以便复核。'
 ];
+
+const drawerWidth = computed(() => {
+  if (isMobile.value) {
+    return '100%';
+  }
+  const margin = 64;
+  const desired = Math.min(1100, viewportWidth.value - margin);
+  return Math.max(720, desired);
+});
+const drawerPlacement = computed(() => (isMobile.value ? 'bottom' : 'right'));
+const drawerHeight = computed(() => (isMobile.value ? '100%' : undefined));
 
 const loadOrder = async () => {
   if (!props.orderId) {
