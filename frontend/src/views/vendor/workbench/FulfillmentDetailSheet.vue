@@ -128,6 +128,15 @@
                     <a-tag :color="disputeStatusColor(item.status)">{{ item.status }}</a-tag>
                   </div>
                   <p>诉求：{{ disputeOptionLabel(item.initiatorOption) }} · {{ item.initiatorReason }}</p>
+                  <div v-if="(item.status === 'OPEN' || item.status === 'PENDING_ADMIN') && item.deadlineAt" class="dispute-countdown">
+                    <ClockCircleOutlined />
+                    <span class="label">剩余处理时间：</span>
+                    <a-statistic-countdown
+                      :value="new Date(item.deadlineAt).getTime()"
+                      format="D 天 H 时 m 分"
+                      :value-style="{ fontSize: '14px', color: 'inherit', lineHeight: 1 }"
+                    />
+                  </div>
                   <div v-if="canRespondDispute(item) && disputeForms[item.id]" class="dispute-actions">
                     <a-radio-group
                       v-model:value="disputeForms[item.id].accept"
@@ -212,6 +221,7 @@
 <script lang="ts" setup>
 import { computed, reactive, ref, watch } from 'vue';
 import { message } from 'ant-design-vue';
+import { ClockCircleOutlined } from '@ant-design/icons-vue';
 import PageSection from '../../../components/layout/PageSection.vue';
 import DataStateBlock from '../../../components/feedback/DataStateBlock.vue';
 import OrderChatPanel from '../../../components/chat/OrderChatPanel.vue';
@@ -738,5 +748,19 @@ fetchProofPolicy()
   .sheet-grid {
     grid-template-columns: 1fr;
   }
+}
+
+.dispute-countdown {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  color: var(--color-warning);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.dispute-countdown .label {
+  margin-right: -4px;
 }
 </style>

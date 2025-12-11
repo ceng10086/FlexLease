@@ -25,12 +25,22 @@
 
     <template v-else>
       <a-alert
-        v-if="activeDispute"
+        v-if="activeDispute && activeDispute.deadlineAt"
         type="info"
         show-icon
-        :message="`存在进行中的纠纷，将在 ${formatDate(activeDispute.deadlineAt)} 自动升级。`"
         class="mb-3"
-      />
+      >
+        <template #message>
+          <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap">
+            <span>存在进行中的纠纷，自动升级倒计时：</span>
+            <a-statistic-countdown
+              :value="new Date(activeDispute.deadlineAt).getTime()"
+              format="D 天 H 时 m 分 s 秒"
+              :value-style="{ fontSize: '14px', lineHeight: '1' }"
+            />
+          </div>
+        </template>
+      </a-alert>
       <a-empty v-if="!order.disputes.length" description="暂无纠纷记录" />
       <div v-else class="dispute-list">
         <a-card v-for="dispute in order.disputes" :key="dispute.id" size="small" class="dispute-card">
