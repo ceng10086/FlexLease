@@ -8,7 +8,29 @@ type UseQueryOptions<T> = {
   transform?: (value: T) => T;
 };
 
+const DEFAULT_SCOPE = 'anonymous';
 const cacheStore = new Map<string, unknown>();
+const cacheScope = ref(DEFAULT_SCOPE);
+
+export const setQueryCacheScope = (scope?: string | null) => {
+  const normalized = scope?.trim() || DEFAULT_SCOPE;
+  if (cacheScope.value !== normalized) {
+    cacheScope.value = normalized;
+  }
+};
+
+export const clearQueryCache = (scope?: string | null) => {
+  if (!scope) {
+    cacheStore.clear();
+    return;
+  }
+  const prefix = `${scope}::`;
+  Array.from(cacheStore.keys()).forEach((key) => {
+    if (key.startsWith(prefix)) {
+      cacheStore.delete(key);
+    }
+  });
+};
 
 export const useQuery = <T>(
   key: string | (() => string),
@@ -17,7 +39,8 @@ export const useQuery = <T>(
 ) => {
   const loading = ref(false);
   const error = ref<Error | null>(null);
-  const cacheKey = computed(() => (typeof key === 'function' ? key() : key));
+  const resolvedKey = computed(() => (typeof key === 'function' ? key() : key));
+  const scopedKey = computed(() => `${cacheScope.value}::${resolvedKey.value}`);
   const data = ref<T | null>(null);
   const shouldAutoRun = options.immediate ?? true;
 
@@ -32,7 +55,7 @@ export const useQuery = <T>(
     if (!enabled.value) {
       return;
     }
-    const finalKey = cacheKey.value;
+    const finalKey = scopedKey.value;
     loading.value = true;
     error.value = null;
     try {
@@ -54,10 +77,10 @@ export const useQuery = <T>(
   const refresh = () => execute();
 
   watch(
-    cacheKey,
+    scopedKey,
     () => {
-      if (options.cache !== false && cacheStore.has(cacheKey.value)) {
-        data.value = cacheStore.get(cacheKey.value) as T;
+      if (options.cache !== false && cacheStore.has(scopedKey.value)) {
+        data.value = cacheStore.get(scopedKey.value) as T;
       } else {
         data.value = null;
       }

@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
 import { message } from 'ant-design-vue';
 import { configureHttpAuth } from '../services/http';
+import { clearQueryCache, setQueryCacheScope } from '../composables/useQuery';
 import {
   login as loginApi,
   registerCustomer,
@@ -38,6 +39,8 @@ export const useAuthStore = defineStore('auth', () => {
   };
 
   const clearSession = () => {
+    clearQueryCache();
+    setQueryCacheScope(null);
     token.value = '';
     refreshToken.value = '';
     user.value = null;
@@ -72,10 +75,12 @@ export const useAuthStore = defineStore('auth', () => {
     if (!token.value) {
       initializing.value = false;
       bootstrapCompleted.value = true;
+      setQueryCacheScope(null);
       return;
     }
     try {
       user.value = await fetchCurrentUser();
+      setQueryCacheScope(user.value?.id ?? null);
     } catch (err) {
       console.warn('Bootstrap auth failed', err);
       clearSession();
@@ -92,6 +97,7 @@ export const useAuthStore = defineStore('auth', () => {
       const session = await loginApi(payload);
       applySession(session);
       user.value = await fetchCurrentUser();
+      setQueryCacheScope(user.value?.id ?? null);
       message.success('登录成功');
     } catch (err) {
       const msg = friendlyErrorMessage(err, '登录失败，请稍后重试');
