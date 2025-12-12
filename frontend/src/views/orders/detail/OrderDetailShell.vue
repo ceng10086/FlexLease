@@ -10,11 +10,11 @@
         <div class="detail-header__meta">
           <div>
             <span>应付总额</span>
-            <strong>¥{{ order?.totalAmount.toFixed(2) ?? '--' }}</strong>
+            <strong>¥{{ displayCurrency(order?.totalAmount) }}</strong>
           </div>
           <div>
             <span>押金</span>
-            <strong>¥{{ order?.depositAmount.toFixed(2) ?? '--' }}</strong>
+            <strong>¥{{ displayCurrency(order?.depositAmount) }}</strong>
           </div>
         </div>
       </div>
@@ -45,6 +45,7 @@ import { fetchOrder, type RentalOrderDetail } from '../../../services/orderServi
 import { friendlyErrorMessage } from '../../../utils/error';
 import { message } from 'ant-design-vue';
 import { provideOrderDetail } from '../../../composables/useOrderDetail';
+import { formatCurrency } from '../../../utils/number';
 
 const route = useRoute();
 const router = useRouter();
@@ -104,6 +105,9 @@ provideOrderDetail({
     order.value = detail;
   }
 });
+
+const displayCurrency = (value: number | null | undefined) =>
+  value == null ? '--' : formatCurrency(value);
 </script>
 
 <style scoped>

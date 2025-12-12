@@ -120,7 +120,18 @@ export default defineConfig((configEnv: ConfigEnv) => {
     },
     build: {
       outDir: 'dist',
-      sourcemap: configEnv.mode !== 'production'
+      sourcemap: configEnv.mode !== 'production',
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            vue: ['vue', 'vue-router', 'pinia'],
+            antd: ['ant-design-vue', '@ant-design/icons-vue'],
+            utility: ['axios', 'dayjs']
+          }
+        }
+      },
+      // isolate the Ant Design vendor slab while keeping warnings focused on unexpected chunks
+      chunkSizeWarningLimit: 1600
     }
   };
 });
