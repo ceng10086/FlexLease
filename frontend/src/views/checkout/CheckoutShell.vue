@@ -34,6 +34,17 @@
             </div>
           </div>
           <DataStateBlock
+            v-else-if="missingProduct"
+            type="empty"
+            title="请选择商品"
+            description="可从商品详情或购物车发起下单，当前页面暂未选中商品。"
+          >
+            <a-space>
+              <a-button type="primary" @click="goCatalog">前往商品目录</a-button>
+              <a-button @click="goCart">打开购物车</a-button>
+            </a-space>
+          </DataStateBlock>
+          <DataStateBlock
             v-else
             type="loading"
             title="正在加载商品信息"
@@ -131,6 +142,7 @@ const auth = useAuthStore();
 const product = ref<CatalogProductDetail | null>(null);
 const preview = ref<OrderPreviewResponse | null>(null);
 const loading = reactive({ preview: false, create: false });
+const missingProduct = ref(false);
 
 const form = reactive<{
   quantity: number;
@@ -161,16 +173,17 @@ const leaseText = computed(() => {
 
 const loadProduct = async () => {
   const productId = route.query.productId as string | undefined;
+  missingProduct.value = !productId;
   if (!productId) {
-    message.error('缺少商品信息');
-    router.replace({ name: 'catalog-feed' });
+    product.value = null;
     return;
   }
   try {
     product.value = await fetchCatalogProduct(productId);
+    missingProduct.value = false;
   } catch (error) {
     message.error(friendlyErrorMessage(error, '加载商品失败，请返回目录重试'));
-    router.replace({ name: 'catalog-feed' });
+    product.value = null;
   }
 };
 
@@ -223,7 +236,7 @@ const buildOrderItems = () => {
 };
 
 const handlePreview = async () => {
-  if (!orderReady.value || !auth.user) {
+  if (!orderReady.value || !auth.user || !product.value || !currentPlan.value || !currentSku.value) {
     return;
   }
   loading.preview = true;
@@ -260,24 +273,28 @@ const handleCreate = async () => {
     };
     const order = await createOrder(payload as any, { idempotencyKey });
     message.success('订单创建成功');
-    try {
-      const result = await autoCompleteInitialPayment({
-        orderId: order.id,
-        vendorId: order.vendorId,
-        userId: order.userId,
-        amount: order.totalAmount,
-        depositAmount: order.depositAmount,
-        rentAmount: order.rentAmount,
-        buyoutAmount: order.buyoutAmount ?? undefined,
-        description: '订单首付款'
-      });
-      if (result.succeeded) {
-        message.success('首付款已自动完成');
-      } else {
-        message.info('已生成支付流水，请在订单详情查看进度');
+    if (order.requiresManualReview) {
+      message.info('订单已提交，需平台人工审核后再支付');
+    } else {
+      try {
+        const result = await autoCompleteInitialPayment({
+          orderId: order.id,
+          vendorId: order.vendorId,
+          userId: order.userId,
+          amount: order.totalAmount,
+          depositAmount: order.depositAmount,
+          rentAmount: order.rentAmount,
+          buyoutAmount: order.buyoutAmount ?? undefined,
+          description: '订单首付款'
+        });
+        if (result.succeeded) {
+          message.success('首付款已自动完成');
+        } else {
+          message.info('已生成支付流水，请在订单详情查看进度');
+        }
+      } catch (paymentError) {
+        message.warning(friendlyErrorMessage(paymentError, '自动支付未完成，请前往订单详情补缴'));
       }
-    } catch (paymentError) {
-      message.warning(friendlyErrorMessage(paymentError, '自动支付未完成，请前往订单详情补缴'));
     }
     router.replace({ name: 'order-overview', params: { orderId: order.id } });
   } catch (error) {
@@ -287,7 +304,19 @@ const handleCreate = async () => {
   }
 };
 
-loadProduct().then(() => handlePreview());
+const goCatalog = () => {
+  router.push({ name: 'catalog-feed' });
+};
+
+const goCart = () => {
+  router.push({ name: 'cart' });
+};
+
+loadProduct().then(() => {
+  if (product.value && currentPlan.value && currentSku.value) {
+    handlePreview();
+  }
+});
 </script>
 
 <style scoped>
