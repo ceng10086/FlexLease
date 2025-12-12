@@ -86,9 +86,14 @@ const detail = reactive<{ open: boolean; orderId: string | null }>({ open: false
 const statusOptions = [
   { label: '待支付', value: 'PENDING_PAYMENT' },
   { label: '待发货', value: 'AWAITING_SHIPMENT' },
+  { label: '待收货', value: 'AWAITING_RECEIPT' },
   { label: '履约中', value: 'IN_LEASE' },
+  { label: '退租审批', value: 'RETURN_REQUESTED' },
   { label: '退租中', value: 'RETURN_IN_PROGRESS' },
+  { label: '买断申请', value: 'BUYOUT_REQUESTED' },
+  { label: '买断完成', value: 'BUYOUT_COMPLETED' },
   { label: '已完成', value: 'COMPLETED' },
+  { label: '已取消', value: 'CANCELLED' },
   { label: '异常关闭', value: 'EXCEPTION_CLOSED' }
 ];
 

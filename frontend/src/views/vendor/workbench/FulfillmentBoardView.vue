@@ -56,6 +56,7 @@ const statusOptions = [
   { label: '全部', value: 'ALL' },
   { label: '待发货', value: 'AWAITING_SHIPMENT' },
   { label: '履约中', value: 'IN_LEASE' },
+  { label: '退租审批', value: 'RETURN_REQUESTED' },
   { label: '退租中', value: 'RETURN_IN_PROGRESS' },
   { label: '买断申请', value: 'BUYOUT_REQUESTED' }
 ];
