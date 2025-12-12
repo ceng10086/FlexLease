@@ -177,6 +177,12 @@
                     </a-button>
                     <a-button type="link" @click="handleEscalateDispute(item)">升级平台</a-button>
                   </div>
+                  <div v-else-if="canAppealDispute(item)" class="dispute-actions">
+                    <a-button type="default" danger ghost @click="openAppealModal(item)">
+                      申诉复核
+                    </a-button>
+                    <span class="hint">每个纠纷仅可申诉一次，提交后将由复核组裁决。</span>
+                  </div>
                 </div>
               </div>
               <p v-else class="text-muted">暂无纠纷。</p>
@@ -216,6 +222,24 @@
       <DataStateBlock v-else-if="!loading" title="请选择订单" description="在左侧列表中选择订单以查看履约详情" />
     </a-spin>
   </a-drawer>
+  <a-modal
+    v-model:open="appealModal.open"
+    title="提交申诉"
+    ok-text="提交"
+    :confirm-loading="appealModal.loading"
+    @ok="handleSubmitAppeal"
+    @cancel="appealModal.open = false"
+  >
+    <a-form layout="vertical">
+      <a-form-item label="申诉说明">
+        <a-textarea
+          v-model:value="appealModal.reason"
+          :rows="3"
+          placeholder="请补充需要复核的理由，系统将同步时间线"
+        />
+      </a-form-item>
+    </a-form>
+  </a-modal>
 </template>
 
 <script lang="ts" setup>
@@ -243,6 +267,7 @@ import {
   fetchProofPolicy,
   respondOrderDispute,
   escalateOrderDispute,
+  appealOrderDispute,
   type RentalOrderDetail,
   type OrderDispute,
   type DisputeResolutionOption,
@@ -286,6 +311,12 @@ const disputeForms = reactive<Record<string, {
   attachmentProofIds: string[];
   loading: boolean;
 }>>({});
+const appealModal = reactive<{ open: boolean; target: OrderDispute | null; reason: string; loading: boolean }>({
+  open: false,
+  target: null,
+  reason: '',
+  loading: false
+});
 
 const vendorQuickPhrases = [
   '已收到您的申请，我们会在 2 小时内回复。',
@@ -605,6 +636,11 @@ const handleSendMessage = async (payload: ChatSendPayload) => {
 };
 
 const canRespondDispute = (item: OrderDispute) => item.status === 'OPEN';
+const canAppealDispute = (item: OrderDispute) =>
+  item.status === 'RESOLVED' &&
+  item.appealCount === 0 &&
+  Boolean(auth.user?.id) &&
+  (item.initiatorId === auth.user?.id || item.respondentId === auth.user?.id);
 
 const handleRespondDispute = async (item: OrderDispute) => {
   if (!order.value || !auth.user?.id) {
@@ -650,6 +686,35 @@ const handleEscalateDispute = async (item: OrderDispute) => {
     loadOrder();
   } catch (error) {
     message.error(friendlyErrorMessage(error, '升级失败'));
+  }
+};
+
+const openAppealModal = (item: OrderDispute) => {
+  if (!canAppealDispute(item)) {
+    return;
+  }
+  appealModal.target = item;
+  appealModal.reason = '';
+  appealModal.open = true;
+};
+
+const handleSubmitAppeal = async () => {
+  if (!order.value || !auth.user?.id || !appealModal.target) {
+    return;
+  }
+  appealModal.loading = true;
+  try {
+    await appealOrderDispute(order.value.id, appealModal.target.id, {
+      actorId: auth.user.id,
+      reason: appealModal.reason?.trim() || undefined
+    });
+    message.success('申诉已提交');
+    appealModal.open = false;
+    loadOrder();
+  } catch (error) {
+    message.error(friendlyErrorMessage(error, '申诉失败'));
+  } finally {
+    appealModal.loading = false;
   }
 };
 

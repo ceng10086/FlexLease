@@ -25,12 +25,18 @@
 <script lang="ts" setup>
 import { reactive, ref } from 'vue';
 import { message } from 'ant-design-vue';
+import { useRoute, useRouter } from 'vue-router';
 import { submitProductInquiry, type ProductInquiryPayload } from '../../services/catalogService';
 import { friendlyErrorMessage } from '../../utils/error';
+import { useAuthStore } from '../../stores/auth';
 
 const props = defineProps<{
   productId: string;
 }>();
+
+const router = useRouter();
+const route = useRoute();
+const auth = useAuthStore();
 
 const form = reactive<ProductInquiryPayload>({
   contactName: '',
@@ -40,9 +46,21 @@ const form = reactive<ProductInquiryPayload>({
 
 const submitting = ref(false);
 
+const ensureAuthenticated = () => {
+  if (auth.isAuthenticated) {
+    return true;
+  }
+  message.info('登录后才能发送咨询');
+  router.push({ name: 'login', query: { redirect: route.fullPath } });
+  return false;
+};
+
 const handleSubmit = async () => {
   if (!form.message) {
     message.warning('请填写咨询内容');
+    return;
+  }
+  if (!ensureAuthenticated()) {
     return;
   }
   submitting.value = true;

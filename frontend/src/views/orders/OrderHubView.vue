@@ -7,11 +7,13 @@
         description="卡片式订单墙，按状态快速筛选并进入聊天/凭证子页。"
       >
         <template #actions>
-          <a-segmented
-            v-model:value="activeStatus"
-            :options="statusOptions"
-            @change="reload"
-          />
+          <div class="status-tabs">
+            <a-segmented
+              v-model:value="activeStatus"
+              :options="statusOptions"
+              @change="reload"
+            />
+          </div>
         </template>
       </PageHeader>
     </template>
@@ -48,17 +50,27 @@ const pagination = reactive({ page: 1, size: 6, total: 0 });
 const activeStatus = ref<OrderStatus | 'ALL'>('ALL');
 const loading = ref(false);
 
-const statusOptions = [
-  { label: '全部', value: 'ALL' },
+const statusOrder: OrderStatus[] = [
   'PENDING_PAYMENT',
   'AWAITING_SHIPMENT',
+  'AWAITING_RECEIPT',
   'IN_LEASE',
   'RETURN_REQUESTED',
-  'COMPLETED'
-].map((value) => ({
-  label: value === 'ALL' ? '全部' : orderStatusLabel(value as OrderStatus),
-  value
-}));
+  'RETURN_IN_PROGRESS',
+  'BUYOUT_REQUESTED',
+  'BUYOUT_COMPLETED',
+  'COMPLETED',
+  'CANCELLED',
+  'EXCEPTION_CLOSED'
+];
+
+const statusOptions = [
+  { label: '全部', value: 'ALL' },
+  ...statusOrder.map((status) => ({
+    label: orderStatusLabel(status),
+    value: status
+  }))
+];
 
 const hasMore = computed(() => orders.value.length < pagination.total);
 
@@ -116,5 +128,11 @@ fetchOrders(true);
 .order-footer {
   text-align: center;
   margin-top: var(--space-4);
+}
+
+.status-tabs {
+  max-width: 100%;
+  overflow-x: auto;
+  padding-bottom: 4px;
 }
 </style>
