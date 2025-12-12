@@ -60,12 +60,7 @@ const statusOptions = [
   { label: '买断申请', value: 'BUYOUT_REQUESTED' }
 ];
 
-const hasMore = computed(() => {
-  if (manualReviewOnly.value) {
-    return pagination.page < pagination.totalPages;
-  }
-  return orders.value.length < pagination.totalElements;
-});
+const hasMore = computed(() => pagination.page < pagination.totalPages);
 
 const fetchOrders = async (reset = false) => {
   if (!vendorId.value) {
@@ -80,16 +75,13 @@ const fetchOrders = async (reset = false) => {
     const response = await listOrders({
       vendorId: vendorId.value,
       status: statusFilter.value === 'ALL' ? undefined : statusFilter.value,
+      manualReviewOnly: manualReviewOnly.value || undefined,
       page: pagination.page,
       size: pagination.size
     });
     pagination.totalElements = response.totalElements;
     pagination.totalPages = response.totalPages || 1;
-    let content = response.content;
-    if (manualReviewOnly.value) {
-      content = content.filter((item) => item.requiresManualReview);
-    }
-    orders.value = reset ? content : [...orders.value, ...content];
+    orders.value = reset ? response.content : [...orders.value, ...response.content];
   } catch (error) {
     message.error(friendlyErrorMessage(error, '加载订单失败'));
   } finally {

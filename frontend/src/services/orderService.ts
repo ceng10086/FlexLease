@@ -411,6 +411,7 @@ export const listOrders = async (params: {
   userId?: string;
   vendorId?: string;
   status?: OrderStatus;
+  manualReviewOnly?: boolean;
   page?: number;
   size?: number;
 }) => {
