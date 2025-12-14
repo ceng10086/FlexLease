@@ -355,6 +355,7 @@ loadProduct().then(() => {
 .payment-summary__total strong {
   font-size: var(--font-size-title-lg);
   color: var(--color-primary);
+  line-height: 1.4;
 }
 
 .credit-card {

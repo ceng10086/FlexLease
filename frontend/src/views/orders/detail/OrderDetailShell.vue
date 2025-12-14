@@ -134,6 +134,11 @@ const displayCurrency = (value: number | null | undefined) =>
   display: block;
   font-size: var(--font-size-title-lg);
   color: var(--color-primary);
+  line-height: 1.4;
+}
+
+.detail-header h1 {
+  line-height: 1.4;
 }
 
 .detail-loading {

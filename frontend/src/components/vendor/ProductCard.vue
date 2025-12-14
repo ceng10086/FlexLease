@@ -87,6 +87,7 @@ const formatDate = (value: string) => new Date(value).toLocaleDateString();
 .product-card__header h3 {
   margin: var(--space-1) 0 0;
   font-size: var(--font-size-title-md);
+  line-height: 1.4;
 }
 
 .product-card__desc {

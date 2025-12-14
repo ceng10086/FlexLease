@@ -123,6 +123,11 @@ watch(
 <style scoped>
 .filter-row {
   margin-bottom: var(--space-4);
+  overflow-x: auto;
+}
+
+.filter-row :deep(.ant-segmented) {
+  max-width: 100%;
 }
 
 .order-grid {

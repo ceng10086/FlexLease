@@ -75,6 +75,7 @@ const variantClass = computed(() => ({
   margin: 0;
   font-size: var(--font-size-title-lg);
   font-weight: 600;
+  line-height: 1.4;
 }
 
 .page-section__description {

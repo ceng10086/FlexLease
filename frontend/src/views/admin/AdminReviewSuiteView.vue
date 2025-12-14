@@ -263,6 +263,11 @@ loadProducts();
 
 .section-toolbar {
   margin-bottom: var(--space-3);
+  overflow-x: auto;
+}
+
+.section-toolbar :deep(.ant-segmented) {
+  max-width: 100%;
 }
 
 .card-column {

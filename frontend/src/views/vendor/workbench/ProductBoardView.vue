@@ -425,6 +425,13 @@ watch(
   gap: var(--space-3);
   flex-wrap: wrap;
   margin-bottom: var(--space-4);
+  align-items: center;
+}
+
+.board-filters :deep(.ant-segmented) {
+  max-width: 100%;
+  flex-shrink: 1;
+  min-width: 0;
 }
 
 .card-grid {
@@ -443,6 +450,14 @@ watch(
   justify-content: space-between;
   align-items: center;
   margin-bottom: var(--space-3);
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.inquiry-toolbar :deep(.ant-segmented) {
+  max-width: 100%;
+  flex-shrink: 1;
+  min-width: 0;
 }
 
 .inquiry-list {

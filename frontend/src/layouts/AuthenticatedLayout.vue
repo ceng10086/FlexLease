@@ -307,10 +307,11 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 24px;
+  padding: 12px 24px;
   background: #fff;
-  height: 76px;
+  min-height: 76px;
   box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08);
+  overflow: visible;
 }
 
 .auth-layout__breadcrumbs {
@@ -331,6 +332,7 @@ onMounted(async () => {
   margin: 0;
   font-size: 22px;
   font-weight: 600;
+  line-height: 1.4;
 }
 
 .auth-layout__actions {

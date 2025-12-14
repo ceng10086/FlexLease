@@ -170,6 +170,7 @@ provideVendorWorkbench({
 
 .meta-card strong {
   font-size: var(--font-size-title-lg);
+  line-height: 1.4;
 }
 
 .meta-card span {
@@ -181,5 +182,26 @@ provideVendorWorkbench({
   padding: 0 var(--space-4);
   border-radius: var(--radius-card);
   border: 1px solid rgba(148, 163, 184, 0.3);
+  overflow-x: auto;
+}
+
+.workbench-tabs :deep(.ant-tabs-nav) {
+  min-height: 46px;
+}
+
+.workbench-tabs :deep(.ant-tabs-tab) {
+  padding: 12px 16px;
+  line-height: 1.5;
+}
+
+.workbench-tabs :deep(.ant-tabs-tab-btn) {
+  line-height: 1.5;
+  overflow: visible;
+}
+
+@media (max-width: 640px) {
+  .workbench-meta {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

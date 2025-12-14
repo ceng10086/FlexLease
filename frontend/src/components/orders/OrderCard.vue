@@ -82,6 +82,7 @@ const statusColor = computed(() => orderStatusColor(props.order.status));
 .order-card__amount strong {
   font-size: var(--font-size-title-lg);
   color: var(--color-primary);
+  line-height: 1.4;
 }
 
 .order-card__footer {

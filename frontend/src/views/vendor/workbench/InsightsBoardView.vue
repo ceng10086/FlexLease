@@ -96,5 +96,6 @@ watch(
 
 .stat-card strong {
   font-size: var(--font-size-title-lg);
+  line-height: 1.4;
 }
 </style>
