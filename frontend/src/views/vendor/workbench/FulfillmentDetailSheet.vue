@@ -295,7 +295,7 @@ const { width: viewportWidth, isMobile } = useViewport();
 const order = ref<RentalOrderDetail | null>(null);
 const loading = ref(false);
 const proofPolicy = ref<ProofPolicySummary | null>(null);
-const vendorProofTypes: OrderProofType[] = ['SHIPMENT', 'INSPECTION', 'OTHER'];
+const vendorProofTypes: OrderProofType[] = ['SHIPMENT', 'RETURN', 'INSPECTION', 'OTHER'];
 
 const shipForm = reactive({ carrier: '', trackingNumber: '', message: '', loading: false });
 const returnDecision = reactive({ loading: false });

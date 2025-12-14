@@ -128,6 +128,12 @@ const NAV_TREE: NavSection[] = [
         ]
       },
       {
+        key: 'vendor-chat-center',
+        label: '沟通中心',
+        path: '/app/vendor/chat-center',
+        icon: 'MessageOutlined'
+      },
+      {
         key: 'vendor-onboarding',
         label: '入驻进度',
         path: '/app/vendor/onboarding',
@@ -259,7 +265,7 @@ const MOBILE_TAB_PRESETS: Record<string, MobileTab[]> = {
     {
       key: 'vendor-chat',
       label: '沟通',
-      path: '/app/vendor/workbench/fulfillment',
+      path: '/app/vendor/chat-center',
       icon: 'MessageOutlined'
     }
   ],

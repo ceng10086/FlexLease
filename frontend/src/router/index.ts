@@ -135,6 +135,12 @@ const router = createRouter({
           meta: { roles: ['VENDOR'], navKey: 'vendor-onboarding' }
         },
         {
+          path: 'vendor/chat-center',
+          name: 'vendor-chat-center',
+          component: () => import('../views/vendor/VendorConversationHubView.vue'),
+          meta: { roles: ['VENDOR'], navKey: 'vendor-chat-center' }
+        },
+        {
           path: 'vendor/workbench',
           component: () => import('../views/vendor/workbench/VendorWorkbenchLayout.vue'),
           meta: { roles: ['VENDOR'] },
