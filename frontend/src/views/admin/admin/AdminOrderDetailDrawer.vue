@@ -122,6 +122,7 @@ import {
   type DisputeResolutionOption
 } from '../../../services/orderService';
 import { friendlyErrorMessage } from '../../../utils/error';
+import { openProofInNewTab } from '../../../services/proofService';
 import { message } from 'ant-design-vue';
 import { formatCurrency } from '../../../utils/number';
 import { disputeOptions, disputeOptionLabel, disputeStatusColor, disputeStatusLabel, disputeActorLabel } from '../../../utils/disputes';
@@ -295,8 +296,12 @@ const handleResolveDispute = async (dispute: OrderDispute) => {
   }
 };
 
-const previewProof = (proof: { fileUrl: string }) => {
-  window.open(proof.fileUrl, '_blank');
+const previewProof = async (proof: { fileUrl: string }) => {
+  try {
+    await openProofInNewTab(proof.fileUrl);
+  } catch (error) {
+    message.error(friendlyErrorMessage(error, '无法打开预览'));
+  }
 };
 </script>
 

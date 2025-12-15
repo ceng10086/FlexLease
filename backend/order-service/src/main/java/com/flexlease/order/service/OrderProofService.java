@@ -130,7 +130,13 @@ public class OrderProofService {
         ensureReadable(order);
         Resource resource = proofStorageService.loadAsResource(storedName);
         String contentType = proof.getContentType() != null ? proof.getContentType() : "application/octet-stream";
-        return new ProofFileResource(storedName, contentType, proof.getFileSize(), resource);
+        long actualSize = proof.getFileSize();
+        try {
+            actualSize = resource.contentLength();
+        } catch (Exception ignored) {
+            // fallback to stored value
+        }
+        return new ProofFileResource(storedName, contentType, actualSize, resource);
     }
 
     private void ensureProofTypeAllowed(OrderActorRole role, OrderProofType type) {

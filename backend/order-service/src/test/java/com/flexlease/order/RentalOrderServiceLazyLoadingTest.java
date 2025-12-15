@@ -45,7 +45,7 @@ class RentalOrderServiceLazyLoadingTest {
                 OrderProofType.SHIPMENT,
                 "发货凭证",
                 "proof.jpg",
-                "/proofs/proof.jpg",
+                "/api/v1/proofs/proof.jpg",
                 "image/jpeg",
                 1024L,
                 order.getVendorId(),

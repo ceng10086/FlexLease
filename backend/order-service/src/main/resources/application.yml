@@ -72,6 +72,3 @@ security:
     permit-all:
       - /actuator/health
       - /actuator/info
-      - /api/v1/proof-policy
-      - /proofs/**
-      - /api/v1/proofs/**

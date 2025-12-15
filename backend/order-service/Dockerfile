@@ -26,7 +26,7 @@ ENV JAVA_HOME=/opt/java-runtime \
 
 # Required by java.desktop font rendering used in image watermarking.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends fontconfig fonts-dejavu-core \
+    && apt-get install -y --no-install-recommends fontconfig fonts-dejavu-core fonts-noto-cjk \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

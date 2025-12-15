@@ -12,18 +12,40 @@
         >
           <template #cover>
             <img
-              v-if="isImage(proof)"
-              :src="proof.fileUrl"
+              v-if="isImage(proof) && objectUrls[proof.id]"
+              :src="objectUrls[proof.id]"
               alt="proof"
               class="proof-cover"
             />
+            <div
+              v-else-if="isImage(proof) && !failed[proof.id]"
+              class="proof-cover proof-cover--loading"
+            />
+            <div
+              v-else-if="isImage(proof) && failed[proof.id]"
+              class="proof-cover proof-cover--file"
+            >
+              <strong>PREVIEW</strong>
+              <span>加载失败</span>
+            </div>
             <video
-              v-else-if="isVideo(proof)"
-              :src="proof.fileUrl"
+              v-else-if="isVideo(proof) && objectUrls[proof.id]"
+              :src="objectUrls[proof.id]"
               class="proof-cover proof-cover--video"
               controls
               preload="metadata"
             />
+            <div
+              v-else-if="isVideo(proof) && !failed[proof.id]"
+              class="proof-cover proof-cover--loading"
+            />
+            <div
+              v-else-if="isVideo(proof) && failed[proof.id]"
+              class="proof-cover proof-cover--file"
+            >
+              <strong>PREVIEW</strong>
+              <span>加载失败</span>
+            </div>
             <div v-else class="proof-cover proof-cover--file">
               <strong>{{ fileBadge(proof) }}</strong>
               <span>{{ formatSize(proof.fileSize) }}</span>
@@ -41,8 +63,9 @@
 </template>
 
 <script lang="ts" setup>
-import { computed } from 'vue';
+import { computed, onBeforeUnmount, reactive, watch } from 'vue';
 import type { OrderProof } from '../../services/orderService';
+import { createObjectUrlFromProof } from '../../services/proofService';
 
 const props = defineProps<{
   proofs: OrderProof[];
@@ -76,6 +99,63 @@ const groupedProofs = computed(() => {
 
 const isImage = (proof: OrderProof) => (proof.contentType ?? '').startsWith('image/');
 const isVideo = (proof: OrderProof) => (proof.contentType ?? '').startsWith('video/');
+
+const objectUrls = reactive<Record<string, string>>({});
+const loading = reactive<Record<string, boolean>>({});
+const failed = reactive<Record<string, boolean>>({});
+
+const needsPreviewBlob = (proof: OrderProof) => isImage(proof) || isVideo(proof);
+
+const ensurePreviewLoaded = async (proof: OrderProof) => {
+  if (!needsPreviewBlob(proof)) {
+    return;
+  }
+  if (objectUrls[proof.id] || loading[proof.id] || failed[proof.id]) {
+    return;
+  }
+  loading[proof.id] = true;
+  try {
+    objectUrls[proof.id] = await createObjectUrlFromProof(proof.fileUrl);
+  } catch {
+    failed[proof.id] = true;
+  } finally {
+    loading[proof.id] = false;
+  }
+};
+
+// Keep this function to trigger lazy loading when needed.
+const previewUrl = (proof: OrderProof) => {
+  void ensurePreviewLoaded(proof);
+  return objectUrls[proof.id] ?? '';
+};
+
+watch(
+  () => props.proofs.map((p) => p.id).join(','),
+  (next, prev) => {
+    const prevIds = new Set((prev ?? '').split(',').filter(Boolean));
+    const nextIds = new Set((next ?? '').split(',').filter(Boolean));
+
+    // Revoke removed URLs
+    for (const id of prevIds) {
+      if (!nextIds.has(id) && objectUrls[id]) {
+        URL.revokeObjectURL(objectUrls[id]);
+        delete objectUrls[id];
+        delete loading[id];
+        delete failed[id];
+      }
+    }
+
+    // Warm cache for current proofs
+    props.proofs.forEach((proof) => {
+      void previewUrl(proof);
+    });
+  },
+  { immediate: true }
+);
+
+onBeforeUnmount(() => {
+  Object.values(objectUrls).forEach((url) => URL.revokeObjectURL(url));
+});
 
 const fileBadge = (proof: OrderProof) => {
   if (proof.contentType) {
@@ -121,6 +201,26 @@ const formatSize = (bytes: number) => {
 
 .proof-cover--video {
   background: #000;
+}
+
+.proof-cover--loading {
+  background: linear-gradient(
+    90deg,
+    rgba(148, 163, 184, 0.18) 0%,
+    rgba(148, 163, 184, 0.32) 50%,
+    rgba(148, 163, 184, 0.18) 100%
+  );
+  background-size: 200% 100%;
+  animation: proof-skeleton 1.1s ease-in-out infinite;
+}
+
+@keyframes proof-skeleton {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 .proof-cover--file {

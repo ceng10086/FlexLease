@@ -59,7 +59,7 @@ class OrderQueryLazyLoadingTest {
                 OrderProofType.SHIPMENT,
                 "物流凭证",
                 "proof.jpg",
-                "/proofs/proof.jpg",
+            "/api/v1/proofs/proof.jpg",
                 "image/jpeg",
                 2048L,
                 order.getVendorId(),

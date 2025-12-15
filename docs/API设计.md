@@ -1,6 +1,6 @@
 # 智能化共享租赁平台 API 设计
 
-> 约定 RESTful 风格，统一前缀 `/api/v1`，所有响应使用统一包装：
+> 约定 RESTful 风格，统一前缀 `/api/v1`（下文表格中的 URL 默认省略该前缀；实际调用时请补上），所有响应使用统一包装：
 > ```json
 > {
 >   "code": 0,
@@ -227,7 +227,7 @@
 | POST | `/orders/{orderId}/messages` | 在时间线中追加沟通记录 | `{ actorId, message }` | 用户/厂商/管理员均可调用，后端会校验请求人与当前登录用户一致，并触发站内信提醒对端 |
 | GET | `/orders/{orderId}/proofs` | 查看全部取证资料 | - | 返回列表按 `uploadedAt` 排序 |
 | POST | `/orders/{orderId}/proofs` | 上传取证文件 | `multipart/form-data`：`actorId`、`proofType=SHIPMENT/RECEIVE/RETURN/INSPECTION/OTHER`、`description?`、`file` | 根据角色限制可选 `proofType`，成功后在时间线追加 `PROOF_UPLOADED` 事件并通过 Notification Service 通知对方 |
-| GET | `/proofs/{fileName}` | 下载取证文件 | - | 静态资源控制器，同步校验当前身份是否有权限读取目标订单 |
+| GET | `/proofs/{fileName}` | 下载取证文件（鉴权） | - | 需携带 `Authorization`；服务端会根据取证材料所属订单校验访问权限，返回 `inline` 资源流（前端预览通常以 `blob` 方式拉取并生成临时 URL） |
 
 > `ProofPolicyProperties` 中可配置发货/退租阶段所需的最少照片/视频数量，未满足要求时 `/orders/{id}/ship`、`/return/complete` 会拒绝操作。
 
@@ -254,7 +254,7 @@
 ### 5.9 内部数据接口
 | 方法 | URL | 角色 | 描述 | 响应要点 |
 | ---- | --- | ---- | ---- | -------- |
-| GET | `/api/v1/internal/vendors/{vendorId}/performance-metrics` | INTERNAL | user-service 读取厂商履约指标（SLA 计算） | `onTimeShipmentRate`、`totalDisputes`、`friendlyDisputes`、`cancellationRate`；返回 0~1 的比率值 |
+| GET | `/internal/vendors/{vendorId}/performance-metrics` | INTERNAL | user-service 读取厂商履约指标（SLA 计算） | `onTimeShipmentRate`、`totalDisputes`、`friendlyDisputes`、`cancellationRate`；返回 0~1 的比率值 |
 
 ## 6. 支付与结算（payment-service）
 > 枚举说明：`scene` 取值 `DEPOSIT`/`RENT`/`BUYOUT`/`PENALTY`；`channel` 取值 `MOCK`/`ALIPAY`/`WECHAT`/`BANK_TRANSFER`；`status` 取值 `PENDING`/`SUCCEEDED`/`FAILED`。

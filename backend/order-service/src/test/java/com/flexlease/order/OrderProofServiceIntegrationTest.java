@@ -121,7 +121,7 @@ class OrderProofServiceIntegrationTest {
             );
             assertThat(response.proofType()).isEqualTo(OrderProofType.SHIPMENT);
             assertThat(response.actorRole()).isEqualTo(OrderActorRole.VENDOR);
-            assertThat(response.fileUrl()).startsWith("/proofs/");
+            assertThat(response.fileUrl()).startsWith("/api/v1/proofs/");
             assertThat(orderProofService.list(created.id())).hasSize(1);
         }
     }

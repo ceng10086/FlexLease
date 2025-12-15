@@ -46,8 +46,8 @@ FlexLease 面向 B2C 场景，为厂商与消费者提供从入驻、商品配�
   - 订单试算自动根据用户信用档案调整押金（优享减免、预警上浮、受限拦截），并写入订单快照供履约审核。
   - 下单支持附带客户备注，厂商工作台与管理员订单抽屉可直接查看，方便处理特殊配送/履约指引。
   - 续租/退租/买断流程及审批、自动库存处理、订单合同生成与签署。
-  - `/orders/{id}/messages` 支持用户与厂商在订单抽屉直接沟通（自动写入时间线），`OrderProofService`（`backend/order-service/src/main/java/com/flexlease/order/service/OrderProofService.java`）提供发货/收货/退租/巡检/其他凭证上传、`/proofs/{fileName}` 下载以及和 Notification Service 的互通提醒。
-  - `ProofPolicyService` 对外暴露 `/api/v1/proof-policy`，统一告知各阶段最小凭证数量与拍摄角度，并由 `ProofStorageService` 对图片自动打水印；`RentalOrderService` 会在发货/收货/退租动作前强制校验凭证数量，`CreditRewardService` 根据支付/退租/纠纷结果触发信用事件（含恶意行为 -30 分并冻结账号 30 天）。
+  - `/orders/{id}/messages` 支持用户与厂商在订单抽屉直接沟通（自动写入时间线），`OrderProofService`（`backend/order-service/src/main/java/com/flexlease/order/service/OrderProofService.java`）提供发货/收货/退租/巡检/其他凭证上传、`/api/v1/proofs/{fileName}` 鉴权下载（前端预览通过拉取 blob 生成本地 URL）以及和 Notification Service 的互通提醒。
+  - `ProofPolicyService` 对外暴露 `/api/v1/proof-policy`，统一告知各阶段最小凭证数量与拍摄角度，并由 `ProofStorageService` 对图片自动打水印；为保证中文水印正常显示，`order-service` 镜像包含 `fonts-noto-cjk` 字体包。
   - `OrderDisputeService`（`backend/order-service/src/main/java/com/flexlease/order/service/OrderDisputeService.java`）封装纠纷创建→协商→升级仲裁→平台裁决→信用扣分→满意度调查的全流程，管理员可在 `/api/v1/admin/orders/{id}/disputes/{disputeId}/resolve` 直接裁决，并支持 `maliciousBehavior` 标志自动触发恶意行为惩罚；双方在发起/回应纠纷时可同步上传多媒体附件与电话纪要，信息将写入时间线与抽屉附件列表。
   - 纠纷调度新增多阶段倒计时提醒（24小时、6小时、1小时前各提醒一次）与超时自动升级逻辑；用户二次申诉进入 `PENDING_REVIEW_PANEL` 状态需 `REVIEW_PANEL` 角色裁决，实现复核组权限区分。
   - 满意度调研由 `OrderSurveyService` 定时激活 `/orders/{id}/surveys` 调查，支持双方打分与评价，并追加时间线+站内信提醒。
@@ -67,7 +67,7 @@ FlexLease 面向 B2C 场景，为厂商与消费者提供从入驻、商品配�
 - **前端体验**
   - 单点登录 + 多角色工作台：消费者覆盖商品目录/详情、购物车、结算、订单详情（含支付、续租/退租/买断、电子合同）与通知中心；厂商拥有商品/媒体工作台、库存流水、订单履约抽屉、运营指标与结算看板；管理员负责入驻审核、商品审核与订单监控（含合同预览、强制关闭）。
   - 仪表盘提供平台/厂商双视角 GMV、订单状态与 7 日趋势，同步呈现租赁模式构成、信用分布、纠纷态势与满意度调研待办，并暴露订单沟通/凭证/纠纷抽屉。
-  - 商品详情页新增“下单前咨询”表单，可在 72 小时有效期内被厂商回复；订单详情/履约抽屉根据 `/proof-policy` 动态展示拍摄指引与水印示例，厂商指标/结算页面同步展示抽成基准与实时佣金。
+  - 商品详情页新增“下单前咨询”表单，可在 72 小时有效期内被厂商回复；订单详情/履约抽屉根据 `/api/v1/proof-policy` 动态展示拍摄指引与水印示例，厂商指标/结算页面同步展示抽成基准与实时佣金。
   - `ProfilePage` 在首次进入时自动触发档案创建，展示信用档位与冻结状态，并允许用户更新联系方式供通知/合同使用。
   - 纠纷面板可以直接上传图片/视频附件并记录电话纪要，消费者、厂商与管理员在抽屉内即可查看并下载所有取证材料。
   - 自动支付模拟、`useVendorContext` 厂商身份刷新、Ant Design Vue + Pinia + Vue Router 组合支撑桌面级交互。
@@ -153,7 +153,7 @@ docker compose up --build
 2. 厂商工作台创建商品/方案/SKU，上传媒体、调整库存并提交审核，管理员在 `/api/v1/admin/products/**` 审核后即可在 Catalog 中看到。
 3. 消费者登录 → 浏览 `/app/catalog` → 进入商品详情 → 加入购物车/直接试算 `/orders/preview` → 创建订单（可附带 `cartItemIds`）→ 支付由 `payment-service` 自动确认。
 4. 在商品详情底部提交“下单前咨询”，72 小时内可在厂商工作台的咨询抽屉查看与回复；消费者通过通知中心获知厂商答复。
-5. 在订单详情体验续租/退租/买断、支付回执与电子合同签署，并查看凭证卡片展示的 `/proof-policy` 拍摄指引与水印示例，同时打开通知中心验证 `/notifications/logs` 的最新日志。
+5. 在订单详情体验续租/退租/买断、支付回执与电子合同签署，并查看凭证卡片展示的 `/api/v1/proof-policy` 拍摄指引与水印示例，同时打开通知中心验证 `/notifications/logs` 的最新日志。
 6. 切换到厂商角色，在订单履约抽屉中完成发货/审批，接着打开运营指标（含抽成洞察）与结算页面（若缺少 `vendorId`，请退出账号后重新登录）。
 7. 切换管理员查看订单监控列表、过滤条件与合同抽屉，并使用强制关闭演练补偿流程；如需纯 API 调试可导入 `docs/postman/cart-api.postman_collection.json`。
 

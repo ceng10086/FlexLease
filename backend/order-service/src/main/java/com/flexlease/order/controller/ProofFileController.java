@@ -24,10 +24,12 @@ public class ProofFileController {
     @GetMapping("/{fileName:.+}")
     public ResponseEntity<Resource> download(@PathVariable String fileName) {
         ProofFileResource file = orderProofService.loadProofFile(fileName);
-        return ResponseEntity.ok()
+        ResponseEntity.BodyBuilder builder = ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(file.contentType()))
-            .contentLength(file.fileSize())
-                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + file.fileName() + "\"")
-                .body(file.resource());
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + file.fileName() + "\"");
+        if (file.fileSize() > 0) {
+            builder.contentLength(file.fileSize());
+        }
+        return builder.body(file.resource());
     }
 }

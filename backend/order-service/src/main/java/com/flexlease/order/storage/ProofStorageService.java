@@ -8,6 +8,7 @@ import java.awt.AlphaComposite;
 import java.awt.Color;
 import java.awt.Font;
 import java.awt.FontMetrics;
+import java.awt.GraphicsEnvironment;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.io.IOException;
@@ -67,7 +68,7 @@ public class ProofStorageService {
         return new StoredFile(
                 originalFilename,
                 generatedName,
-                "/proofs/" + generatedName,
+            "/api/v1/proofs/" + generatedName,
                 file.getContentType(),
                 file.getSize()
         );
@@ -122,7 +123,7 @@ public class ProofStorageService {
             graphics.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.35f));
             graphics.setColor(Color.WHITE);
             int fontSize = Math.max(20, image.getWidth() / 25);
-            graphics.setFont(new Font(Font.SANS_SERIF, Font.BOLD, fontSize));
+            graphics.setFont(resolveWatermarkFont(fontSize));
             FontMetrics metrics = graphics.getFontMetrics();
             int x = Math.max(10, image.getWidth() - metrics.stringWidth(watermarkText) - 20);
             int y = Math.max(metrics.getHeight(), image.getHeight() - metrics.getDescent() - 20);
@@ -143,6 +144,29 @@ public class ProofStorageService {
             return "";
         }
         return filename.substring(idx + 1).toLowerCase(Locale.ROOT);
+    }
+
+    private Font resolveWatermarkFont(int size) {
+        // Prefer fonts that can render Chinese glyphs when running in slim containers.
+        String[] preferredFamilies = {
+                "Noto Sans CJK SC",
+                "Noto Sans CJK",
+                "WenQuanYi Zen Hei",
+                "Microsoft YaHei"
+        };
+        try {
+            String[] available = GraphicsEnvironment.getLocalGraphicsEnvironment().getAvailableFontFamilyNames();
+            for (String preferred : preferredFamilies) {
+                for (String family : available) {
+                    if (preferred.equalsIgnoreCase(family)) {
+                        return new Font(family, Font.BOLD, size);
+                    }
+                }
+            }
+        } catch (Exception ignored) {
+            // fallback
+        }
+        return new Font(Font.SANS_SERIF, Font.BOLD, size);
     }
 
     public record StoredFile(String originalName, String storedName, String fileUrl, String contentType, long size) {

@@ -1,4 +1,5 @@
 import http from './http';
+import type { AxiosError } from 'axios';
 
 export type AuthUser = {
   id: string;
@@ -32,8 +33,29 @@ type ApiResponse<T> = {
   data: T;
 };
 
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const shouldRetryAuth = (error: unknown) => {
+  const axiosError = error as AxiosError | undefined;
+  const status = axiosError?.response?.status;
+  const url = axiosError?.config?.url ?? '';
+  return status === 503 && url.includes('/auth/');
+};
+
+const withAuthRetry = async <T>(fn: () => Promise<T>): Promise<T> => {
+  try {
+    return await fn();
+  } catch (error) {
+    if (!shouldRetryAuth(error)) {
+      throw error;
+    }
+    await sleep(800);
+    return await fn();
+  }
+};
+
 export const login = async (payload: LoginPayload): Promise<AuthSession> => {
-  const response = await http.post<ApiResponse<AuthSession>>('/auth/token', payload);
+  const response = await withAuthRetry(() => http.post<ApiResponse<AuthSession>>('/auth/token', payload));
   const session = response.data?.data;
   if (!session?.accessToken) {
     throw new Error('登录失败，请检查账号或稍后再试');
@@ -45,10 +67,12 @@ export const login = async (payload: LoginPayload): Promise<AuthSession> => {
 };
 
 export const refreshAuthToken = async (token: string): Promise<AuthSession> => {
-  const response = await http.post<ApiResponse<AuthSession>>(
-    '/auth/token/refresh',
-    { refreshToken: token },
-    { _skipAuthRefresh: true } as any
+  const response = await withAuthRetry(() =>
+    http.post<ApiResponse<AuthSession>>(
+      '/auth/token/refresh',
+      { refreshToken: token },
+      { _skipAuthRefresh: true } as any
+    )
   );
   const session = response.data?.data;
   if (!session?.accessToken || !session.refreshToken) {
@@ -68,7 +92,7 @@ export const registerVendor = async (payload: RegisterPayload): Promise<AuthUser
 };
 
 export const fetchCurrentUser = async (): Promise<AuthUser> => {
-  const response = await http.get<ApiResponse<AuthUser>>('/auth/me');
+  const response = await withAuthRetry(() => http.get<ApiResponse<AuthUser>>('/auth/me'));
   const user = response.data?.data;
   if (!user) {
     throw new Error('未能获取当前用户信息');

@@ -21,6 +21,7 @@ import PageSection from '../../../components/layout/PageSection.vue';
 import ProofGallery from '../../../components/proof/ProofGallery.vue';
 import ProofUploader from '../../../components/proof/ProofUploader.vue';
 import { uploadOrderProof, type OrderProofType } from '../../../services/orderService';
+import { openProofInNewTab } from '../../../services/proofService';
 import { useAuthStore } from '../../../stores/auth';
 import { message } from 'ant-design-vue';
 import { friendlyErrorMessage } from '../../../utils/error';
@@ -30,8 +31,12 @@ const order = computed(() => getOrder());
 const auth = useAuthStore();
 const consumerProofTypes: OrderProofType[] = ['RECEIVE', 'RETURN', 'INSPECTION', 'OTHER'];
 
-const handlePreview = (proof: { fileUrl: string }) => {
-  window.open(proof.fileUrl, '_blank');
+const handlePreview = async (proof: { fileUrl: string }) => {
+  try {
+    await openProofInNewTab(proof.fileUrl);
+  } catch (error) {
+    message.error(friendlyErrorMessage(error, '无法打开预览'));
+  }
 };
 
 const handleUpload = async (payload: { proofType: OrderProofType; description?: string; file: File }) => {
