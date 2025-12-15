@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping({"/proofs", "/api/v1/proofs"})
+@RequestMapping("/api/v1/proofs")
 public class ProofFileController {
 
     private final OrderProofService orderProofService;
@@ -27,7 +27,7 @@ public class ProofFileController {
         return ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(file.contentType()))
             .contentLength(file.fileSize())
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + file.fileName() + "\"")
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + file.fileName() + "\"")
                 .body(file.resource());
     }
 }

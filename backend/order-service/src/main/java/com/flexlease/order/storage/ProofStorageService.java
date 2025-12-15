@@ -131,8 +131,9 @@ public class ProofStorageService {
             String extension = resolveExtension(storedName);
             String format = "png".equals(extension) ? "png" : "jpg";
             ImageIO.write(image, format, path.toFile());
-        } catch (IOException ex) {
-            LOG.warn("Failed to apply watermark to proof {}: {}", storedName, ex.getMessage());
+        } catch (Throwable ex) {
+            // watermark is best-effort; don't fail the upload if font/image processing is unavailable
+            LOG.warn("Failed to apply watermark to proof {}: {}", storedName, ex.toString());
         }
     }
 

@@ -69,3 +69,9 @@ security:
     secret: ${SECURITY_JWT_SECRET:flexlease-default-secret-please-change}
     issuer: ${SECURITY_JWT_ISSUER:flexlease-auth-service}
     internal-access-token: ${SECURITY_JWT_INTERNAL:flexlease-internal-secret}
+    permit-all:
+      - /actuator/health
+      - /actuator/info
+      - /api/v1/proof-policy
+      - /proofs/**
+      - /api/v1/proofs/**

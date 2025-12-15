@@ -19,20 +19,28 @@
         :disabled="isDisabled"
       />
     </div>
-    <div class="proof-uploader__picker">
+    <div
+      class="proof-uploader__picker"
+      :class="{ 'proof-uploader__picker--dragging': isDragging }"
+      @dragenter.prevent="handleDragEnter"
+      @dragover.prevent="handleDragOver"
+      @dragleave.prevent="handleDragLeave"
+      @drop.prevent="handleDrop"
+    >
       <div class="picker-copy">
         <strong>选择需要上传的图片 / 视频</strong>
         <span>支持批量选择，系统会在后台自动打水印。</span>
       </div>
-      <a-button type="dashed" :disabled="isDisabled" @click="triggerFileSelect">
+      <a-button type="dashed" html-type="button" :disabled="isDisabled" @click="triggerFileSelect">
         添加文件
       </a-button>
       <input
         ref="fileInput"
         type="file"
         multiple
-        hidden
+        class="proof-uploader__file-input"
         :disabled="isDisabled"
+        accept="image/*,video/*"
         @change="handleFileChange"
       />
     </div>
@@ -130,6 +138,7 @@ const form = reactive<{ proofType: OrderProofType; description?: string }>({
 const queue = ref<UploadQueueItem[]>([]);
 const processing = ref(false);
 const fileInput = ref<HTMLInputElement | null>(null);
+const isDragging = ref(false);
 let fileSeed = 0;
 
 const proofTypeOptions = computed(() =>
@@ -196,16 +205,24 @@ const triggerFileSelect = () => {
   if (isDisabled.value) {
     return;
   }
-  fileInput.value?.click();
-};
-
-const handleFileChange = (event: Event) => {
-  const target = event.target as HTMLInputElement;
-  const files = Array.from(target.files ?? []);
-  if (!files.length) {
+  const input = fileInput.value;
+  if (!input) {
     return;
   }
-  const nextItems = files.map<UploadQueueItem>((file) => ({
+  const showPicker = (input as unknown as { showPicker?: () => void }).showPicker;
+  if (typeof showPicker === 'function') {
+    showPicker.call(input);
+    return;
+  }
+  input.click();
+};
+
+const appendFilesToQueue = (files: File[]) => {
+  const filtered = files.filter((file) => file.size > 0);
+  if (!filtered.length) {
+    return;
+  }
+  const nextItems = filtered.map<UploadQueueItem>((file) => ({
     id: ++fileSeed,
     file,
     name: file.name,
@@ -215,9 +232,45 @@ const handleFileChange = (event: Event) => {
     error: null
   }));
   queue.value = [...queue.value, ...nextItems];
+};
+
+const handleFileChange = (event: Event) => {
+  const target = event.target as HTMLInputElement;
+  const files = Array.from(target.files ?? []);
+  if (!files.length) {
+    return;
+  }
+  appendFilesToQueue(files);
   if (target) {
     target.value = '';
   }
+};
+
+const handleDragEnter = () => {
+  if (isDisabled.value) {
+    return;
+  }
+  isDragging.value = true;
+};
+
+const handleDragOver = () => {
+  if (isDisabled.value) {
+    return;
+  }
+  isDragging.value = true;
+};
+
+const handleDragLeave = () => {
+  isDragging.value = false;
+};
+
+const handleDrop = (event: DragEvent) => {
+  if (isDisabled.value) {
+    return;
+  }
+  isDragging.value = false;
+  const files = Array.from(event.dataTransfer?.files ?? []);
+  appendFilesToQueue(files);
 };
 
 const removeFromQueue = (id: number) => {
@@ -325,6 +378,23 @@ const retryUpload = async (id: number) => {
   align-items: center;
   gap: var(--space-3);
   background: var(--color-surface-muted, #f7f7f5);
+}
+
+.proof-uploader__picker--dragging {
+  border-color: var(--color-primary, #2563eb);
+  background: rgba(37, 99, 235, 0.08);
+}
+
+.proof-uploader__file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .picker-copy {

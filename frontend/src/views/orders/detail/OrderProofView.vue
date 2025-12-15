@@ -36,11 +36,10 @@ const handlePreview = (proof: { fileUrl: string }) => {
 
 const handleUpload = async (payload: { proofType: OrderProofType; description?: string; file: File }) => {
   if (!order.value) {
-    return;
+    throw new Error('订单不存在或尚未加载');
   }
   if (!auth.user) {
-    message.warning('请先登录后再上传凭证');
-    return;
+    throw new Error('请先登录后再上传凭证');
   }
   try {
     await uploadOrderProof(order.value!.id, {

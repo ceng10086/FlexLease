@@ -213,7 +213,12 @@
             </PageSection>
             <PageSection title="凭证">
               <ProofGallery :proofs="order.proofs" @preview="previewProof" />
-              <ProofUploader :allowed-types="vendorProofTypes" :upload-handler="handleUploadProof" />
+              <ProofUploader
+                :allowed-types="vendorProofTypes"
+                :disabled="!order || !auth.user"
+                :disabled-reason="!auth.user ? '请先登录后上传凭证。' : !order ? '请先选择订单后上传凭证。' : null"
+                :upload-handler="handleUploadProof"
+              />
               <p class="hint">{{ proofPolicyHint }}</p>
             </PageSection>
           </div>
@@ -574,8 +579,11 @@ const handleBuyoutDecision = async (approve: boolean) => {
 };
 
 const handleUploadProof = async (payload: { proofType: OrderProofType; description?: string; file: File }) => {
-  if (!order.value || !auth.user) {
-    return;
+  if (!order.value) {
+    throw new Error('请先选择订单');
+  }
+  if (!auth.user) {
+    throw new Error('请先登录');
   }
   try {
     await uploadOrderProof(order.value.id, {

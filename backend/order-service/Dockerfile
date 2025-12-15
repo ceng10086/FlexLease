@@ -23,6 +23,12 @@ ARG SERVICE_NAME
 ARG ARTIFACT_NAME
 ENV JAVA_HOME=/opt/java-runtime \
     PATH="/opt/java-runtime/bin:${PATH}"
+
+# Required by java.desktop font rendering used in image watermarking.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends fontconfig fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 COPY --from=builder /opt/java-runtime /opt/java-runtime
 COPY --from=builder /workspace/backend/${SERVICE_NAME}/target/${ARTIFACT_NAME} /app/app.jar
