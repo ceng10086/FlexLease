@@ -182,6 +182,60 @@ docker compose up --build
 - `./mvnw clean verify` 在 H2 + Flyway 下执行，CI 挂载 PostgreSQL 验证脚本一致性；前端执行 `npm run build` 完成产物校验。
 - `platform-common` 提供异常枚举、JWT 解析、幂等工具、消息常量等基础能力，保障跨服务契约。
 
+### 前端 E2E（Playwright）
+
+前端提供 1 条端到端脚本（注册 → 入驻 → 上架 → 下单 → 发货 → 收货 → 纠纷升级），适合演示“完整闭环”。
+
+**前置条件**
+
+1. 保证网关与前端可访问：打开 http://localhost:8080 能看到登录页。
+   - 推荐直接使用 `docker compose up --build` 拉起全套环境。
+2. 安装前端依赖与 Playwright 浏览器：
+
+```powershell
+cd frontend
+npm install
+npx playwright install
+```
+
+**运行（默认 headless）**
+
+```powershell
+cd frontend
+npm run test:e2e
+```
+
+**演示（headed + 三窗口并排）**
+
+该脚本会同时打开 3 个窗口（管理员 / 厂商 / 消费者），用于现场讲解多角色协作。
+
+```powershell
+cd frontend
+$env:E2E_DEMO_CHROME_SCALE_FACTOR=1  # 建议：抵消 Windows 200% 缩放造成的“看起来放大”
+npm run test:e2e -- --headed
+```
+
+**常用环境变量**（可按屏幕大小与偏好微调）
+
+- 目标地址：
+  - `E2E_BASE_URL`：默认 `http://localhost:8080`
+- 演示节奏：
+  - `E2E_SLOW_MO_MS`：headed 演示每步延迟（默认 200ms）
+- 三窗口布局（单位：像素；默认值已适配 3200×2000 + 200% 缩放的演示环境，可直接用）
+  - `E2E_DEMO_WIN_W` / `E2E_DEMO_WIN_H`：每个窗口大小
+  - `E2E_DEMO_WIN_GAP`：窗口间距
+  - `E2E_DEMO_WIN_TOP`：顶部偏移
+  - `E2E_DEMO_WIN_MARGIN`：左右边距
+- 桌面端渲染（避免移动端抽屉/侧边栏动画影响演示稳定性）
+  - `E2E_DEMO_RENDER_MODE`：默认 `desktop`（可切换 `mobile`）
+  - `E2E_DEMO_DSF`：deviceScaleFactor（默认 0.5，用于“桌面端布局塞进小窗口”）
+  - `E2E_DEMO_VIEWPORT_W` / `E2E_DEMO_VIEWPORT_H`：桌面端 viewport（默认 1040×1600）
+- Windows 缩放相关（一般不用改）
+  - `E2E_DEMO_CHROME_SCALE_FACTOR`：Chromium 启动时 `--force-device-scale-factor`（默认 1）
+  - `E2E_DEMO_WIN_DPI_SCALE`：窗口坐标/大小换算倍率（默认自动推断；必要时可强制设为 2）
+
+> 如果窗口“看起来太小/太大”，优先调 `E2E_DEMO_WIN_W/H`；如果内容密度不合适，调 `E2E_DEMO_DSF`。
+
 ## 文档索引
 
 - 《项目说明》：`docs/项目说明.md`

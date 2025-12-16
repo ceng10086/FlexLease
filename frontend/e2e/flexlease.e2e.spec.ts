@@ -1,5 +1,5 @@
 /// <reference types="node" />
-import { test, expect, type Browser, type Page } from '@playwright/test';
+import { test, expect, chromium, type Browser, type Page } from '@playwright/test';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
@@ -27,6 +27,203 @@ const assetPayload = (name: string, mimeType: string) => ({
 });
 
 const rawBaseURL = process.env.E2E_BASE_URL ?? 'http://localhost:8080';
+
+const defaultSlowMoMs = Number(process.env.E2E_SLOW_MO_MS ?? 200);
+
+type DemoWindowSlot = 0 | 1 | 2;
+
+const demoWindowLayout = {
+  // 适配演示环境：3200*2000 且 Windows 200% 缩放下，Chromium 的可用坐标通常约等于 1600*1000。
+  // 默认值按“看起来更舒服”设置得偏大；若遮挡可自行调小。
+  width: Number(process.env.E2E_DEMO_WIN_W ?? 1000),
+  height: Number(process.env.E2E_DEMO_WIN_H ?? 1800),
+  gap: Number(process.env.E2E_DEMO_WIN_GAP ?? 16),
+  top: Number(process.env.E2E_DEMO_WIN_TOP ?? 0)
+};
+
+// 默认用“桌面端布局”，但通过 deviceScaleFactor 把 CSS 像素缩小到能塞进三列小窗口。
+// 这样避免移动端侧边栏/抽屉动画导致的“滑来滑去卡住”。
+const demoRenderMode = (process.env.E2E_DEMO_RENDER_MODE ?? 'desktop').toLowerCase();
+
+// Windows 200% 缩放会让 Chromium 的 UI/页面整体看起来放大。
+// 可通过 --force-device-scale-factor 抵消（默认 1）。
+const demoChromeScaleFactor = Number(process.env.E2E_DEMO_CHROME_SCALE_FACTOR ?? 1);
+// Windows 200% 缩放下通常为 2。用于把“逻辑像素”(screen.* / CSS px) 转为窗口管理的像素单位。
+const demoWinDpiScaleOverride = Number(process.env.E2E_DEMO_WIN_DPI_SCALE ?? 0);
+
+type WindowBounds = {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+};
+
+const setWindowBounds = async (page: Page, bounds: WindowBounds) => {
+  // 通过 CDP 强制设置窗口位置/大小，比启动参数更可靠。
+  try {
+    const context = page.context();
+    const client = await context.newCDPSession(page);
+    const { windowId } = await client.send('Browser.getWindowForTarget');
+    await client.send('Browser.setWindowBounds', {
+      windowId,
+      bounds: {
+        windowState: 'normal',
+        left: Math.max(0, Math.floor(bounds.left)),
+        top: Math.max(0, Math.floor(bounds.top)),
+        width: Math.max(320, Math.floor(bounds.width)),
+        height: Math.max(480, Math.floor(bounds.height))
+      }
+    });
+  } catch {
+    // ignore
+  }
+};
+
+const getWindowBounds = async (page: Page) => {
+  try {
+    const context = page.context();
+    const client = await context.newCDPSession(page);
+    const { windowId, bounds } = await client.send('Browser.getWindowForTarget');
+    return { windowId, bounds };
+  } catch {
+    return null;
+  }
+};
+
+const detectWindowManagerScale = async (page: Page) => {
+  // 在 Windows 缩放 (如 200%) 下：
+  // - JS 的 window.outerWidth/outerHeight 往往是“逻辑像素”(DIP)
+  // - CDP Browser.setWindowBounds 往往按“窗口管理像素单位”
+  // 通过设置一个探针尺寸并对比 outerWidth 来估算比例。
+  const override = demoWinDpiScaleOverride;
+  if (override > 0) return override;
+
+  const probe = { width: 800, height: 600 };
+  await setWindowBounds(page, { left: 0, top: 0, width: probe.width, height: probe.height });
+  await page.waitForTimeout(100);
+
+  let outer = { width: 0, height: 0 };
+  try {
+    outer = (await page.evaluate(() => {
+      return { width: window.outerWidth ?? 0, height: window.outerHeight ?? 0 };
+    })) as { width: number; height: number };
+  } catch {
+    // ignore
+  }
+
+  const safeOuterW = Math.max(1, outer.width);
+  const safeOuterH = Math.max(1, outer.height);
+  const scaleW = probe.width / safeOuterW;
+  const scaleH = probe.height / safeOuterH;
+  const raw = (scaleW + scaleH) / 2;
+
+  const clamped = Math.max(1, Math.min(3, raw));
+  // 取整到 0.25，避免浮点抖动。
+  return Math.round(clamped * 4) / 4;
+};
+
+const positionDemoWindows = async (adminPage: Page, vendorPage: Page, userPage: Page) => {
+  const { width: desiredWidth, height: desiredHeight, gap, top } = demoWindowLayout;
+  const margin = Number(process.env.E2E_DEMO_WIN_MARGIN ?? 24);
+
+  // 注意：我们在 demo/desktop 模式下会用 deviceScaleFactor 做页面缩放，
+  // 这会让 window.screen.availWidth/availHeight 变成“模拟设备屏幕”，不能用于真实窗口布局。
+  // 因此：窗口摆放完全基于 CDP 读回的真实 bounds，逐个窗口计算 nextLeft，保证不重叠。
+
+  const dpiScale = await detectWindowManagerScale(adminPage);
+  const desiredWidthPx = Math.floor(desiredWidth * dpiScale);
+  const desiredHeightPx = Math.floor(desiredHeight * dpiScale);
+  const gapPx = Math.floor(gap * dpiScale);
+  const topPx = Math.floor(top * dpiScale);
+  const marginPx = Math.floor(margin * dpiScale);
+
+  // 先顺序摆放（左起），每次 set 之后立刻读回实际宽度（Chromium 有最小宽度约束）。
+  await setWindowBounds(adminPage, { left: marginPx, top: topPx, width: desiredWidthPx, height: desiredHeightPx });
+  await adminPage.waitForTimeout(60);
+  const b1 = (await getWindowBounds(adminPage))?.bounds;
+  const w1 = b1?.width ?? desiredWidthPx;
+  const l1 = b1?.left ?? marginPx;
+
+  await setWindowBounds(vendorPage, {
+    left: l1 + w1 + gapPx,
+    top: topPx,
+    width: desiredWidthPx,
+    height: desiredHeightPx
+  });
+  await vendorPage.waitForTimeout(60);
+  const b2 = (await getWindowBounds(vendorPage))?.bounds;
+  const w2 = b2?.width ?? desiredWidthPx;
+  const l2 = b2?.left ?? l1 + w1 + gapPx;
+
+  await setWindowBounds(userPage, {
+    left: l2 + w2 + gapPx,
+    top: topPx,
+    width: desiredWidthPx,
+    height: desiredHeightPx
+  });
+  await userPage.waitForTimeout(60);
+  const b3 = (await getWindowBounds(userPage))?.bounds;
+
+  // 可选：尝试用 CDP 获取真实屏幕可用宽度，然后整体居中一次。
+  let screenAvailWidthPx = 0;
+  try {
+    const client = await adminPage.context().newCDPSession(adminPage);
+    const infos = (await client.send('Emulation.getScreenInfos').catch(() => null)) as any;
+    const primary = infos?.screenInfos?.[0];
+    const avail = primary?.availWidth ?? primary?.workArea?.width ?? 0;
+    screenAvailWidthPx = typeof avail === 'number' ? avail : 0;
+  } catch {
+    // ignore
+  }
+
+  if (screenAvailWidthPx > 0 && b1 && b2 && b3) {
+    const leftMost = b1.left ?? marginPx;
+    const rightMost = (b3.left ?? 0) + (b3.width ?? 0);
+    const total = rightMost - leftMost;
+    if (total > 0 && screenAvailWidthPx > total + marginPx * 2) {
+      const targetLeft = Math.floor((screenAvailWidthPx - total) / 2);
+      const delta = targetLeft - leftMost;
+      await Promise.all([
+        setWindowBounds(adminPage, { left: (b1.left ?? 0) + delta, top: b1.top ?? topPx, width: b1.width ?? desiredWidthPx, height: b1.height ?? desiredHeightPx }),
+        setWindowBounds(vendorPage, { left: (b2.left ?? 0) + delta, top: b2.top ?? topPx, width: b2.width ?? desiredWidthPx, height: b2.height ?? desiredHeightPx }),
+        setWindowBounds(userPage, { left: (b3.left ?? 0) + delta, top: b3.top ?? topPx, width: b3.width ?? desiredWidthPx, height: b3.height ?? desiredHeightPx })
+      ]);
+    }
+  }
+
+  // 调试输出：方便确认“逻辑像素 vs CDP 单位”的换算是否命中。
+  try {
+    const adminOuter = await adminPage.evaluate(() => ({ x: window.screenX, y: window.screenY, w: window.outerWidth, h: window.outerHeight }));
+    const adminBounds = await getWindowBounds(adminPage);
+    console.log(
+      `[e2e][window] dpiScale=${dpiScale} desired=${desiredWidth}x${desiredHeight} ` +
+        `adminOuter=${adminOuter.w}x${adminOuter.h} adminBounds=${JSON.stringify(adminBounds?.bounds ?? null)} screenAvailWidthPx=${screenAvailWidthPx || 'n/a'}`
+    );
+  } catch {
+    // ignore
+  }
+};
+
+const demoViewportLayout = {
+  // 窗口物理宽度较小（例如 500），但我们希望触发桌面端断点（通常 >= 1024）。
+  // 用 deviceScaleFactor < 1 让 viewport( CSS 像素 ) 变大而不增大窗口物理尺寸。
+  // 经验值：0.5 时 500px 窗口约等于 1000px 的布局宽度。
+  deviceScaleFactor: Number(process.env.E2E_DEMO_DSF ?? 0.5),
+  // 让桌面端布局可用（>=1024），同时确保 viewportWidth * dsf <= winWidth。
+  width: Number(process.env.E2E_DEMO_VIEWPORT_W ?? 1040),
+  height: Number(process.env.E2E_DEMO_VIEWPORT_H ?? 1600)
+};
+
+const launchDemoBrowser = async (slot: DemoWindowSlot) => {
+  const { width, height, gap, top } = demoWindowLayout;
+  const left = slot * (width + gap);
+
+  return chromium.launch({
+    headless: false,
+    // slowMo 将在 test 内根据是否 headed 来决定传多少（这里只保留占位）。
+    args: [`--window-size=${width},${height}`, `--window-position=${left},${top}`]
+  });
+};
 
 const resolveUrl = (page: Page, pathname: string) => {
   const current = page.url();
@@ -78,8 +275,12 @@ async function login(page: Page, username: string, password: string) {
   await page.getByLabel('密码').fill(password);
   await page.getByRole('button', { name: /登\s*录/ }).click();
   await page.waitForURL('**/app/**', { timeout: 30_000 });
-  await expect(page.locator('.auth-layout__logo')).toBeVisible({ timeout: 30_000 });
-  await expect(page.locator('.auth-layout__username')).toContainText(username, { timeout: 30_000 });
+  // 小视口/移动端样式下，侧边栏可能收起导致 logo 不可见；以 header 是否渲染为准。
+  await expect(page.locator('.auth-layout__header')).toBeVisible({ timeout: 30_000 });
+  const usernameLocator = page.locator('.auth-layout__username');
+  if (await usernameLocator.isVisible().catch(() => false)) {
+    await expect(usernameLocator).toContainText(username, { timeout: 30_000 });
+  }
 }
 
 async function register(page: Page, role: 'USER' | 'VENDOR', username: string, password: string) {
@@ -455,19 +656,89 @@ async function newContextWithBase(browser: Browser) {
   });
 }
 
+async function newContextWithBaseForDemo(browser: Browser) {
+  // demo 演示默认使用“桌面端渲染 + 缩放适配小窗口”。
+  // 关键点：viewport 是 CSS 像素，window-size 是物理窗口像素；两者配合 deviceScaleFactor 才能既三列小窗又保持桌面端布局。
+  const viewportWidth = demoRenderMode === 'mobile' ? demoWindowLayout.width : demoViewportLayout.width;
+  const viewportHeight = demoRenderMode === 'mobile' ? demoWindowLayout.height : demoViewportLayout.height;
+  const deviceScaleFactor =
+    demoRenderMode === 'mobile' ? undefined : demoViewportLayout.deviceScaleFactor;
+
+  return browser.newContext({
+    baseURL: rawBaseURL,
+    viewport: {
+      width: viewportWidth,
+      height: viewportHeight
+    },
+    deviceScaleFactor,
+    isMobile: demoRenderMode === 'mobile',
+    hasTouch: demoRenderMode === 'mobile'
+  });
+}
+
 test.describe.serial('FlexLease E2E（由 playwright-mcp 操作转换）', () => {
-  test('完整链路：注册→入驻→上架→下单→发货→收货→纠纷升级', async ({ browser }) => {
+  test('完整链路：注册→入驻→上架→下单→发货→收货→纠纷升级', async ({}, testInfo) => {
+    // 以 Playwright 的实际配置为准判断是否 headed（比 argv/env 更可靠）。
+    const isHeaded = (testInfo.project.use as any)?.headless === false;
+    const slowMoMs = Number(process.env.E2E_SLOW_MO_MS ?? (isHeaded ? defaultSlowMoMs : 0));
+
+    console.log(
+      `[e2e] headed=${isHeaded} slowMo=${slowMoMs} win=${demoWindowLayout.width}x${demoWindowLayout.height} gap=${demoWindowLayout.gap} chromeScale=${demoChromeScaleFactor} winDpiScale=${demoWinDpiScaleOverride || 'auto'}`
+    );
+
     const userEmail = uniqueEmail('e2e_user');
     const vendorEmail = uniqueEmail('e2e_vendor');
     const productName = `iPhone 15 Pro Max E2E ${Date.now()}`;
 
-    const adminContext = await newContextWithBase(browser);
-    const vendorContext = await newContextWithBase(browser);
-    const userContext = await newContextWithBase(browser);
+    let sharedBrowser: Browser | undefined;
+    let adminBrowser: Browser | undefined;
+    let vendorBrowser: Browser | undefined;
+    let userBrowser: Browser | undefined;
+
+    // 关键点：不要依赖 Playwright 的 browser fixture。
+    // 否则 runner 仍会额外启动一个默认大窗口，导致“看起来还是重叠、没有三列”。
+    if (isHeaded) {
+      const { width, height, gap, top } = demoWindowLayout;
+      const winArgs = (slot: DemoWindowSlot) => {
+        const left = slot * (width + gap);
+        return [
+          `--window-size=${width},${height}`,
+          `--window-position=${left},${top}`,
+          '--high-dpi-support=1',
+          `--force-device-scale-factor=${demoChromeScaleFactor}`
+        ];
+      };
+
+      [adminBrowser, vendorBrowser, userBrowser] = await Promise.all([
+        chromium.launch({ headless: false, slowMo: slowMoMs > 0 ? slowMoMs : undefined, args: winArgs(0) }),
+        chromium.launch({ headless: false, slowMo: slowMoMs > 0 ? slowMoMs : undefined, args: winArgs(1) }),
+        chromium.launch({ headless: false, slowMo: slowMoMs > 0 ? slowMoMs : undefined, args: winArgs(2) })
+      ]);
+    } else {
+      sharedBrowser = await chromium.launch({ headless: true, slowMo: slowMoMs > 0 ? slowMoMs : undefined });
+      adminBrowser = sharedBrowser;
+      vendorBrowser = sharedBrowser;
+      userBrowser = sharedBrowser;
+    }
+
+    const adminContext = isHeaded
+      ? await newContextWithBaseForDemo(adminBrowser!)
+      : await newContextWithBase(adminBrowser!);
+    const vendorContext = isHeaded
+      ? await newContextWithBaseForDemo(vendorBrowser!)
+      : await newContextWithBase(vendorBrowser!);
+    const userContext = isHeaded
+      ? await newContextWithBaseForDemo(userBrowser!)
+      : await newContextWithBase(userBrowser!);
 
     const adminPage = await adminContext.newPage();
     const vendorPage = await vendorContext.newPage();
     const userPage = await userContext.newPage();
+
+    if (isHeaded) {
+      // 多窗口演示：避免窗口被系统“挤到左边/重叠”，在 page 创建后再用 CDP 强制布局。
+      await positionDemoWindows(adminPage, vendorPage, userPage);
+    }
 
     vendorPage.on('request', (req) => {
       if (req.url().includes('/api/v1/vendors/applications')) {
@@ -528,5 +799,14 @@ test.describe.serial('FlexLease E2E（由 playwright-mcp 操作转换）', () =>
     await adminContext.close();
     await vendorContext.close();
     await userContext.close();
+
+    // headed：关闭三个独立窗口；headless：关闭 sharedBrowser。
+    if (isHeaded) {
+      await adminBrowser?.close().catch(() => undefined);
+      await vendorBrowser?.close().catch(() => undefined);
+      await userBrowser?.close().catch(() => undefined);
+    } else {
+      await sharedBrowser?.close().catch(() => undefined);
+    }
   });
 });
