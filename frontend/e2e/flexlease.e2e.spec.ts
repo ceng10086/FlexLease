@@ -233,19 +233,37 @@ async function vendorCreateAndSubmitProduct(page: Page, productName: string): Pr
   return productId;
 }
 
-async function adminApproveProductByApi(page: Page, productId: string) {
-  const token = await page.evaluate(() => localStorage.getItem('flexlease_token') ?? '');
-  if (!token) {
-    throw new Error('管理员 token 缺失，无法执行 API 审核');
+async function adminApproveProductByUi(page: Page, productName: string) {
+  await gotoPath(page, '/app/admin/review');
+  await expect(page.locator('.page-header__title', { hasText: '审核大厅' })).toBeVisible();
+
+  const productSection = page
+    .locator('section.page-section')
+    .filter({ has: page.getByRole('heading', { name: '商品审核' }) })
+    .first();
+  await expect(productSection).toBeVisible({ timeout: 30_000 });
+
+  const productCard = productSection.locator('.review-card', { hasText: productName }).first();
+
+  // 列表可能尚未刷新（管理员此前可能已打开过该页），通过切换商品筛选触发 loadProducts。
+  try {
+    await expect(productCard).toBeVisible({ timeout: 15_000 });
+  } catch {
+    // 切到“已上线”再切回“待审核”（限定在商品审核区块，避免点到厂商筛选）
+    await productSection.getByText('已上线', { exact: true }).click().catch(() => undefined);
+    await productSection.getByText('待审核', { exact: true }).click().catch(() => undefined);
+    await expect(productCard).toBeVisible({ timeout: 60_000 });
   }
-  const resp = await page.request.post(resolveUrl(page, `/api/v1/admin/products/${productId}/approve`), {
-    data: { remark: 'e2e approve' },
-    headers: { Authorization: `Bearer ${token}` }
-  });
-  if (!resp.ok()) {
-    const text = await resp.text().catch(() => '');
-    throw new Error(`管理员审核商品失败: HTTP ${resp.status()} ${text.slice(0, 300)}`);
-  }
+
+  await productCard.click();
+  const drawer = page.locator('.ant-drawer').filter({ hasText: '商品审核' }).first();
+  await expect(drawer).toBeVisible({ timeout: 30_000 });
+  await expect(drawer.getByText(productName)).toBeVisible({ timeout: 30_000 });
+
+  // 填写备注（可选），再通过
+  await drawer.getByPlaceholder('审核备注').fill('e2e approve');
+  await drawer.getByRole('button', { name: /通\s*过/ }).click();
+  await expect(page.getByText('已通过商品')).toBeVisible({ timeout: 60_000 });
 }
 
 async function userFillProfile(page: Page, userEmail: string) {
@@ -348,37 +366,23 @@ async function vendorShipOrder(page: Page, orderId: string, orderNo: string) {
   await expect(page.getByText('凭证已上传').first()).toBeVisible({ timeout: 60_000 });
   await orderReloadAfterUpload.catch(() => undefined);
 
-  // 提交发货（用 API 更稳定，避免输入框被 loadOrder 回填清空）
-  const vendorToken = await page.evaluate(() => localStorage.getItem('flexlease_token') ?? '');
-  if (!vendorToken) {
-    throw new Error('厂商 token 缺失，无法执行发货 API');
-  }
-  const meResp = await page.request.get(resolveUrl(page, '/api/v1/auth/me'), {
-    headers: { Authorization: `Bearer ${vendorToken}` }
-  });
-  if (!meResp.ok()) {
-    throw new Error(`获取厂商信息失败: HTTP ${meResp.status()}`);
-  }
-  const meJson = (await meResp.json().catch(() => null)) as any;
-  const vendorId = (meJson?.data?.vendorId ?? '') as string;
-  if (!vendorId) {
-    throw new Error('无法从 /auth/me 解析 vendorId');
-  }
+  // 提交发货（纯 UI 操作）
+  const shipCard = drawer.locator('.action-card', { hasText: '发货' }).first();
+  await expect(shipCard).toBeVisible({ timeout: 30_000 });
 
-  const shipApiResp = await page.request.post(resolveUrl(page, `/api/v1/orders/${orderId}/ship`), {
-    data: {
-      vendorId,
-      carrier: 'SF',
-      trackingNumber: 'SF123456789',
-      message: '商品已发出，请留意签收'
-    },
-    headers: { Authorization: `Bearer ${vendorToken}` }
-  });
-  if (!shipApiResp.ok()) {
-    const text = await shipApiResp.text().catch(() => '');
-    throw new Error(`提交发货失败: HTTP ${shipApiResp.status()} ${text.slice(0, 300)}`);
-  }
+  // 等待按钮可点：只有满足凭证要求才允许提交
+  const submitShipButton = shipCard.getByRole('button', { name: '提交发货' });
+  await expect(submitShipButton).toBeEnabled({ timeout: 60_000 });
 
+  await shipCard.locator('.ant-form-item', { hasText: '承运方' }).locator('input').fill('SF');
+  await shipCard.locator('.ant-form-item', { hasText: '运单号' }).locator('input').fill('SF123456789');
+  await shipCard
+    .locator('.ant-form-item', { hasText: '留言给用户' })
+    .locator('textarea')
+    .fill('商品已发出，请留意签收');
+
+  await submitShipButton.click();
+  await expect(page.getByText('已提交发货')).toBeVisible({ timeout: 60_000 });
 }
 
 async function userReceiveAndConfirm(page: Page, orderId: string) {
@@ -506,7 +510,7 @@ test.describe.serial('FlexLease E2E（由 playwright-mcp 操作转换）', () =>
 
     // 厂商创建商品并提交审核 + 管理员审核上架
     const productId = await vendorCreateAndSubmitProduct(vendorPage, productName);
-    await adminApproveProductByApi(adminPage, productId);
+    await adminApproveProductByUi(adminPage, productName);
 
     // 消费者完善资料 + 下单
     await userFillProfile(userPage, userEmail);
