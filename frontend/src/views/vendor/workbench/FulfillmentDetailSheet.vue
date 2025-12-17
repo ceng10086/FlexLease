@@ -140,6 +140,31 @@
                     <a-tag :color="disputeStatusColor(item.status)">{{ item.status }}</a-tag>
                   </div>
                   <p>诉求：{{ disputeOptionLabel(item.initiatorOption) }} · {{ item.initiatorReason }}</p>
+                  <p v-if="item.initiatorPhoneMemo">发起人电话纪要：{{ item.initiatorPhoneMemo }}</p>
+                  <div v-if="item.initiatorAttachmentProofIds?.length" class="dispute-proof-tags">
+                    <span class="label">发起人凭证：</span>
+                    <a-tag
+                      v-for="proofId in item.initiatorAttachmentProofIds"
+                      :key="proofId"
+                      class="proof-tag"
+                      @click="openProof(proofId)"
+                    >
+                      {{ proofLabel(proofId) }}
+                    </a-tag>
+                  </div>
+                  <p v-if="item.respondentRemark">对方回应：{{ item.respondentRemark }}</p>
+                  <p v-if="item.respondentPhoneMemo">对方电话纪要：{{ item.respondentPhoneMemo }}</p>
+                  <div v-if="item.respondentAttachmentProofIds?.length" class="dispute-proof-tags">
+                    <span class="label">对方凭证：</span>
+                    <a-tag
+                      v-for="proofId in item.respondentAttachmentProofIds"
+                      :key="proofId"
+                      class="proof-tag"
+                      @click="openProof(proofId)"
+                    >
+                      {{ proofLabel(proofId) }}
+                    </a-tag>
+                  </div>
                   <div v-if="(item.status === 'OPEN' || item.status === 'PENDING_ADMIN') && item.deadlineAt" class="dispute-countdown">
                     <ClockCircleOutlined />
                     <span class="label">剩余处理时间：</span>
@@ -427,6 +452,29 @@ const proofOptions = computed(() =>
     value: proof.id
   }))
 );
+
+const proofMap = computed(() => {
+  const map = new Map<string, (typeof proofList.value)[number]>();
+  proofList.value.forEach((proof) => map.set(proof.id, proof));
+  return map;
+});
+
+const proofLabel = (proofId: string) => {
+  const proof = proofMap.value.get(proofId);
+  if (!proof) {
+    return proofId.slice(0, 8).toUpperCase();
+  }
+  return `${proof.proofType} · ${new Date(proof.uploadedAt).toLocaleString()}`;
+};
+
+const openProof = (proofId: string) => {
+  const proof = proofMap.value.get(proofId);
+  if (!proof?.fileUrl) {
+    message.warning('凭证链接不可用');
+    return;
+  }
+  window.open(proof.fileUrl, '_blank');
+};
 
 const drawerWidth = computed(() => {
   if (isMobile.value) {
@@ -875,5 +923,22 @@ fetchProofPolicy()
 
 .dispute-countdown .label {
   margin-right: -4px;
+}
+
+.dispute-proof-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.dispute-proof-tags .label {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.proof-tag {
+  cursor: pointer;
 }
 </style>

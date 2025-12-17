@@ -252,11 +252,24 @@ const proofPolicyStages = computed(() => {
   }));
 });
 
-const openWatermarkExample = (url?: string | null) => {
-  if (!url) {
+const openWatermarkExample = (value?: string | null) => {
+  if (!value) {
     return;
   }
-  window.open(url, '_blank');
+  const normalized = value.trim();
+  if (!normalized) {
+    return;
+  }
+  const looksLikeUrl = /^https?:\/\//i.test(normalized) || normalized.startsWith('/');
+  if (looksLikeUrl) {
+    window.open(normalized, '_blank');
+    return;
+  }
+  Modal.info({
+    title: '水印示例',
+    content: normalized,
+    okText: '知道了'
+  });
 };
 
 const requireAuthUser = () => {

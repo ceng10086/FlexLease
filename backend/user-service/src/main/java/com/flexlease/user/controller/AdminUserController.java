@@ -4,6 +4,7 @@ import com.flexlease.common.dto.ApiResponse;
 import com.flexlease.common.exception.BusinessException;
 import com.flexlease.common.exception.ErrorCode;
 import com.flexlease.user.dto.CreditAdjustmentRequest;
+import com.flexlease.user.dto.CreditAdjustmentResponse;
 import com.flexlease.user.dto.PagedResponse;
 import com.flexlease.user.dto.UserProfileResponse;
 import com.flexlease.user.dto.UserStatusUpdateRequest;
@@ -72,6 +73,17 @@ public class AdminUserController {
         int delta = request.delta();
         LOG.info("Admin {} adjusting credit for user {} by {}", adminId, userUuid, delta);
         return ApiResponse.success(userProfileService.adjustCredit(userUuid, delta, request.reason(), adminId));
+    }
+
+    @GetMapping("/{userId}/credit-adjustments")
+    public ApiResponse<PagedResponse<CreditAdjustmentResponse>> listCreditAdjustments(@PathVariable String userId,
+                                                                                      @RequestParam(defaultValue = "1") int page,
+                                                                                      @RequestParam(defaultValue = "10") int size) {
+        if (!SecurityUtils.hasRole("ADMIN")) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "仅管理员可查看信用调整记录");
+        }
+        UUID userUuid = parseUuid(userId, "userId");
+        return ApiResponse.success(userProfileService.listCreditAdjustments(userUuid, page, size));
     }
 
     private UUID parseUuid(String raw, String fieldName) {

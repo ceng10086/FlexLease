@@ -88,7 +88,7 @@ class OrderQueryLazyLoadingTest {
             assertThat(orderProofService.list(order.getId())).hasSize(1);
             assertThat(orderDisputeService.list(order.getId())).hasSize(1);
             assertThat(orderSurveyService.list(order.getId())).hasSize(1);
-            PagedResponse<?> userOrders = rentalOrderService.listOrdersForUser(order.getUserId(), null, PageRequest.of(0, 5));
+            PagedResponse<?> userOrders = rentalOrderService.listOrdersForUser(order.getUserId(), null, null, PageRequest.of(0, 5));
             assertThat(userOrders.content()).hasSize(1);
         } finally {
             SecurityContextHolder.clearContext();
@@ -97,7 +97,7 @@ class OrderQueryLazyLoadingTest {
         FlexleasePrincipal vendorPrincipal = new FlexleasePrincipal(null, order.getVendorId(), "vendor", Set.of("VENDOR"));
         setAuthentication(vendorPrincipal);
         try {
-            PagedResponse<?> vendorOrders = rentalOrderService.listOrdersForVendor(order.getVendorId(), null, PageRequest.of(0, 5));
+            PagedResponse<?> vendorOrders = rentalOrderService.listOrdersForVendor(order.getVendorId(), null, null, PageRequest.of(0, 5));
             assertThat(vendorOrders.content()).hasSize(1);
         } finally {
             SecurityContextHolder.clearContext();

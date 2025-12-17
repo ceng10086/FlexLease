@@ -128,10 +128,10 @@ public class RentalOrderController {
 
         Pageable pageable = PageRequest.of(Math.max(page - 1, 0), Math.max(1, Math.min(size, 100)), Sort.by(Sort.Direction.DESC, "createdAt"));
         if (effectiveUserId != null) {
-            return ApiResponse.success(rentalOrderService.listOrdersForUser(effectiveUserId, status, pageable));
+            return ApiResponse.success(rentalOrderService.listOrdersForUser(effectiveUserId, status, manualReviewOnly, pageable));
         }
         if (effectiveVendorId != null) {
-            return ApiResponse.success(rentalOrderService.listOrdersForVendor(effectiveVendorId, status, pageable));
+            return ApiResponse.success(rentalOrderService.listOrdersForVendor(effectiveVendorId, status, manualReviewOnly, pageable));
         }
         throw new BusinessException(ErrorCode.VALIDATION_ERROR, "请提供 userId 或 vendorId");
     }

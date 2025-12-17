@@ -2,14 +2,20 @@ package com.flexlease.user.service;
 
 import com.flexlease.common.exception.BusinessException;
 import com.flexlease.common.exception.ErrorCode;
+import com.flexlease.common.notification.NotificationChannel;
+import com.flexlease.common.notification.NotificationSendRequest;
 import com.flexlease.common.user.CreditTierRules;
+import com.flexlease.user.domain.CreditAdjustment;
 import com.flexlease.user.domain.CreditEventType;
 import com.flexlease.user.domain.UserProfile;
 import com.flexlease.user.domain.UserProfileGender;
+import com.flexlease.user.dto.CreditAdjustmentResponse;
 import com.flexlease.user.dto.PagedResponse;
 import com.flexlease.user.dto.UserCreditResponse;
 import com.flexlease.user.dto.UserProfileResponse;
 import com.flexlease.user.dto.UserProfileUpdateRequest;
+import com.flexlease.user.integration.NotificationClient;
+import com.flexlease.user.repository.CreditAdjustmentRepository;
 import com.flexlease.user.repository.UserProfileRepository;
 import java.util.Map;
 import java.util.Locale;
@@ -30,11 +36,17 @@ public class UserProfileService {
 
     private final UserProfileRepository userProfileRepository;
     private final CreditEventService creditEventService;
+    private final CreditAdjustmentRepository creditAdjustmentRepository;
+    private final NotificationClient notificationClient;
 
     public UserProfileService(UserProfileRepository userProfileRepository,
-                              CreditEventService creditEventService) {
+                              CreditEventService creditEventService,
+                              CreditAdjustmentRepository creditAdjustmentRepository,
+                              NotificationClient notificationClient) {
         this.userProfileRepository = userProfileRepository;
         this.creditEventService = creditEventService;
+        this.creditAdjustmentRepository = creditAdjustmentRepository;
+        this.notificationClient = notificationClient;
     }
 
     @Transactional
@@ -78,9 +90,29 @@ public class UserProfileService {
                 .orElseGet(() -> userProfileRepository.save(UserProfile.create(userId)));
         profile.applyCreditDelta(delta);
         UserProfile saved = userProfileRepository.save(profile);
-        LOG.info("Adjusted credit for user {} by {} points, operator={}, reason={}",
-                userId, delta, operatorId, reason);
+        CreditAdjustment adjustment = creditAdjustmentRepository.save(CreditAdjustment.create(
+                userId,
+                delta,
+                normalizeReason(reason),
+                operatorId
+        ));
+        notifyCreditAdjusted(userId, delta, adjustment.getReason(), adjustment.getId(), operatorId);
+        LOG.info("Adjusted credit for user {} by {} points, operator={}, reason={}, adjustmentId={}",
+                userId, delta, operatorId, adjustment.getReason(), adjustment.getId());
         return toResponse(saved);
+    }
+
+    @Transactional(readOnly = true)
+    public PagedResponse<CreditAdjustmentResponse> listCreditAdjustments(UUID userId, int page, int size) {
+        Pageable pageable = PageRequest.of(Math.max(page - 1, 0), Math.max(1, Math.min(size, 100)));
+        Page<CreditAdjustment> adjustments = creditAdjustmentRepository.findByUserIdOrderByCreatedAtDesc(userId, pageable);
+        return new PagedResponse<>(
+                adjustments.map(this::toResponse).getContent(),
+                adjustments.getNumber() + 1,
+                adjustments.getSize(),
+                adjustments.getTotalElements(),
+                adjustments.getTotalPages()
+        );
     }
 
     @Transactional
@@ -132,8 +164,49 @@ public class UserProfileService {
                 profile.isKycVerified(),
                 profile.getKycVerifiedAt(),
                 profile.getPaymentStreak(),
+                profile.getSuspendedUntil(),
                 profile.getCreatedAt(),
                 profile.getUpdatedAt()
         );
+    }
+
+    private CreditAdjustmentResponse toResponse(CreditAdjustment adjustment) {
+        return new CreditAdjustmentResponse(
+                adjustment.getId(),
+                adjustment.getUserId(),
+                adjustment.getDelta(),
+                adjustment.getReason(),
+                adjustment.getOperatorId(),
+                adjustment.getCreatedAt()
+        );
+    }
+
+    private String normalizeReason(String reason) {
+        if (reason == null) {
+            return null;
+        }
+        String normalized = reason.trim();
+        return normalized.isBlank() ? null : normalized;
+    }
+
+    private void notifyCreditAdjusted(UUID userId,
+                                      int delta,
+                                      String reason,
+                                      UUID adjustmentId,
+                                      UUID operatorId) {
+        String deltaText = delta >= 0 ? "+" + delta : String.valueOf(delta);
+        String subject = operatorId == null ? "信用分调整提醒" : "信用分人工调整";
+        String content = "信用积分 %s，原因：%s。".formatted(deltaText, reason == null ? "无" : reason);
+        NotificationSendRequest request = new NotificationSendRequest(
+                null,
+                NotificationChannel.IN_APP,
+                userId.toString(),
+                subject,
+                content,
+                Map.of("delta", delta, "reason", reason == null ? "" : reason),
+                "CREDIT",
+                adjustmentId == null ? null : adjustmentId.toString()
+        );
+        notificationClient.send(request);
     }
 }

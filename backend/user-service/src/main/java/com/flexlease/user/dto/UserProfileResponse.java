@@ -18,6 +18,7 @@ public record UserProfileResponse(
         boolean kycVerified,
         OffsetDateTime kycVerifiedAt,
         int paymentStreak,
+        OffsetDateTime suspendedUntil,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt
 ) {

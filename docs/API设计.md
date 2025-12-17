@@ -85,6 +85,7 @@
 | GET | `/admin/users` | ADMIN | 查询用户列表 | 支持 `keyword` 模糊搜索姓名，返回分页 |
 | PUT | `/admin/users/{userId}/status` | ADMIN | 启用/禁用用户 | 请求体 `{ status }`，通过认证服务内部接口生效 |
 | POST | `/admin/users/{userId}/credit-adjustments` | ADMIN | 管理员人工调整信用分 | `{ delta, reason }`，同时写入信用历史并下发通知 |
+| GET | `/admin/users/{userId}/credit-adjustments` | ADMIN | 查看信用调整记录 | 返回 `PagedResponse<CreditAdjustmentResponse>`（含 `delta/reason/operatorId/createdAt`） |
 
 > `/customers/profile` 在首次访问时会自动补建档案；`/admin/users/{userId}/status` 实际由 user-service 代为调用认证服务 `/api/v1/internal/users/{id}/status`，请求头需携带 `X-Internal-Token`。
 
@@ -165,7 +166,7 @@
 | POST | `/orders/preview` | 价格试算（押金、租金、合计） | `{ userId, vendorId, planType?, leaseStartAt?, leaseEndAt?, items: [{ productId, skuId?, planId?, productName, skuCode?, planSnapshot?, quantity, unitRentAmount, unitDepositAmount, buyoutPrice? }] }` | `depositAmount`, `rentAmount`, `totalAmount` |
 | POST | `/orders` | 创建订单（可传 `items` 或 `cartItemIds`，服务端生成 `orderNo` 并固化明细快照） | `{ userId, vendorId, planType?, leaseStartAt?, leaseEndAt?, items?: [...], cartItemIds?: [], remark? }`<br>当 `cartItemIds` 提供时自动从购物车加载明细并清空对应条目 | `RentalOrderResponse`（含订单基础信息、明细、事件、续租/退租记录） |
 | GET | `/orders/{orderId}` | 查看订单详情 | - | `RentalOrderResponse` |
-| GET | `/orders` | 查询订单列表 | 需提供 `userId` 或 `vendorId` 其一，可选 `status`、`page`、`size` | `PagedResponse<RentalOrderSummaryResponse>` |
+| GET | `/orders` | 查询订单列表 | 需提供 `userId` 或 `vendorId` 其一，可选 `status`、`manualReviewOnly`、`page`、`size` | `PagedResponse<RentalOrderSummaryResponse>` |
 
 > 注意：`userId` 会与当前登录用户二次校验；传入 `cartItemIds` 时要求所有条目属于同一 `vendorId`，成功下单后自动删除对应购物车记录；订单明细会调用 Catalog 校验 plan/sku，并更新 `planSnapshot` 以固化定价。
 
@@ -218,7 +219,7 @@
 ### 5.6 取证策略与指导
 | 方法 | URL | 描述 | 备注 |
 | ---- | --- | ---- | ---- |
-| GET | `/proof-policy` | 返回发货、收货、退租阶段的最小照片/视频数量、拍摄指引、水印示例 | 前端基于该接口在订单详情/履约抽屉动态展示提醒；配置来源于 `flexlease.order.proof-policy.*` |
+| GET | `/proof-policy` | 返回发货、收货、退租阶段的最小照片/视频数量、拍摄指引、水印示例 | `watermarkExample` 默认为说明文本（如 `WATERMARK: 订单号 + 发货时间`），前端应按文本展示（若为 URL 则可打开）；配置来源于 `flexlease.order.proof-policy.*` |
 
 > 下单传入 `cartItemIds` 后端会自动加载并移除对应购物车条目，同时触发库存预占。
 

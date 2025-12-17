@@ -6,6 +6,7 @@ import com.flexlease.common.notification.NotificationChannel;
 import com.flexlease.common.notification.NotificationSendRequest;
 import com.flexlease.common.security.FlexleasePrincipal;
 import com.flexlease.common.security.SecurityUtils;
+import com.flexlease.common.user.CreditTier;
 import com.flexlease.payment.domain.PaymentScene;
 import com.flexlease.payment.domain.PaymentSplit;
 import com.flexlease.payment.domain.PaymentSplitType;
@@ -49,6 +50,8 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 public class PaymentTransactionService {
 
     private static final Logger LOG = LoggerFactory.getLogger(PaymentTransactionService.class);
+    private static final int EXCELLENT_CREDIT_THRESHOLD = 90;
+    private static final BigDecimal EXCELLENT_CREDIT_COMMISSION_DISCOUNT = new BigDecimal("0.01");
 
     private final PaymentTransactionRepository paymentTransactionRepository;
     private final PaymentAssembler assembler;
@@ -78,7 +81,16 @@ public class PaymentTransactionService {
                     throw new BusinessException(ErrorCode.VALIDATION_ERROR, "存在待支付的同类流水");
                 });
 
-        SplitBuildResult splitResult = buildSplits(request.vendorId(), request.splits());
+        OrderServiceClient.OrderCreditSnapshot creditSnapshot = null;
+        try {
+            creditSnapshot = orderServiceClient.loadOrderCreditSnapshot(orderId);
+        } catch (BusinessException ex) {
+            LOG.warn("加载订单 {} 信用快照失败，将跳过抽成优惠: {}", orderId, ex.getMessage());
+        } catch (RuntimeException ex) {
+            LOG.warn("加载订单 {} 信用快照异常，将跳过抽成优惠: {}", orderId, ex.getMessage());
+        }
+
+        SplitBuildResult splitResult = buildSplits(request.vendorId(), request.splits(), creditSnapshot);
         if (splitResult.totalAmount().compareTo(request.amount()) > 0) {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "分账金额超过支付总额");
         }
@@ -266,7 +278,9 @@ public class PaymentTransactionService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "支付流水不存在"));
     }
 
-    private SplitBuildResult buildSplits(UUID vendorId, List<PaymentSplitRequest> rawSplits) {
+    private SplitBuildResult buildSplits(UUID vendorId,
+                                         List<PaymentSplitRequest> rawSplits,
+                                         OrderServiceClient.OrderCreditSnapshot creditSnapshot) {
         if (rawSplits == null || rawSplits.isEmpty()) {
             return new SplitBuildResult(List.of(), BigDecimal.ZERO, null);
         }
@@ -297,6 +311,7 @@ public class PaymentTransactionService {
         BigDecimal commissionRate = null;
         if (vendorIncome.compareTo(BigDecimal.ZERO) > 0) {
             commissionRate = resolveCommissionRate(vendorId);
+            commissionRate = applyCustomerCreditDiscount(commissionRate, creditSnapshot);
             if (commissionRate == null) {
                 commissionRate = BigDecimal.ZERO;
             }
@@ -327,6 +342,24 @@ public class PaymentTransactionService {
                 .map(PaymentSplit::getAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         return new SplitBuildResult(sanitized, total, commissionRate);
+    }
+
+    private BigDecimal applyCustomerCreditDiscount(BigDecimal commissionRate,
+                                                   OrderServiceClient.OrderCreditSnapshot creditSnapshot) {
+        if (commissionRate == null || creditSnapshot == null) {
+            return commissionRate;
+        }
+        Integer score = creditSnapshot.creditScore();
+        CreditTier tier = creditSnapshot.creditTier();
+        boolean eligible = (score != null && score >= EXCELLENT_CREDIT_THRESHOLD) || tier == CreditTier.EXCELLENT;
+        if (!eligible) {
+            return commissionRate;
+        }
+        BigDecimal adjusted = commissionRate.subtract(EXCELLENT_CREDIT_COMMISSION_DISCOUNT);
+        if (adjusted.signum() < 0) {
+            adjusted = BigDecimal.ZERO;
+        }
+        return adjusted.setScale(4, RoundingMode.HALF_UP);
     }
 
     private BigDecimal resolveCommissionRate(UUID vendorId) {

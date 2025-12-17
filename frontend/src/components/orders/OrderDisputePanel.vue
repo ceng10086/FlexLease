@@ -65,9 +65,43 @@
               <span>原因</span>
               <p>{{ dispute.initiatorReason }}</p>
             </div>
+            <div class="card-row" v-if="dispute.initiatorPhoneMemo">
+              <span>发起人电话纪要</span>
+              <p>{{ dispute.initiatorPhoneMemo }}</p>
+            </div>
+            <div class="card-row" v-if="dispute.initiatorAttachmentProofIds?.length">
+              <span>发起人关联凭证</span>
+              <div class="proof-tags">
+                <a-tag
+                  v-for="proofId in dispute.initiatorAttachmentProofIds"
+                  :key="proofId"
+                  class="proof-tag"
+                  @click="openProof(proofId)"
+                >
+                  {{ proofLabel(proofId) }}
+                </a-tag>
+              </div>
+            </div>
             <div class="card-row" v-if="dispute.respondentRemark">
               <span>对方回应</span>
               <p>{{ dispute.respondentRemark }}</p>
+            </div>
+            <div class="card-row" v-if="dispute.respondentPhoneMemo">
+              <span>对方电话纪要</span>
+              <p>{{ dispute.respondentPhoneMemo }}</p>
+            </div>
+            <div class="card-row" v-if="dispute.respondentAttachmentProofIds?.length">
+              <span>对方关联凭证</span>
+              <div class="proof-tags">
+                <a-tag
+                  v-for="proofId in dispute.respondentAttachmentProofIds"
+                  :key="proofId"
+                  class="proof-tag"
+                  @click="openProof(proofId)"
+                >
+                  {{ proofLabel(proofId) }}
+                </a-tag>
+              </div>
             </div>
             <div class="card-row" v-if="dispute.deadlineAt">
               <span>协商截止</span>
@@ -248,6 +282,29 @@ const proofOptions = computed(() =>
     value: proof.id
   }))
 );
+
+const proofMap = computed(() => {
+  const map = new Map<string, RentalOrderDetail['proofs'][number]>();
+  (props.order.proofs ?? []).forEach((proof) => map.set(proof.id, proof));
+  return map;
+});
+
+const proofLabel = (proofId: string) => {
+  const proof = proofMap.value.get(proofId);
+  if (!proof) {
+    return proofId.slice(0, 8).toUpperCase();
+  }
+  return `${proof.proofType} · ${new Date(proof.uploadedAt).toLocaleString()}`;
+};
+
+const openProof = (proofId: string) => {
+  const proof = proofMap.value.get(proofId);
+  if (!proof?.fileUrl) {
+    message.warning('凭证链接不可用');
+    return;
+  }
+  window.open(proof.fileUrl, '_blank');
+};
 
 const createForm = reactive({
   option: disputeOptions[0].value as DisputeResolutionOption,
@@ -482,5 +539,15 @@ const submitActionModal = async () => {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.proof-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.proof-tag {
+  cursor: pointer;
 }
 </style>

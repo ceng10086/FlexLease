@@ -238,20 +238,42 @@ public class RentalOrderService {
         return assembler.toOrderResponse(order);
     }
 
-    public PagedResponse<RentalOrderSummaryResponse> listOrdersForUser(UUID userId, OrderStatus status, Pageable pageable) {
+    public PagedResponse<RentalOrderSummaryResponse> listOrdersForUser(UUID userId,
+                                                                       OrderStatus status,
+                                                                       Boolean manualReviewOnly,
+                                                                       Pageable pageable) {
         ensureUserListPermission(userId);
-        Page<RentalOrder> page = status == null
-                ? rentalOrderRepository.findByUserId(userId, pageable)
-                : rentalOrderRepository.findByUserIdAndStatus(userId, status, pageable);
-        return toPagedResponse(page);
+        if (!Boolean.TRUE.equals(manualReviewOnly)) {
+            Page<RentalOrder> page = status == null
+                    ? rentalOrderRepository.findByUserId(userId, pageable)
+                    : rentalOrderRepository.findByUserIdAndStatus(userId, status, pageable);
+            return toPagedResponse(page);
+        }
+        Specification<RentalOrder> specification = Specification.where((root, query, cb) -> cb.equal(root.get("userId"), userId));
+        if (status != null) {
+            specification = combine(specification, (root, query, cb) -> cb.equal(root.get("status"), status));
+        }
+        specification = combine(specification, (root, query, cb) -> cb.isTrue(root.get("requiresManualReview")));
+        return toPagedResponse(rentalOrderRepository.findAll(specification, pageable));
     }
 
-    public PagedResponse<RentalOrderSummaryResponse> listOrdersForVendor(UUID vendorId, OrderStatus status, Pageable pageable) {
+    public PagedResponse<RentalOrderSummaryResponse> listOrdersForVendor(UUID vendorId,
+                                                                         OrderStatus status,
+                                                                         Boolean manualReviewOnly,
+                                                                         Pageable pageable) {
         ensureVendorListPermission(vendorId);
-        Page<RentalOrder> page = status == null
-                ? rentalOrderRepository.findByVendorId(vendorId, pageable)
-                : rentalOrderRepository.findByVendorIdAndStatus(vendorId, status, pageable);
-        return toPagedResponse(page);
+        if (!Boolean.TRUE.equals(manualReviewOnly)) {
+            Page<RentalOrder> page = status == null
+                    ? rentalOrderRepository.findByVendorId(vendorId, pageable)
+                    : rentalOrderRepository.findByVendorIdAndStatus(vendorId, status, pageable);
+            return toPagedResponse(page);
+        }
+        Specification<RentalOrder> specification = Specification.where((root, query, cb) -> cb.equal(root.get("vendorId"), vendorId));
+        if (status != null) {
+            specification = combine(specification, (root, query, cb) -> cb.equal(root.get("status"), status));
+        }
+        specification = combine(specification, (root, query, cb) -> cb.isTrue(root.get("requiresManualReview")));
+        return toPagedResponse(rentalOrderRepository.findAll(specification, pageable));
     }
 
     public PagedResponse<RentalOrderSummaryResponse> listOrdersForAdmin(UUID userId,

@@ -317,6 +317,15 @@ class UserServiceApplicationTests {
         assertThat(adjustNode.at("/data/creditScore").asInt()).isEqualTo(75);
         assertThat(adjustNode.at("/data/creditTier").asText()).isEqualTo("STANDARD");
 
+        MvcResult historyResult = mockMvc.perform(get("/api/v1/admin/users/" + userId + "/credit-adjustments")
+                        .header(HttpHeaders.AUTHORIZATION, adminToken))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        JsonNode historyNode = readJson(historyResult);
+        assertThat(historyNode.at("/data/content/0/delta").asInt()).isEqualTo(15);
+        assertThat(historyNode.at("/data/content/0/reason").asText()).isEqualTo("按时支付奖励");
+
         MvcResult internalResult = mockMvc.perform(get("/api/v1/internal/users/" + userId + "/credit")
                         .header("X-Internal-Token", "flexlease-internal-secret"))
                 .andExpect(status().isOk())

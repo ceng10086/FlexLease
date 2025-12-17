@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.flexlease.common.exception.BusinessException;
+import com.flexlease.common.user.CreditTier;
 import com.flexlease.payment.client.NotificationClient;
 import com.flexlease.payment.client.OrderServiceClient;
 import com.flexlease.payment.client.VendorServiceClient;
@@ -163,6 +164,36 @@ class PaymentTransactionServiceIntegrationTest {
         assertThat(settlement.refundedAmount()).isEqualByComparingTo("200.00");
         assertThat(settlement.netAmount()).isEqualByComparingTo("180.00");
         assertThat(settlement.transactionCount()).isEqualTo(1);
+    }
+
+    @Test
+    void shouldApplyExcellentCreditDiscountOnCommissionRate() {
+        mockCommissionRate(new BigDecimal("0.10"));
+        UUID orderId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        UUID vendorId = UUID.randomUUID();
+
+        when(orderServiceClient.loadOrderCreditSnapshot(orderId))
+                .thenReturn(new OrderServiceClient.OrderCreditSnapshot(orderId, 95, CreditTier.EXCELLENT));
+
+        PaymentSplitRequest vendorSplit = new PaymentSplitRequest(
+                PaymentSplitType.VENDOR_INCOME,
+                new BigDecimal("200.00"),
+                "VENDOR_ACCOUNT"
+        );
+
+        PaymentTransactionResponse created = paymentTransactionService.initPayment(orderId, new PaymentInitRequest(
+                userId,
+                vendorId,
+                PaymentScene.RENT,
+                PaymentChannel.MOCK,
+                new BigDecimal("200.00"),
+                "租金支付",
+                List.of(vendorSplit)
+        ));
+
+        assertThat(created.commissionRate()).isEqualByComparingTo("0.0900");
+        assertThat(created.platformCommissionAmount()).isEqualByComparingTo("18.00");
     }
 
     @Test
