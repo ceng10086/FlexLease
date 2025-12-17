@@ -6,9 +6,11 @@ import com.flexlease.product.config.StorageProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication(scanBasePackages = "com.flexlease")
 @EnableConfigurationProperties({StorageProperties.class, InventoryConcurrencyProperties.class, NotificationServiceProperties.class})
+@EnableScheduling
 public class ProductServiceApplication {
 
     public static void main(String[] args) {

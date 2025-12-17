@@ -106,7 +106,15 @@ public class ProofStorageService {
         if (!StringUtils.hasText(storedName) || !StringUtils.hasText(watermarkText)) {
             return;
         }
-        if (contentType == null || (!contentType.startsWith("image/png") && !contentType.startsWith("image/jpeg"))) {
+        String extension = resolveExtension(storedName);
+        boolean extensionLooksSupported = "png".equals(extension) || "jpg".equals(extension) || "jpeg".equals(extension);
+        boolean contentTypeLooksImage = StringUtils.hasText(contentType) && contentType.toLowerCase(Locale.ROOT).startsWith("image/");
+        if (contentTypeLooksImage) {
+            String normalized = contentType.toLowerCase(Locale.ROOT);
+            if (!normalized.startsWith("image/png") && !normalized.startsWith("image/jpeg") && !normalized.startsWith("image/jpg")) {
+                return;
+            }
+        } else if (!extensionLooksSupported) {
             return;
         }
         Path path = rootLocation.resolve(storedName).normalize();
@@ -129,7 +137,6 @@ public class ProofStorageService {
             int y = Math.max(metrics.getHeight(), image.getHeight() - metrics.getDescent() - 20);
             graphics.drawString(watermarkText, x, y);
             graphics.dispose();
-            String extension = resolveExtension(storedName);
             String format = "png".equals(extension) ? "png" : "jpg";
             ImageIO.write(image, format, path.toFile());
         } catch (Throwable ex) {

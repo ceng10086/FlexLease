@@ -99,13 +99,12 @@ FlexLease 面向 B2C 场景，为厂商与消费者提供从入驻、商品配�
 ## 多角色能力速览
 
 - **平台管理员**
-  - 入驻审核：`/app/admin/vendor-review` 通过 `user-service` 审核接口激活厂商账号并回写认证中心。
-  - 商品审核：`/app/admin/product-review` 直连 `product-service` 的 `/api/v1/admin/products/**`。
+  - 入驻/商品审核：`/app/admin/review` 汇总厂商入驻与商品审核任务，分别调用 `user-service` 与 `product-service` 的审核接口。
   - 订单监控：`/app/admin/orders` 支持按用户/厂商/状态过滤，并提供“仅人工审核”筛选（`manualReviewOnly`）用于快速定位信用预警订单（风险关注标记，不阻断支付/履约），抽屉内嵌电子合同查看、操作时间线与 `/admin/orders/{id}/force-close`。
 - **厂商**
-  - 商品与库存：`VendorProductWorkspace` 绑定 `vendorId`，可配置方案、SKU、媒体并调用 `/inventory/adjust`。
-  - 履约操作：`VendorOrderWorkspace` 针对 `/orders/{id}/ship`、续租/退租/买断审批、订单留言、凭证上传、纠纷响应等动作提供抽屉，内置库存出入库补偿。
-  - 指标与结算：`VendorAnalyticsPage`、`VendorSettlementPage` 调用 `/analytics/vendor/{vendorId}`、`/payments/settlements`，依赖登录会话携带的 `vendorId`（缺少时需重新登录）。
+  - 商品与库存：`/app/vendor/workbench/products`（`frontend/src/views/vendor/workbench/ProductBoardView.vue`）可配置方案、SKU、媒体并调用 `/inventory/adjust`。
+  - 履约操作：`/app/vendor/workbench/fulfillment`（`frontend/src/views/vendor/workbench/FulfillmentBoardView.vue` + `frontend/src/views/vendor/workbench/FulfillmentDetailSheet.vue`）覆盖发货、续租/退租/买断审批、订单留言、凭证上传与纠纷处理。
+  - 指标与结算：`/app/vendor/workbench/insights`、`/app/vendor/workbench/settlement` 分别调用 `/analytics/vendor/{vendorId}`、`/payments/settlements`，依赖登录会话携带的 `vendorId`（缺少时需重新登录）。
 - **消费者**
   - 自助下单：商品目录 → 详情 → 购物车/结算页 → `/orders` & `/payments` 的试算、下单与自动支付流程。
   - 订单售后：详情页直接操作续租/退租/买断/确认收货、上传取证、发起/回复纠纷，会自动触发通知与站内信；纠纷结案后收到满意度调查邀请。

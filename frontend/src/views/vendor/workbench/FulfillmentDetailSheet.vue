@@ -130,6 +130,17 @@
             </PageSection>
 
             <PageSection title="纠纷与仲裁">
+              <template #actions>
+                <a-button
+                  type="primary"
+                  ghost
+                  size="small"
+                  :disabled="!canCreateDispute"
+                  @click="openCreateDisputeModal"
+                >
+                  发起纠纷
+                </a-button>
+              </template>
               <div v-if="disputes.length" class="dispute-list">
                 <div v-for="item in disputes" :key="item.id" class="dispute-card">
                   <div class="dispute-card__header">
@@ -214,6 +225,10 @@
                     </a-button>
                     <a-button type="link" @click="handleEscalateDispute(item)">升级平台</a-button>
                   </div>
+                  <div v-else-if="canEscalateDispute(item)" class="dispute-actions">
+                    <a-button type="link" @click="handleEscalateDispute(item)">升级平台</a-button>
+                    <span class="hint">当前轮到对方回应，必要时可直接请求平台介入。</span>
+                  </div>
                   <div v-else-if="canAppealDispute(item)" class="dispute-actions">
                     <a-button type="default" danger ghost @click="openAppealModal(item)">
                       申诉复核
@@ -265,6 +280,41 @@
     </a-spin>
   </a-drawer>
   <a-modal
+    v-model:open="createDisputeModal.open"
+    title="发起纠纷"
+    ok-text="提交"
+    :confirm-loading="createDisputeModal.loading"
+    @ok="handleSubmitCreateDispute"
+    @cancel="createDisputeModal.open = false"
+  >
+    <a-form layout="vertical">
+      <a-form-item label="预设方案">
+        <a-select v-model:value="createDisputeForm.option" :options="disputeOptions" />
+      </a-form-item>
+      <a-form-item label="纠纷原因" required>
+        <a-textarea
+          v-model:value="createDisputeForm.reason"
+          :rows="3"
+          placeholder="请描述问题与期望处理方式"
+        />
+      </a-form-item>
+      <a-form-item label="补充说明（可选）">
+        <a-input v-model:value="createDisputeForm.remark" placeholder="例如：希望补发配件/需要退款等" />
+      </a-form-item>
+      <a-form-item label="电话纪要（可选）">
+        <a-input v-model:value="createDisputeForm.phoneMemo" placeholder="例如：已电话沟通约定 xx" />
+      </a-form-item>
+      <a-form-item label="关联凭证（可选）">
+        <a-select
+          v-model:value="createDisputeForm.attachmentProofIds"
+          mode="multiple"
+          :options="proofOptions"
+          placeholder="选择要关联到纠纷的凭证"
+        />
+      </a-form-item>
+    </a-form>
+  </a-modal>
+  <a-modal
     v-model:open="appealModal.open"
     title="提交申诉"
     ok-text="提交"
@@ -308,6 +358,7 @@ import {
   uploadOrderProof,
   postOrderMessage,
   fetchProofPolicy,
+  createOrderDispute,
   respondOrderDispute,
   escalateOrderDispute,
   appealOrderDispute,
@@ -356,6 +407,20 @@ const disputeForms = reactive<Record<string, {
   attachmentProofIds: string[];
   loading: boolean;
 }>>({});
+const createDisputeModal = reactive<{ open: boolean; loading: boolean }>({ open: false, loading: false });
+const createDisputeForm = reactive<{
+  option: DisputeResolutionOption;
+  reason: string;
+  remark: string;
+  phoneMemo: string;
+  attachmentProofIds: string[];
+}>({
+  option: disputeOptions[0].value as DisputeResolutionOption,
+  reason: '',
+  remark: '',
+  phoneMemo: '',
+  attachmentProofIds: []
+});
 const appealModal = reactive<{ open: boolean; target: OrderDispute | null; reason: string; loading: boolean }>({
   open: false,
   target: null,
@@ -444,6 +509,8 @@ const chatEvents = computed(() => {
 });
 
 const disputes = computed(() => order.value?.disputes ?? []);
+const activeDispute = computed(() => disputes.value.find((item) => item.status !== 'CLOSED') ?? null);
+const canCreateDispute = computed(() => Boolean(order.value) && Boolean(auth.user?.id) && !activeDispute.value);
 
 const proofList = computed(() => order.value?.proofs ?? []);
 const proofOptions = computed(() =>
@@ -478,6 +545,22 @@ const openProof = async (proofId: string) => {
   } catch (error) {
     message.error(friendlyErrorMessage(error, '无法打开预览'));
   }
+};
+
+const resetCreateDisputeForm = () => {
+  createDisputeForm.option = disputeOptions[0].value as DisputeResolutionOption;
+  createDisputeForm.reason = '';
+  createDisputeForm.remark = '';
+  createDisputeForm.phoneMemo = '';
+  createDisputeForm.attachmentProofIds = [];
+};
+
+const openCreateDisputeModal = () => {
+  if (!canCreateDispute.value) {
+    return;
+  }
+  resetCreateDisputeForm();
+  createDisputeModal.open = true;
 };
 
 const drawerWidth = computed(() => {
@@ -731,7 +814,17 @@ const handleSendMessage = async (payload: ChatSendPayload) => {
   }
 };
 
-const canRespondDispute = (item: OrderDispute) => item.status === 'OPEN';
+const canRespondDispute = (item: OrderDispute) => {
+  if (item.status !== 'OPEN') {
+    return false;
+  }
+  if (!item.respondentRole) {
+    return item.initiatorRole !== 'VENDOR';
+  }
+  return item.respondentRole !== 'VENDOR';
+};
+
+const canEscalateDispute = (item: OrderDispute) => item.status === 'OPEN';
 const canAppealDispute = (item: OrderDispute) =>
   item.status === 'CLOSED' &&
   item.appealCount === 0 &&
@@ -769,6 +862,36 @@ const handleRespondDispute = async (item: OrderDispute) => {
     message.error(friendlyErrorMessage(error, '回复失败'));
   } finally {
     form.loading = false;
+  }
+};
+
+const handleSubmitCreateDispute = async () => {
+  if (!order.value || !auth.user?.id) {
+    return;
+  }
+  if (!createDisputeForm.reason.trim()) {
+    message.warning('请填写纠纷原因');
+    return;
+  }
+  createDisputeModal.loading = true;
+  try {
+    await createOrderDispute(order.value.id, {
+      actorId: auth.user.id,
+      option: createDisputeForm.option,
+      reason: createDisputeForm.reason.trim(),
+      remark: createDisputeForm.remark?.trim() || undefined,
+      phoneMemo: createDisputeForm.phoneMemo?.trim() || undefined,
+      attachmentProofIds: createDisputeForm.attachmentProofIds.length
+        ? [...createDisputeForm.attachmentProofIds]
+        : undefined
+    });
+    message.success('纠纷已提交');
+    createDisputeModal.open = false;
+    loadOrder();
+  } catch (error) {
+    message.error(friendlyErrorMessage(error, '提交纠纷失败'));
+  } finally {
+    createDisputeModal.loading = false;
   }
 };
 

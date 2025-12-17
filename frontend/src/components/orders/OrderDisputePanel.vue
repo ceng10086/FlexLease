@@ -402,9 +402,7 @@ const canRespond = (dispute: OrderDispute) => {
 };
 
 const canEscalate = (dispute: OrderDispute) =>
-  Boolean(currentUserId.value) &&
-  dispute.status === 'OPEN' &&
-  dispute.initiatorId === currentUserId.value;
+  Boolean(currentUserId.value) && isOrderOwner.value && dispute.status === 'OPEN';
 
 const canAppeal = (dispute: OrderDispute) =>
   Boolean(currentUserId.value) &&

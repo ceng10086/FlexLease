@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -33,4 +34,15 @@ public interface ProductInquiryRepository extends JpaRepository<ProductInquiry, 
     Optional<ProductInquiry> findByIdAndVendorId(UUID id, UUID vendorId);
 
     List<ProductInquiry> findByStatusAndExpiresAtBefore(ProductInquiryStatus status, OffsetDateTime cutoff);
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            update ProductInquiry pi
+               set pi.status = :expired
+             where pi.status = :open
+               and pi.expiresAt < :cutoff
+            """)
+    int bulkExpire(@Param("open") ProductInquiryStatus open,
+                   @Param("expired") ProductInquiryStatus expired,
+                   @Param("cutoff") OffsetDateTime cutoff);
 }

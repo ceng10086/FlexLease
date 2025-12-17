@@ -66,7 +66,7 @@
                       v-model:value="disputeForms[item.id].penalize"
                       :min="-30"
                       :max="30"
-                      placeholder="信用变动"
+                      placeholder="扣分(正)/加分(负)"
                       :disabled="disputeForms[item.id].malicious"
                     />
                     <a-input v-model:value="disputeForms[item.id].remark" placeholder="备注" />

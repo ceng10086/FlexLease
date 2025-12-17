@@ -18,6 +18,8 @@ import com.flexlease.order.repository.RentalOrderRepository;
 import com.flexlease.order.storage.ProofStorageService;
 import com.flexlease.order.storage.ProofStorageService.StoredFile;
 import jakarta.transaction.Transactional;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
@@ -96,7 +98,11 @@ public class OrderProofService {
         ensureProofTypeAllowed(actorRole, proofType);
         StoredFile stored = proofStorageService.store(file);
         try {
-            proofStorageService.applyWatermark(stored.storedName(), stored.contentType(), "订单 " + order.getOrderNo());
+            String watermark = "订单 %s %s".formatted(
+                    order.getOrderNo(),
+                    OffsetDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
+            );
+            proofStorageService.applyWatermark(stored.storedName(), stored.contentType(), watermark);
         } catch (RuntimeException ex) {
             // best-effort watermark; don't block upload
         }

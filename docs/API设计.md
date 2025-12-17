@@ -220,7 +220,7 @@
 ### 5.6 取证策略与指导
 | 方法 | URL | 描述 | 备注 |
 | ---- | --- | ---- | ---- |
-| GET | `/proof-policy` | 返回发货、收货、退租阶段的最小照片/视频数量、拍摄指引、水印示例 | `watermarkExample` 默认为说明文本（如 `WATERMARK: 订单号 + 发货时间`），前端应按文本展示（若为 URL 则可打开）；配置来源于 `flexlease.order.proof-policy.*` |
+| GET | `/proof-policy` | 返回发货、收货、退租阶段的最小照片/视频数量、拍摄指引、水印示例 | `watermarkExample` 默认为说明文本（如 `WATERMARK: 订单号 + 上传时间`），前端应按文本展示（若为 URL 则可打开）；配置来源于 `flexlease.order.proof-policy.*` |
 
 > 下单传入 `cartItemIds` 后端会自动加载并移除对应购物车条目，同时触发库存预占。
 
