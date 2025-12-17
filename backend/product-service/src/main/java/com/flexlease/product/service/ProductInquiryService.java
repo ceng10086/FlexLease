@@ -72,6 +72,20 @@ public class ProductInquiryService {
                 .toList();
     }
 
+    public List<ProductInquiryResponse> listByRequester(UUID productId, UUID requesterId) {
+        List<ProductInquiry> inquiries = productInquiryRepository.findByRequester(productId, requesterId);
+        for (ProductInquiry inquiry : inquiries) {
+            ProductInquiryStatus previous = inquiry.getStatus();
+            inquiry.refreshExpirationState();
+            if (previous != inquiry.getStatus()) {
+                productInquiryRepository.save(inquiry);
+            }
+        }
+        return inquiries.stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
     public ProductInquiryResponse reply(UUID vendorId,
                                         UUID inquiryId,
                                         ProductInquiryReplyRequest request) {

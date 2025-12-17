@@ -15,8 +15,8 @@
     />
 
     <div v-else>
-      <div v-if="pendingSurveys.length" class="survey-list">
-        <a-card v-for="survey in pendingSurveys" :key="survey.id" size="small" class="survey-card">
+      <div v-if="openSurveys.length" class="survey-list">
+        <a-card v-for="survey in openSurveys" :key="survey.id" size="small" class="survey-card">
           <template #title>
             <div class="card-title">
               <div>
@@ -47,7 +47,29 @@
           </div>
         </a-card>
       </div>
-      <a-empty v-else description="暂无待办调查" />
+      <a-empty v-else description="暂无可提交调查" />
+
+      <div v-if="pendingSurveys.length" class="pending-list">
+        <h4>未开放</h4>
+        <div class="survey-list">
+          <a-card v-for="survey in pendingSurveys" :key="survey.id" size="small" class="survey-card">
+            <template #title>
+              <div class="card-title">
+                <div>
+                  <p class="card-subtitle">
+                    调查开放时间 · {{ formatDate(survey.availableAt) }}
+                  </p>
+                  <strong>满意度调查</strong>
+                </div>
+                <a-tag color="default">未开放</a-tag>
+              </div>
+            </template>
+            <div class="card-body">
+              <p style="margin: 0; color: var(--color-text-secondary)">调查尚未开放，到达开放时间后可提交。</p>
+            </div>
+          </a-card>
+        </div>
+      </div>
 
       <div v-if="completedSurveys.length" class="completed-list">
         <h4>已完成</h4>
@@ -85,12 +107,21 @@ const currentUserId = computed(() => props.currentUserId ?? null);
 const effectiveTargetRef = computed(() => props.targetRef ?? currentUserId.value);
 const effectiveTargetRole = computed(() => props.targetRole ?? null);
 
+const openSurveys = computed(() =>
+  props.order.surveys.filter(
+    (survey) =>
+      (!effectiveTargetRef.value || survey.targetRef === effectiveTargetRef.value) &&
+      (!effectiveTargetRole.value || survey.targetRole === effectiveTargetRole.value) &&
+      survey.status === 'OPEN'
+  )
+);
+
 const pendingSurveys = computed(() =>
   props.order.surveys.filter(
     (survey) =>
       (!effectiveTargetRef.value || survey.targetRef === effectiveTargetRef.value) &&
       (!effectiveTargetRole.value || survey.targetRole === effectiveTargetRole.value) &&
-      survey.status !== 'COMPLETED'
+      survey.status === 'PENDING'
   )
 );
 
@@ -104,7 +135,7 @@ const completedSurveys = computed(() =>
 );
 
 watch(
-  pendingSurveys,
+  openSurveys,
   (surveys) => {
     surveys.forEach((survey) => {
       if (!surveyForms[survey.id]) {
@@ -170,6 +201,12 @@ const submitSurvey = async (survey: OrderSurvey) => {
   flex-direction: column;
   gap: 12px;
   margin-bottom: 16px;
+}
+
+.pending-list {
+  border-top: 1px solid var(--color-border);
+  padding-top: 12px;
+  margin-top: 12px;
 }
 
 .survey-card {

@@ -30,6 +30,8 @@ export const disputeStatusLabel = (status: OrderDispute['status']) => {
       return '已协调';
     case 'CLOSED':
       return '已结案';
+    case 'PENDING_REVIEW_PANEL':
+      return '复核中';
     default:
       return status;
   }
@@ -45,6 +47,8 @@ export const disputeStatusColor = (status: OrderDispute['status']) => {
       return 'green';
     case 'CLOSED':
       return 'red';
+    case 'PENDING_REVIEW_PANEL':
+      return 'purple';
     default:
       return 'default';
   }

@@ -215,3 +215,25 @@ export const submitProductInquiry = async (productId: string, payload: ProductIn
     payload
   );
 };
+
+export type ProductInquiryStatus = 'OPEN' | 'RESPONDED' | 'EXPIRED';
+
+export type ProductInquiry = {
+  id: string;
+  productId: string;
+  vendorId: string;
+  requesterId?: string | null;
+  contactName?: string | null;
+  contactMethod?: string | null;
+  message: string;
+  status: ProductInquiryStatus;
+  reply?: string | null;
+  expiresAt: string;
+  respondedAt?: string | null;
+  createdAt: string;
+};
+
+export const listMyProductInquiries = async (productId: string): Promise<ProductInquiry[]> => {
+  const response = await http.get<ApiResponse<ProductInquiry[]>>(`/catalog/products/${productId}/inquiries`);
+  return response.data.data;
+};

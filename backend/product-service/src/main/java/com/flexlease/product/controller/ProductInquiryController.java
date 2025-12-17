@@ -8,7 +8,9 @@ import com.flexlease.product.dto.ProductInquiryRequest;
 import com.flexlease.product.dto.ProductInquiryResponse;
 import com.flexlease.product.service.ProductInquiryService;
 import jakarta.validation.Valid;
+import java.util.List;
 import java.util.UUID;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -33,5 +35,14 @@ public class ProductInquiryController {
         }
         UUID requesterId = SecurityUtils.requireUserId();
         return ApiResponse.success(productInquiryService.createInquiry(productId, requesterId, request));
+    }
+
+    @GetMapping
+    public ApiResponse<List<ProductInquiryResponse>> listMyInquiries(@PathVariable UUID productId) {
+        if (!SecurityUtils.hasRole("USER") && !SecurityUtils.hasRole("ADMIN")) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "仅消费者可查看咨询");
+        }
+        UUID requesterId = SecurityUtils.requireUserId();
+        return ApiResponse.success(productInquiryService.listByRequester(productId, requesterId));
     }
 }

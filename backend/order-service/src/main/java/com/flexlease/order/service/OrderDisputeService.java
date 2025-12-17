@@ -89,6 +89,11 @@ public class OrderDisputeService {
 
     public OrderDisputeResponse create(UUID orderId, OrderDisputeCreateRequest request) {
         RentalOrder order = loadOrder(orderId);
+        boolean hasActiveDispute = order.getDisputes().stream()
+                .anyMatch(dispute -> dispute.getStatus() != OrderDisputeStatus.CLOSED);
+        if (hasActiveDispute) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "该订单已有进行中的纠纷");
+        }
         OrderActorRole actorRole = resolveActorRole(order, request.actorId());
         OrderDispute dispute = OrderDispute.create(
                 actorRole,

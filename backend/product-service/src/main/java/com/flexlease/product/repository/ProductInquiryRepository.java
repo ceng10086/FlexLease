@@ -21,6 +21,15 @@ public interface ProductInquiryRepository extends JpaRepository<ProductInquiry, 
     List<ProductInquiry> findByVendor(@Param("vendorId") UUID vendorId,
                                       @Param("status") ProductInquiryStatus status);
 
+    @Query("""
+            select pi from ProductInquiry pi
+            where pi.product.id = :productId
+              and pi.requesterId = :requesterId
+            order by pi.createdAt desc
+            """)
+    List<ProductInquiry> findByRequester(@Param("productId") UUID productId,
+                                         @Param("requesterId") UUID requesterId);
+
     Optional<ProductInquiry> findByIdAndVendorId(UUID id, UUID vendorId);
 
     List<ProductInquiry> findByStatusAndExpiresAtBefore(ProductInquiryStatus status, OffsetDateTime cutoff);

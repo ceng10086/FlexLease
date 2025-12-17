@@ -1,5 +1,6 @@
 package com.flexlease.order.controller;
 
+import com.flexlease.common.security.SecurityUtils;
 import com.flexlease.order.service.VendorPerformanceService;
 import com.flexlease.order.service.VendorPerformanceService.VendorPerformanceMetrics;
 import java.util.UUID;
@@ -28,6 +29,7 @@ public class InternalOrderController {
     @GetMapping("/vendors/{vendorId}/performance-metrics")
     public ResponseEntity<VendorPerformanceMetrics> getVendorPerformanceMetrics(
             @PathVariable UUID vendorId) {
+        SecurityUtils.requireRole("INTERNAL");
         VendorPerformanceMetrics metrics = performanceService.calculateMetrics(vendorId);
         return ResponseEntity.ok(metrics);
     }

@@ -467,13 +467,17 @@ const proofLabel = (proofId: string) => {
   return `${proof.proofType} · ${new Date(proof.uploadedAt).toLocaleString()}`;
 };
 
-const openProof = (proofId: string) => {
+const openProof = async (proofId: string) => {
   const proof = proofMap.value.get(proofId);
   if (!proof?.fileUrl) {
     message.warning('凭证链接不可用');
     return;
   }
-  window.open(proof.fileUrl, '_blank');
+  try {
+    await openProofInNewTab(proof.fileUrl);
+  } catch (error) {
+    message.error(friendlyErrorMessage(error, '无法打开预览'));
+  }
 };
 
 const drawerWidth = computed(() => {
@@ -729,7 +733,7 @@ const handleSendMessage = async (payload: ChatSendPayload) => {
 
 const canRespondDispute = (item: OrderDispute) => item.status === 'OPEN';
 const canAppealDispute = (item: OrderDispute) =>
-  item.status === 'RESOLVED' &&
+  item.status === 'CLOSED' &&
   item.appealCount === 0 &&
   Boolean(auth.user?.id) &&
   (item.initiatorId === auth.user?.id || item.respondentId === auth.user?.id);

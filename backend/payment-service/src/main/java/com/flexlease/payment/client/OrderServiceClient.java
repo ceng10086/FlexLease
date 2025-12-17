@@ -1,5 +1,6 @@
 package com.flexlease.payment.client;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.flexlease.common.dto.ApiResponse;
 import com.flexlease.common.exception.BusinessException;
 import com.flexlease.common.exception.ErrorCode;
@@ -106,6 +107,7 @@ public class OrderServiceClient {
         return headers;
     }
 
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public record OrderCreditSnapshot(UUID id, Integer creditScore, CreditTier creditTier) {
     }
 }

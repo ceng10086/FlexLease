@@ -243,7 +243,7 @@ export type DisputeResolutionOption =
   | 'DISCOUNTED_BUYOUT'
   | 'CUSTOM';
 
-export type OrderDisputeStatus = 'OPEN' | 'PENDING_ADMIN' | 'RESOLVED' | 'CLOSED';
+export type OrderDisputeStatus = 'OPEN' | 'PENDING_ADMIN' | 'RESOLVED' | 'CLOSED' | 'PENDING_REVIEW_PANEL';
 
 export type OrderDispute = {
   id: string;

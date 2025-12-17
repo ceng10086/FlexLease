@@ -156,6 +156,7 @@
 | 方法 | URL | 角色 | 描述 | 请求/响应要点 |
 | ---- | --- | ---- | ---- | ------------- |
 | POST | `/catalog/products/{productId}/inquiries` | USER | 消费者在下单前提问，系统记录 72 小时有效的咨询 | `{ contactName?, contactMethod?, message }`，服务端自动带上 `requesterId` 并设置过期时间 |
+| GET | `/catalog/products/{productId}/inquiries` | USER | 消费者查看自己在该商品下的咨询记录 | 返回数组，包含 `status/reply/expiresAt/respondedAt/createdAt`，用于展示 72 小时倒计时与厂商答复 |
 | GET | `/vendors/{vendorId}/inquiries` | VENDOR | 厂商查看咨询列表 | 支持 `status`（`OPEN/RESPONDED/EXPIRED`）过滤；返回数组包含 `reply/expiresAt` |
 | POST | `/vendors/{vendorId}/inquiries/{inquiryId}/reply` | VENDOR | 厂商回复咨询 | `{ reply }`，仅 `OPEN` 状态可回复，成功后触发通知 |
 
@@ -244,6 +245,8 @@
 | POST | `/admin/orders/{orderId}/disputes/{disputeId}/resolve` | ADMIN | 平台裁决 | `{ decision, penalizeUserDelta?, remark? }`；`penalizeUserDelta` 为信用扣分，正数代表扣减 |
 
 > 纠纷的每个阶段都会同步写入时间线，且通过 Notification Service 向双方推送站内信；平台裁决后会自动触发满意度调查。
+>
+> 申诉接口仅对 `CLOSED`（平台裁决结案）纠纷开放；申诉后纠纷进入 `PENDING_REVIEW_PANEL`，裁决接口会根据纠纷状态要求 `ADMIN` 或 `REVIEW_PANEL` 权限处理。
 
 ### 5.8 满意度调研
 | 方法 | URL | 描述 | 请求体要点 |

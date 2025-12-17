@@ -253,6 +253,7 @@ import {
   disputeStatusLabel,
   disputeActorLabel
 } from '../../utils/disputes';
+import { openProofInNewTab } from '../../services/proofService';
 
 const props = defineProps<{
   order: RentalOrderDetail;
@@ -297,13 +298,18 @@ const proofLabel = (proofId: string) => {
   return `${proof.proofType} · ${new Date(proof.uploadedAt).toLocaleString()}`;
 };
 
-const openProof = (proofId: string) => {
+const openProof = async (proofId: string) => {
   const proof = proofMap.value.get(proofId);
   if (!proof?.fileUrl) {
     message.warning('凭证链接不可用');
     return;
   }
-  window.open(proof.fileUrl, '_blank');
+  try {
+    await openProofInNewTab(proof.fileUrl);
+  } catch (error) {
+    console.error(error);
+    message.error('打开凭证失败');
+  }
 };
 
 const createForm = reactive({
@@ -323,11 +329,17 @@ const respondForm = reactive({
 });
 
 const currentUserId = computed(() => props.currentUserId ?? null);
+const isOrderOwner = computed(() => Boolean(currentUserId.value) && currentUserId.value === props.order.userId);
 const activeDispute = computed(() =>
-  props.order.disputes.find((dispute) => dispute.status === 'OPEN' || dispute.status === 'PENDING_ADMIN') || null
+  props.order.disputes.find((dispute) =>
+    dispute.status === 'OPEN' ||
+    dispute.status === 'PENDING_ADMIN' ||
+    dispute.status === 'RESOLVED' ||
+    dispute.status === 'PENDING_REVIEW_PANEL'
+  ) || null
 );
 const canCreateDispute = computed(
-  () => Boolean(currentUserId.value) && !activeDispute.value
+  () => Boolean(currentUserId.value) && isOrderOwner.value && !activeDispute.value
 );
 
 const formatDate = (value?: string | null) => (value ? new Date(value).toLocaleString() : '--');
@@ -376,10 +388,18 @@ const submitCreate = async () => {
   }
 };
 
-const canRespond = (dispute: OrderDispute) =>
-  Boolean(currentUserId.value) &&
-  dispute.status === 'OPEN' &&
-  dispute.initiatorId !== currentUserId.value;
+const canRespond = (dispute: OrderDispute) => {
+  if (!currentUserId.value || !isOrderOwner.value) {
+    return false;
+  }
+  if (dispute.status !== 'OPEN') {
+    return false;
+  }
+  if (!dispute.respondentRole) {
+    return dispute.initiatorRole !== 'USER';
+  }
+  return dispute.respondentRole !== 'USER';
+};
 
 const canEscalate = (dispute: OrderDispute) =>
   Boolean(currentUserId.value) &&
@@ -388,7 +408,7 @@ const canEscalate = (dispute: OrderDispute) =>
 
 const canAppeal = (dispute: OrderDispute) =>
   Boolean(currentUserId.value) &&
-  dispute.status === 'RESOLVED' &&
+  dispute.status === 'CLOSED' &&
   dispute.appealCount === 0 &&
   (dispute.initiatorId === currentUserId.value || dispute.respondentId === currentUserId.value);
 
