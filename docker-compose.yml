@@ -141,7 +141,7 @@ services:
       FLEXLEASE_NOTIFICATION_SERVICE_BASE_URL: http://notification-service:9006/api/v1
       FLEXLEASE_PRODUCT_SERVICE_BASE_URL: http://product-service:9003/api/v1
       FLEXLEASE_USER_SERVICE_BASE_URL: http://user-service:9002/api/v1
-      FLEXLEASE_PROOF_STORAGE_ROOT: /app/storage/order-proofs
+      FLEXLEASE_ORDER_PROOF_ROOT: /app/storage/order-proofs
       SERVER_PORT: 9004
     volumes:
       - order-proofs:/app/storage/order-proofs

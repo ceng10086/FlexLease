@@ -8,13 +8,13 @@
 >   "data": {}
 > }
 > ```
-> 认证方式为 OAuth2 + JWT，访问令牌放置在 `Authorization: Bearer <token>` 头部。除 `auth` 模块外，其余接口均需鉴权。角色控制通过 RBAC 校验。
+> 认证方式为 **JWT（Access/Refresh）**：访问令牌放置在 `Authorization: Bearer <token>` 头部，令牌由 `auth-service` 的 `/auth/token`（JSON 请求体）签发并可通过 `/auth/token/refresh` 刷新。除 `auth` 模块外，其余接口均需鉴权。角色控制通过 RBAC 校验。
 
 - **分页**：使用 `PagedResponse` 包装，字段包含 `content`、`page`、`size`、`totalElements`、`totalPages`。
 
 ## 1. 公共与约定
 - **HTTP 状态码**：200 成功；4xx 客户端错误；5xx 服务错误。
-- **分页参数**：`page`（从 1 起）、`size`、`sort`（如 `createdAt,desc`）。
+- **分页参数**：`page`（从 1 起）、`size`（当前实现固定按 `createdAt desc` 排序，不暴露 `sort` 参数）。
 - **时间格式**：ISO 8601（UTC），示例 `2025-01-15T08:00:00Z`。
 - **幂等**：下单、支付相关接口支持 Idempotency-Key 请求头。
 - **错误码**（参考 `platform-common` 枚举）：
@@ -211,11 +211,11 @@
 ### 5.5 购物车接口
 | 方法 | URL | 描述 | 请求体要点 | 备注 |
 | ---- | --- | ---- | ---------- | ---- |
-| GET | `/cart` | 查询用户购物车 | `userId`（query 参数） | 返回 `List<CartItemResponse>` |
-| POST | `/cart/items` | 新增/合并条目 | `{ userId, vendorId, productId, skuId, planId?, productName, skuCode?, planSnapshot?, quantity, unitRentAmount, unitDepositAmount, buyoutPrice? }` | 相同用户+SKU 会合并数量并刷新定价 |
-| PUT | `/cart/items/{itemId}` | 更新数量 | `{ userId, quantity }` | 数量需 ≥1 |
-| DELETE | `/cart/items/{itemId}` | 删除条目 | `userId`（query 参数） | - |
-| DELETE | `/cart` | 清空购物车 | `userId`（query 参数） | - |
+| GET | `/cart` | 查询用户购物车 | `userId?`（query；管理员/内部必填） | 返回 `List<CartItemResponse>` |
+| POST | `/cart/items` | 新增/合并条目 | `{ userId, vendorId, productId, skuId, planId?, productName, skuCode?, planSnapshot?, quantity, unitRentAmount, unitDepositAmount, buyoutPrice? }` | `userId` 必填且需与当前 JWT 用户一致（管理员/内部可指定任意用户）；相同用户+SKU 会合并数量并刷新定价 |
+| PUT | `/cart/items/{itemId}` | 更新数量 | `{ userId, quantity }` | `userId` 规则同上；数量需 ≥1 |
+| DELETE | `/cart/items/{itemId}` | 删除条目 | `userId?`（query；管理员/内部必填） | - |
+| DELETE | `/cart` | 清空购物车 | `userId?`（query；管理员/内部必填） | - |
 
 ### 5.6 取证策略与指导
 | 方法 | URL | 描述 | 备注 |
@@ -224,7 +224,7 @@
 
 > 下单传入 `cartItemIds` 后端会自动加载并移除对应购物车条目，同时触发库存预占。
 
-### 5.6 订单沟通与取证
+### 5.7 订单沟通与取证
 | 方法 | URL | 描述 | 请求体要点 | 备注 |
 | ---- | --- | ---- | ---------- | ---- |
 | POST | `/orders/{orderId}/messages` | 在时间线中追加沟通记录 | `{ actorId, message }` | 用户/厂商/管理员均可调用，后端会校验请求人与当前登录用户一致，并触发站内信提醒对端 |
@@ -234,7 +234,7 @@
 
 > `ProofPolicyProperties` 中可配置发货/退租阶段所需的最少照片/视频数量，未满足要求时 `/orders/{id}/ship`、`/return/complete` 会拒绝操作。
 
-### 5.7 订单纠纷与仲裁
+### 5.8 订单纠纷与仲裁
 | 方法 | URL | 角色 | 描述 | 备注 |
 | ---- | --- | ---- | ---- | ---- |
 | GET | `/orders/{orderId}/disputes` | USER/VENDOR/ADMIN | 查看纠纷列表 | 自动按时间排序，返回 `OrderDisputeResponse` |
@@ -248,7 +248,7 @@
 >
 > 申诉接口仅对 `CLOSED`（平台裁决结案）纠纷开放；申诉后纠纷进入 `PENDING_REVIEW_PANEL`，裁决接口会根据纠纷状态要求 `ADMIN` 或 `REVIEW_PANEL` 权限处理。
 
-### 5.8 满意度调研
+### 5.9 满意度调研
 | 方法 | URL | 描述 | 请求体要点 |
 | ---- | --- | ---- | ---------- |
 | GET | `/orders/{orderId}/surveys` | 查看订单下的所有调查 | - |
@@ -256,7 +256,7 @@
 
 > `OrderSurveyScheduler` 会根据 `flexlease.order.survey.*` 定时激活状态为 `PENDING` 的调查并发送邀请，问卷完成后附加时间线事件与感谢通知。
 
-### 5.9 内部数据接口
+### 5.10 内部数据接口
 | 方法 | URL | 角色 | 描述 | 响应要点 |
 | ---- | --- | ---- | ---- | -------- |
 | GET | `/internal/vendors/{vendorId}/performance-metrics` | INTERNAL | user-service 读取厂商履约指标（SLA 计算） | `onTimeShipmentRate`、`totalDisputes`、`friendlyDisputes`、`cancellationRate`；返回 0~1 的比率值 |

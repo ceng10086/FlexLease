@@ -11,18 +11,18 @@ FlexLease 面向 B2C 场景，为厂商与消费者提供从入驻、商品配�
 
 ## 架构拓扑
 
-| 组件 | 端口 | 说明 |
+| 组件 | 端口（默认） | 说明 |
 | --- | --- | --- |
-| registry-service | 8761 | Eureka Server，所有微服务注册发现入口 |
-| gateway-service | 8080 | Spring Cloud Gateway，统一 JWT 校验与路由转发（`/api/v1/**`） |
-| auth-service | 9001 | 账号注册/登录、密码重置、刷新令牌、内部账号绑定 vendorId |
-| user-service | 9002 | 厂商入驻与资料、用户档案、管理员用户冻结/解冻 |
-| product-service | 9003 | 商品/Rental Plan/SKU/库存、媒体文件管理、对前台提供目录查询与内部库存接口 |
-| order-service | 9004 | 订单预览/下单/履约操作/购物车/合同、运营指标、超时取消调度、RabbitMQ 事件 |
-| payment-service | 9005 | 支付流水、自动模拟确认与回调、退款、结算统计 |
-| notification-service | 9006 | 模板管理、通知发送日志、订阅订单事件并向厂商推送站内信 |
-| redis / postgres / rabbitmq | 6379 / 5432 / 5672+15672 | 依赖中间件（Volume 持久化 + 管控台端口映射） |
-| frontend | 8080 (Nginx) | Vite 构建后的管理端 SPA，通过 Gateway 访问后端 |
+| frontend | 8080（对外暴露） | 管理端 SPA；Nginx 反代 `/api/**` → `gateway-service:8080`，`/media/**` → `product-service:9003` |
+| registry-service | 8761（对外暴露） | Eureka Server，所有微服务注册发现入口 |
+| gateway-service | 8080（仅容器/本地） | Spring Cloud Gateway，统一 JWT 校验与路由转发（`/api/v1/**`）；Compose 中通过前端 Nginx 访问 |
+| auth-service | 9001（仅容器/本地） | 账号注册/登录、密码重置、刷新令牌、内部账号绑定 vendorId |
+| user-service | 9002（仅容器/本地） | 厂商入驻与资料、用户档案、管理员用户冻结/解冻 |
+| product-service | 9003（仅容器/本地） | 商品/Rental Plan/SKU/库存、媒体文件管理、对前台提供目录查询与内部库存接口 |
+| order-service | 9004（仅容器/本地） | 订单预览/下单/履约操作/购物车/合同、运营指标、超时取消调度、RabbitMQ 事件 |
+| payment-service | 9005（仅容器/本地） | 支付流水、自动模拟确认与回调、退款、结算统计 |
+| notification-service | 9006（仅容器/本地） | 模板管理、通知发送日志、订阅订单事件并向厂商推送站内信 |
+| redis / postgres / rabbitmq | 6379 / 5432 / 5672+15672（对外暴露） | 依赖中间件（Volume 持久化 + 管控台端口映射） |
 
 > 默认管理员账号由认证服务启动时自动创建：`admin@flexlease.test / Admin@123`。所有内部互信调用需在 Header 中附带 `X-Internal-Token:flexlease-internal-secret`，生产部署请通过 `.env` 或 CI/CD 密文覆盖。
 
@@ -93,7 +93,7 @@ FlexLease 面向 B2C 场景，为厂商与消费者提供从入驻、商品配�
 - 所有服务共用 `security.jwt.secret` 与 `security.jwt.internal-access-token`，请在部署时统一覆盖；内部调用统一在 Header 中写入 `X-Internal-Token`（默认 `flexlease-internal-secret`）。
 - `flexlease.bootstrap.admin.username/password` 控制认证服务默认管理员账号；`FLEXLEASE_STORAGE_ROOT` 指定商品媒体文件目录；`FLEXLEASE_*_BASE_URL` 用于跨服务调用（order→product/payment/notification 等）。
 - `FLEXLEASE_PAYMENT_AUTO_CONFIRM`（或 `flexlease.payment.auto-confirm`）控制支付是否自动成功；`FLEXLEASE_ORDER_MAINTENANCE_PENDING_PAYMENT_EXPIRE_MINUTES` 与 `FLEXLEASE_ORDER_MAINTENANCE_SCAN_INTERVAL_MS` 调整待支付超时策略；`FLEXLEASE_MESSAGING_ENABLED` 与 `FLEXLEASE_REDIS_ENABLED` 可在开发环境禁用 RabbitMQ 或 Redis 依赖。
-- `flexlease.notification-service.base-url` 现被 user-service 与 product-service 复用，用于向 notification-service 发送站内信；如需联调自定义域名，请同步覆盖这两个服务的配置。
+- `flexlease.notification-service.base-url` 被多个服务用于调用通知服务（站内信），如需联调自定义域名请统一覆盖相关服务配置。
 - `flexlease.order.proof-policy.*`（含 `shipment-photo-required/receive-photo-required/return-photo-required` 等字段）与 `FLEXLEASE_ORDER_PROOF_ROOT` 控制取证最低数量与存储目录，可按实际履约规范调整照片/视频要求及水印文案。
 
 ## 多角色能力速览
@@ -120,7 +120,7 @@ docker compose up --build
 
 命令会依次构建并启动数据库、Redis、RabbitMQ、Eureka、所有微服务以及 Nginx 容器，首次执行耗时取决于网络与 Maven 缓存。完成后可访问：
 
-- 管理端 & API 网关：http://localhost:8080
+- 统一入口（管理端 + `/api` 反代到网关）：http://localhost:8080
 - Eureka 面板：http://localhost:8761
 - RabbitMQ 控制台：http://localhost:15672（`guest/guest`）
 
@@ -130,7 +130,7 @@ docker compose up --build
 
 1. **后端单服务**：`SPRING_PROFILES_ACTIVE=dev` 使用 H2 + 自动建 schema，或 `postgres` profile 连接本地数据库。
    ```bash
-   mvn -pl backend/order-service -am spring-boot:run
+   ./mvnw -pl backend/order-service -am spring-boot:run
    ```
 2. **前端**：
    ```bash
@@ -142,7 +142,7 @@ docker compose up --build
 3. **常用命令**
    ```bash
    ./mvnw clean verify      # 全量构建+测试
-   mvn -pl backend/product-service -am test
+   ./mvnw -pl backend/product-service -am test
    npm run build && npm run test:e2e
    ```
 
