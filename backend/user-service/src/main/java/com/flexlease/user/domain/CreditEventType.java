@@ -5,6 +5,7 @@ public enum CreditEventType {
     ON_TIME_PAYMENT,
     EARLY_RETURN,
     LATE_PAYMENT,
+    INSPECTION_COOPERATED,
     FRIENDLY_DISPUTE,
     /** 恶意行为（拒收、拒不退还、需赔偿）：扣 30 分并冻结账号 30 天 */
     MALICIOUS_BEHAVIOR

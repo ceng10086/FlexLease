@@ -52,7 +52,7 @@
 | ---- | --- | ---- | ---- |
 | PATCH | `/internal/users/{userId}/status` | 更新指定账号状态 | 典型用例：厂商入驻审核通过后将账号从 `PENDING_REVIEW` 调整为 `ENABLED`；支持 `ENABLED`/`DISABLED`，请求体 `{ "status": "ENABLED" }` |
 | PATCH | `/internal/users/{userId}/vendor` | 绑定认证账号与厂商 ID | 审核通过后由用户服务调用，确保 JWT 与 `/auth/me` 返回 `vendorId`，请求体 `{ "vendorId": "UUID" }` |
-| POST | `/internal/users/{userId}/credit-events` | 记录信用事件，`eventType` 取值 `KYC_VERIFIED/ON_TIME_PAYMENT/EARLY_RETURN/LATE_PAYMENT/FRIENDLY_DISPUTE/MALICIOUS_BEHAVIOR`，`attributes` 可携带 `orderNo/disputeId/reason` 等上下文 | 仅 `INTERNAL` 角色可调用，用于触发信用分加减与站内信提醒，恶意行为会附带冻结信息 |
+| POST | `/internal/users/{userId}/credit-events` | 记录信用事件，`eventType` 取值 `KYC_VERIFIED/ON_TIME_PAYMENT/EARLY_RETURN/LATE_PAYMENT/INSPECTION_COOPERATED/FRIENDLY_DISPUTE/MALICIOUS_BEHAVIOR`，`attributes` 可携带 `orderNo/disputeId/reason` 等上下文 | 仅 `INTERNAL` 角色可调用，用于触发信用分加减与站内信提醒，恶意行为会附带冻结信息 |
 
 ## 3. 用户 & 厂商管理（user-service）
 ### 3.1 厂商入驻
@@ -177,6 +177,7 @@
 | POST | `/orders/{orderId}/cancel` | USER | 支付前取消订单 | `{ userId, reason? }` |
 | POST | `/orders/{orderId}/ship` | VENDOR | 填写发货信息，订单进入 `IN_LEASE` | `{ vendorId, carrier, trackingNumber }` |
 | POST | `/orders/{orderId}/confirm-receive` | USER | 确认收货，记录事件 | `{ actorId }` |
+| POST | `/orders/{orderId}/inspection/request` | VENDOR | 发起巡检请求，提示用户补充巡检凭证 | `{ vendorId, remark? }` |
 | POST | `/orders/{orderId}/extend` | USER | 发起续租申请 | `{ userId, additionalMonths, remark? }` |
 | POST | `/orders/{orderId}/extend/approve` | VENDOR | 处理续租申请，更新租期 | `{ vendorId, approve, remark? }` |
 | POST | `/orders/{orderId}/return` | USER | 发起退租申请，记录物流信息 | `{ userId, reason?, logisticsCompany?, trackingNumber? }` |
@@ -300,8 +301,8 @@
 ## 8. 网关与前端约定
 - 所有微服务注册到 Eureka（`registry-service`，端口 8761），网关根据路径转发：
   - `/api/v1/auth/**` → auth-service
-  - `/api/v1/users/**` `/api/v1/vendors/**` → user-service
-  - `/api/v1/products/**` `/api/v1/catalog/**` → product-service
+  - `/api/v1/users/**` `/api/v1/vendors/**`（除 `/api/v1/vendors/*/inquiries/**`） → user-service
+  - `/api/v1/products/**` `/api/v1/catalog/**` `/api/v1/vendors/*/inquiries/**` → product-service
   - `/api/v1/orders/**` `/api/v1/cart/**` → order-service
   - `/api/v1/payments/**` → payment-service
   - `/api/v1/notifications/**` → notification-service

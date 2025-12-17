@@ -46,3 +46,5 @@ flexlease:
     internal-token: ${FLEXLEASE_AUTH_SERVICE_INTERNAL_TOKEN:flexlease-internal-secret}
   notification-service:
     base-url: ${FLEXLEASE_NOTIFICATION_SERVICE_BASE_URL:http://notification-service/api/v1}
+  order-service:
+    base-url: ${FLEXLEASE_ORDER_SERVICE_BASE_URL:http://order-service}

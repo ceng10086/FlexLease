@@ -102,7 +102,7 @@ class ProductServiceIntegrationTest {
         assertThat(approved.reviewedBy()).isEqualTo(reviewerId);
         assertThat(approved.mediaAssets()).isNotNull();
 
-        PagedResponse<CatalogProductResponse> catalogList = catalogQueryService.listActive(null, null, PageRequest.of(0, 10));
+        PagedResponse<CatalogProductResponse> catalogList = catalogQueryService.listActive(null, null, null, null, null, null, PageRequest.of(0, 10));
         assertThat(catalogList.content()).hasSize(1);
         CatalogProductResponse catalogProduct = catalogList.content().getFirst();
         assertThat(catalogProduct.status()).isEqualTo(ProductStatus.ACTIVE);

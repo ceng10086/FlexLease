@@ -35,6 +35,7 @@ import com.flexlease.order.dto.OrderBuyoutDecisionRequest;
 import com.flexlease.order.dto.OrderCancelRequest;
 import com.flexlease.order.dto.OrderExtensionApplyRequest;
 import com.flexlease.order.dto.OrderExtensionDecisionRequest;
+import com.flexlease.order.dto.OrderInspectionRequest;
 import com.flexlease.order.dto.OrderItemRequest;
 import com.flexlease.order.dto.OrderMessageRequest;
 import com.flexlease.order.dto.OrderPaymentRequest;
@@ -407,6 +408,26 @@ public class RentalOrderService {
         }
         recordEvent(order, OrderEventType.ORDER_RECEIVED, "用户确认收货", request.actorId());
         notifyVendor(order, "买家确认收货", "订单 %s 已确认收货，租期正式开始计算。".formatted(order.getOrderNo()));
+        return assembler.toOrderResponse(order);
+    }
+
+    public RentalOrderResponse requestInspection(UUID orderId, OrderInspectionRequest request) {
+        RentalOrder order = getOrderForUpdate(orderId);
+        ensureVendor(order, request.vendorId());
+        if (order.getStatus() != OrderStatus.IN_LEASE) {
+            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "当前状态不支持发起巡检");
+        }
+        String remark = Optional.ofNullable(request.remark()).map(String::trim).filter(s -> !s.isBlank()).orElse(null);
+        String description = remark == null ? "发起巡检请求" : "发起巡检请求：" + remark;
+        recordEvent(order,
+                OrderEventType.INSPECTION_REQUESTED,
+                description,
+                request.vendorId(),
+                remark == null ? Map.of() : Map.of("remark", remark),
+                OrderActorRole.VENDOR);
+        notifyUser(order,
+                "收到巡检请求",
+                "订单 %s 厂商发起巡检请求，请按指引上传巡检凭证以获得信用加分。".formatted(order.getOrderNo()));
         return assembler.toOrderResponse(order);
     }
 

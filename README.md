@@ -34,7 +34,7 @@ FlexLease 面向 B2C 场景，为厂商与消费者提供从入驻、商品配�
 - **厂商与用户**
   - 厂商入驻申请、管理员审核（自动回写认证中心并创建 vendor 资料）。
   - 厂商资料分页与状态管控、消费者档案（含管理员冻结）。
-  - `CreditEventService` 暴露 `/api/v1/internal/users/{id}/credit-events`，支持实名认证奖励、按时支付/提前归还奖励（连续履约达标额外 +5 分）、逾期惩罚、友好协商加分、恶意行为冻结等自动信用事件，并同步站内信提示；管理员亦可经 `/api/v1/admin/users/{id}/credit-adjustments` 人工干预信用分并记录原因。
+  - `CreditEventService` 暴露 `/api/v1/internal/users/{id}/credit-events`，支持实名认证奖励、按时支付/提前归还奖励（连续履约达标额外 +5 分）、巡检配合奖励（+2 分）、逾期惩罚、友好协商加分、恶意行为冻结等自动信用事件，并同步站内信提示；管理员亦可经 `/api/v1/admin/users/{id}/credit-adjustments` 人工干预信用分并记录原因。
   - `AccountUnfreezeScheduler` 每小时自动检查并解冻到期账号（恶意行为冻结 30 天后自动恢复），确保账号生命周期完整闭环。
   - `VendorService` 为支付/订单服务提供 `/api/v1/internal/vendors/{id}/commission-profile` 内部接口与 `/vendors/{id}/commission-profile` 管理入口，管理员可直接维护行业基准费率、信用档位及最近一次 SLA 评分。
 - **商品域**
@@ -46,10 +46,10 @@ FlexLease 面向 B2C 场景，为厂商与消费者提供从入驻、商品配�
   - 订单试算自动根据用户信用档案调整押金（优享减免、预警上浮、受限拦截），并写入订单快照供履约审核。
   - 下单支持附带客户备注，厂商工作台与管理员订单抽屉可直接查看，方便处理特殊配送/履约指引。
   - 续租/退租/买断流程及审批、自动库存处理、订单合同生成与签署。
-  - `/orders/{id}/messages` 支持用户与厂商在订单抽屉直接沟通（自动写入时间线），`OrderProofService`（`backend/order-service/src/main/java/com/flexlease/order/service/OrderProofService.java`）提供发货/收货/退租/巡检/其他凭证上传、`/api/v1/proofs/{fileName}` 鉴权下载（前端预览通过拉取 blob 生成本地 URL）以及和 Notification Service 的互通提醒。
+  - `/orders/{id}/messages` 支持用户与厂商在订单抽屉直接沟通（自动写入时间线），`OrderProofService`（`backend/order-service/src/main/java/com/flexlease/order/service/OrderProofService.java`）提供发货/收货/退租/巡检/其他凭证上传、`/api/v1/proofs/{fileName}` 鉴权下载（前端预览通过拉取 blob 生成本地 URL）以及和 Notification Service 的互通提醒；厂商也可通过 `/orders/{id}/inspection/request` 发起巡检请求，用户上传巡检凭证后自动触发信用加分。
   - `ProofPolicyService` 对外暴露 `/api/v1/proof-policy`，统一告知各阶段最小凭证数量与拍摄角度，并由 `ProofStorageService` 对图片自动打水印；为保证中文水印正常显示，`order-service` 镜像包含 `fonts-noto-cjk` 字体包。
   - `OrderDisputeService`（`backend/order-service/src/main/java/com/flexlease/order/service/OrderDisputeService.java`）封装纠纷创建→协商→升级仲裁→平台裁决→信用扣分→满意度调查的全流程，管理员可在 `/api/v1/admin/orders/{id}/disputes/{disputeId}/resolve` 直接裁决，并支持 `maliciousBehavior` 标志自动触发恶意行为惩罚；双方在发起/回应纠纷时可同步上传多媒体附件与电话纪要，信息将写入时间线与抽屉附件列表。
-  - 纠纷调度新增多阶段倒计时提醒（24小时、6小时、1小时前各提醒一次）与超时自动升级逻辑；用户二次申诉进入 `PENDING_REVIEW_PANEL` 状态需 `REVIEW_PANEL` 角色裁决，实现复核组权限区分。
+  - 纠纷调度新增多阶段倒计时提醒（24小时、6小时、1小时前各提醒一次）与超时自动升级逻辑；用户二次申诉进入 `PENDING_REVIEW_PANEL` 状态可由 `ADMIN` 或 `REVIEW_PANEL` 角色裁决，避免“申诉后无人结案”卡死。
   - 满意度调研由 `OrderSurveyService` 定时激活 `/orders/{id}/surveys` 调查，支持双方打分与评价，并追加时间线+站内信提醒。
   - 平台/厂商运营指标、管理员强制关闭、待支付订单自动取消调度。
   - RabbitMQ 事件总线 + Notification-Service 异步告警。
@@ -101,7 +101,7 @@ FlexLease 面向 B2C 场景，为厂商与消费者提供从入驻、商品配�
 - **平台管理员**
   - 入驻审核：`/app/admin/vendor-review` 通过 `user-service` 审核接口激活厂商账号并回写认证中心。
   - 商品审核：`/app/admin/product-review` 直连 `product-service` 的 `/api/v1/admin/products/**`。
-  - 订单监控：`/app/admin/orders` 支持按用户/厂商/状态过滤，并新增“仅人工审核”筛选（`manualReviewOnly`）用于快速定位信用预警订单，抽屉内嵌电子合同查看、操作时间线与 `/admin/orders/{id}/force-close`。
+  - 订单监控：`/app/admin/orders` 支持按用户/厂商/状态过滤，并提供“仅人工审核”筛选（`manualReviewOnly`）用于快速定位信用预警订单（风险关注标记，不阻断支付/履约），抽屉内嵌电子合同查看、操作时间线与 `/admin/orders/{id}/force-close`。
 - **厂商**
   - 商品与库存：`VendorProductWorkspace` 绑定 `vendorId`，可配置方案、SKU、媒体并调用 `/inventory/adjust`。
   - 履约操作：`VendorOrderWorkspace` 针对 `/orders/{id}/ship`、续租/退租/买断审批、订单留言、凭证上传、纠纷响应等动作提供抽屉，内置库存出入库补偿。

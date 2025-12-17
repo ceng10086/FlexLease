@@ -88,7 +88,7 @@
               v-if="preview.creditSnapshot.requiresManualReview"
               type="warning"
               show-icon
-              message="信用预警：提交后需平台人工复核"
+              message="信用预警：平台将关注该订单，请在倒计时内完成支付"
             />
           </div>
           <a-space direction="vertical" style="width: 100%">
@@ -274,27 +274,26 @@ const handleCreate = async () => {
     const order = await createOrder(payload as any, { idempotencyKey });
     message.success('订单创建成功');
     if (order.requiresManualReview) {
-      message.info('订单已提交，需平台人工审核后再支付');
-    } else {
-      try {
-        const result = await autoCompleteInitialPayment({
-          orderId: order.id,
-          vendorId: order.vendorId,
-          userId: order.userId,
-          amount: order.totalAmount,
-          depositAmount: order.depositAmount,
-          rentAmount: order.rentAmount,
-          buyoutAmount: order.buyoutAmount ?? undefined,
-          description: '订单首付款'
-        });
-        if (result.succeeded) {
-          message.success('首付款已自动完成');
-        } else {
-          message.info('已生成支付流水，请在订单详情查看进度');
-        }
-      } catch (paymentError) {
-        message.warning(friendlyErrorMessage(paymentError, '自动支付未完成，请前往订单详情补缴'));
+      message.warning('信用预警：平台可能会抽检该订单，但不影响支付');
+    }
+    try {
+      const result = await autoCompleteInitialPayment({
+        orderId: order.id,
+        vendorId: order.vendorId,
+        userId: order.userId,
+        amount: order.totalAmount,
+        depositAmount: order.depositAmount,
+        rentAmount: order.rentAmount,
+        buyoutAmount: order.buyoutAmount ?? undefined,
+        description: '订单首付款'
+      });
+      if (result.succeeded) {
+        message.success('首付款已自动完成');
+      } else {
+        message.info('已生成支付流水，请在订单详情查看进度');
       }
+    } catch (paymentError) {
+      message.warning(friendlyErrorMessage(paymentError, '自动支付未完成，请前往订单详情补缴'));
     }
     router.replace({ name: 'order-overview', params: { orderId: order.id } });
   } catch (error) {

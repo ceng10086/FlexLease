@@ -59,6 +59,18 @@
                     </a-button>
                   </a-form>
                 </div>
+                <div class="action-card" v-if="canRequestInspection">
+                  <h4>巡检</h4>
+                  <p>发起巡检请求后，用户上传巡检凭证可获得信用加分。</p>
+                  <a-form layout="vertical">
+                    <a-form-item label="巡检说明（选填）">
+                      <a-textarea v-model:value="inspectionForm.remark" :rows="2" placeholder="例如：请拍摄设备外观与开机状态" />
+                    </a-form-item>
+                    <a-button type="primary" :loading="inspectionForm.loading" @click="handleRequestInspection">
+                      发起巡检请求
+                    </a-button>
+                  </a-form>
+                </div>
                 <div class="action-card">
                   <h4>退租处理</h4>
                   <template v-if="canApproveReturn">
@@ -263,6 +275,7 @@ import { useViewport } from '../../../composables/useViewport';
 import {
   fetchOrder,
   shipOrder,
+  requestOrderInspection,
   decideOrderReturn,
   completeOrderReturn,
   decideOrderExtension,
@@ -304,6 +317,7 @@ const proofPolicy = ref<ProofPolicySummary | null>(null);
 const vendorProofTypes: OrderProofType[] = ['SHIPMENT', 'RETURN', 'INSPECTION', 'OTHER'];
 
 const shipForm = reactive({ carrier: '', trackingNumber: '', message: '', loading: false });
+const inspectionForm = reactive({ remark: '', loading: false });
 const returnDecision = reactive({ loading: false });
 const returnCompletion = reactive({ refundAmount: 0, remark: '', loading: false });
 const extensionDecision = reactive({ loading: false });
@@ -390,6 +404,7 @@ const ensureContext = () => {
 };
 
 const canShip = computed(() => order.value?.status === 'AWAITING_SHIPMENT');
+const canRequestInspection = computed(() => order.value?.status === 'IN_LEASE');
 const canApproveReturn = computed(() => order.value?.status === 'RETURN_REQUESTED');
 const canCompleteReturn = computed(() => order.value?.status === 'RETURN_IN_PROGRESS');
 const pendingExtension = computed(
@@ -494,6 +509,26 @@ const handleShip = async () => {
     message.error(friendlyErrorMessage(error, '提交失败'));
   } finally {
     shipForm.loading = false;
+  }
+};
+
+const handleRequestInspection = async () => {
+  if (!ensureContext() || !order.value) {
+    return;
+  }
+  inspectionForm.loading = true;
+  try {
+    const updated = await requestOrderInspection(order.value.id, {
+      vendorId: props.vendorId!,
+      remark: inspectionForm.remark || undefined
+    });
+    order.value = updated;
+    inspectionForm.remark = '';
+    message.success('已发起巡检请求');
+  } catch (error) {
+    message.error(friendlyErrorMessage(error, '操作失败'));
+  } finally {
+    inspectionForm.loading = false;
   }
 };
 

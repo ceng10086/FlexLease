@@ -1,9 +1,11 @@
 package com.flexlease.product.controller;
 
 import com.flexlease.common.dto.ApiResponse;
+import com.flexlease.product.domain.RentalPlanType;
 import com.flexlease.product.dto.CatalogProductResponse;
 import com.flexlease.product.dto.PagedResponse;
 import com.flexlease.product.service.CatalogQueryService;
+import java.math.BigDecimal;
 import java.util.UUID;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -27,10 +29,15 @@ public class CatalogController {
     @GetMapping
     public ApiResponse<PagedResponse<CatalogProductResponse>> list(@RequestParam(required = false) String categoryCode,
                                                                     @RequestParam(required = false) String keyword,
+                                                                    @RequestParam(required = false) RentalPlanType planType,
+                                                                    @RequestParam(required = false) BigDecimal minDeposit,
+                                                                    @RequestParam(required = false) BigDecimal maxDeposit,
+                                                                    @RequestParam(required = false) String rentSort,
                                                                     @RequestParam(defaultValue = "1") int page,
                                                                     @RequestParam(defaultValue = "10") int size) {
         Pageable pageable = PageRequest.of(Math.max(page - 1, 0), Math.max(1, Math.min(size, 100)), Sort.by(Sort.Direction.DESC, "createdAt"));
-        return ApiResponse.success(catalogQueryService.listActive(categoryCode, keyword, pageable));
+        String normalizedSort = rentSort == null || rentSort.isBlank() ? null : rentSort.trim().toUpperCase();
+        return ApiResponse.success(catalogQueryService.listActive(categoryCode, keyword, planType, minDeposit, maxDeposit, normalizedSort, pageable));
     }
 
     @GetMapping("/{productId}")

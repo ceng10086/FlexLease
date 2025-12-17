@@ -59,11 +59,15 @@
                       :options="disputeOptions"
                       style="width: 200px"
                     />
+                    <a-checkbox v-model:checked="disputeForms[item.id].malicious">
+                      判定恶意行为（冻结 30 天）
+                    </a-checkbox>
                     <a-input-number
                       v-model:value="disputeForms[item.id].penalize"
                       :min="-30"
                       :max="30"
                       placeholder="信用变动"
+                      :disabled="disputeForms[item.id].malicious"
                     />
                     <a-input v-model:value="disputeForms[item.id].remark" placeholder="备注" />
                     <a-button
@@ -145,7 +149,7 @@ const { width: viewportWidth, isMobile } = useViewport();
 const order = ref<RentalOrderDetail | null>(null);
 const loading = ref(false);
 const forceCloseForm = reactive({ reason: '', loading: false });
-const disputeForms = reactive<Record<string, { decision: DisputeResolutionOption; remark: string; penalize: number | null; loading: boolean }>>({});
+const disputeForms = reactive<Record<string, { decision: DisputeResolutionOption; remark: string; penalize: number | null; malicious: boolean; loading: boolean }>>({});
 const chatSending = ref(false);
 const adminQuickPhrases = [
   '平台已介入处理，请保持与对方沟通。',
@@ -178,6 +182,7 @@ const loadOrder = async () => {
           decision: item.adminDecisionOption ?? item.initiatorOption ?? 'REDELIVER',
           remark: '',
           penalize: 0,
+          malicious: false,
           loading: false
         };
       }
@@ -283,8 +288,9 @@ const handleResolveDispute = async (dispute: OrderDispute) => {
   try {
     await resolveOrderDispute(order.value.id, dispute.id, {
       decision: form.decision,
-      penalizeUserDelta: form.penalize ?? undefined,
-      remark: form.remark || undefined
+      penalizeUserDelta: form.malicious ? undefined : form.penalize ?? undefined,
+      remark: form.remark || undefined,
+      maliciousBehavior: form.malicious ? true : undefined
     });
     message.success('已提交裁决');
     loadOrder();

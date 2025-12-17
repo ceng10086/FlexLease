@@ -53,19 +53,22 @@ public class OrderProofService {
     private final OrderTimelineService timelineService;
     private final NotificationClient notificationClient;
     private final OrderProofRepository orderProofRepository;
+    private final CreditRewardService creditRewardService;
 
     public OrderProofService(RentalOrderRepository rentalOrderRepository,
                              ProofStorageService proofStorageService,
                              OrderAssembler orderAssembler,
                              OrderTimelineService timelineService,
                              NotificationClient notificationClient,
-                             OrderProofRepository orderProofRepository) {
+                             OrderProofRepository orderProofRepository,
+                             CreditRewardService creditRewardService) {
         this.rentalOrderRepository = rentalOrderRepository;
         this.proofStorageService = proofStorageService;
         this.orderAssembler = orderAssembler;
         this.timelineService = timelineService;
         this.notificationClient = notificationClient;
         this.orderProofRepository = orderProofRepository;
+        this.creditRewardService = creditRewardService;
     }
 
     public List<OrderProofResponse> list(UUID orderId) {
@@ -116,11 +119,38 @@ public class OrderProofService {
             String eventMessage = "[%s] 上传取证材料".formatted(proofType.name());
             timelineService.append(order, OrderEventType.PROOF_UPLOADED, eventMessage, actorId, attributes, actorRole);
             notifyCounterparty(order, actorRole, proofType);
+            maybeRewardInspection(order, actorRole, proofType, actorId);
             return orderAssembler.toProofResponse(proof);
         } catch (RuntimeException ex) {
             proofStorageService.delete(stored.storedName());
             throw ex;
         }
+    }
+
+    private void maybeRewardInspection(RentalOrder order,
+                                       OrderActorRole actorRole,
+                                       OrderProofType proofType,
+                                       UUID actorId) {
+        if (actorRole != OrderActorRole.USER || proofType != OrderProofType.INSPECTION) {
+            return;
+        }
+        boolean requested = order.getEvents().stream()
+                .anyMatch(event -> event.getEventType() == OrderEventType.INSPECTION_REQUESTED);
+        if (!requested) {
+            return;
+        }
+        boolean rewarded = order.getEvents().stream()
+                .anyMatch(event -> event.getEventType() == OrderEventType.INSPECTION_REWARDED);
+        if (rewarded) {
+            return;
+        }
+        creditRewardService.rewardInspectionCooperation(order);
+        timelineService.append(order,
+                OrderEventType.INSPECTION_REWARDED,
+                "巡检配合奖励：信用积分 +2",
+                actorId,
+                Map.of("creditDelta", 2),
+                actorRole);
     }
 
     public ProofFileResource loadProofFile(String storedName) {

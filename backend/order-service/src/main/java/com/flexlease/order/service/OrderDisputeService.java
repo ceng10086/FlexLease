@@ -256,7 +256,7 @@ public class OrderDisputeService {
         RentalOrder order = loadOrder(orderId);
         OrderDispute dispute = loadDispute(orderId, disputeId);
         if (dispute.getStatus() == OrderDisputeStatus.PENDING_REVIEW_PANEL) {
-            SecurityUtils.requireRole("REVIEW_PANEL");
+            SecurityUtils.requireAnyRole("REVIEW_PANEL", "ADMIN");
         } else {
             SecurityUtils.requireRole("ADMIN");
         }

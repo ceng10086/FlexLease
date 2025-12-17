@@ -31,7 +31,7 @@
           v-if="order.requiresManualReview"
           type="warning"
           show-icon
-          message="信用预警：该订单需平台人工复核后才会履约"
+          message="信用预警：平台将关注该订单（不影响正常支付与履约）"
         />
       </div>
       <OrderActionBar

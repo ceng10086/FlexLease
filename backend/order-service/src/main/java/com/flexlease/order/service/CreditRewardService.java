@@ -84,6 +84,16 @@ public class CreditRewardService {
         }
     }
 
+    public void rewardInspectionCooperation(RentalOrder order) {
+        try {
+            userProfileClient.recordCreditEvent(order.getUserId(),
+                    "INSPECTION_COOPERATED",
+                    Map.of("orderNo", order.getOrderNo()));
+        } catch (RuntimeException ex) {
+            LOG.warn("Failed to record inspection cooperation credit event for order {}: {}", order.getOrderNo(), ex.getMessage());
+        }
+    }
+
     private boolean isEarlyOrOnTime(OffsetDateTime plannedLeaseEnd) {
         if (plannedLeaseEnd == null) {
             return true;
@@ -92,4 +102,3 @@ public class CreditRewardService {
         return !now.isAfter(plannedLeaseEnd.plus(EARLY_RETURN_GRACE));
     }
 }
-

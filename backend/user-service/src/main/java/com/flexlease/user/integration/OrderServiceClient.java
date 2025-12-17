@@ -2,6 +2,7 @@ package com.flexlease.user.integration;
 
 import com.flexlease.common.exception.BusinessException;
 import com.flexlease.common.exception.ErrorCode;
+import com.flexlease.common.security.JwtAuthProperties;
 import com.flexlease.user.config.OrderServiceProperties;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -19,11 +20,15 @@ public class OrderServiceClient {
     private static final Logger LOG = LoggerFactory.getLogger(OrderServiceClient.class);
 
     private final RestClient restClient;
+    private final JwtAuthProperties jwtAuthProperties;
 
-    public OrderServiceClient(RestClient.Builder builder, OrderServiceProperties properties) {
+    public OrderServiceClient(RestClient.Builder builder,
+                              OrderServiceProperties properties,
+                              JwtAuthProperties jwtAuthProperties) {
         this.restClient = builder
                 .baseUrl(properties.getBaseUrl())
                 .build();
+        this.jwtAuthProperties = jwtAuthProperties;
     }
 
     /**
@@ -48,6 +53,7 @@ public class OrderServiceClient {
         try {
             return restClient.get()
                     .uri("/api/v1/internal/vendors/{vendorId}/performance-metrics", vendorId)
+                    .header("X-Internal-Token", jwtAuthProperties.getInternalAccessToken())
                     .retrieve()
                     .body(VendorPerformanceMetrics.class);
         } catch (RestClientException ex) {

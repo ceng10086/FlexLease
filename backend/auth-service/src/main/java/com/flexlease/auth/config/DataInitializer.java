@@ -34,6 +34,7 @@ public class DataInitializer {
         roleService.ensureRole(RoleService.ROLE_ADMIN, "平台管理员", "平台全局管理员");
         roleService.ensureRole(RoleService.ROLE_VENDOR, "厂商", "B 端厂商用户");
         roleService.ensureRole(RoleService.ROLE_USER, "消费者", "C 端用户");
+        roleService.ensureRole(RoleService.ROLE_REVIEW_PANEL, "复核组", "纠纷申诉后的复核裁决角色");
 
         try {
             userAccountService.register(adminUsername, adminPassword, UserStatus.ENABLED,

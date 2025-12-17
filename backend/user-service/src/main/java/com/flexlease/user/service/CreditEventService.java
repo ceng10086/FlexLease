@@ -26,6 +26,7 @@ public class CreditEventService {
     private static final int STREAK_WINDOW = 3;
     private static final int MALICIOUS_PENALTY = -30;
     private static final int SUSPEND_DAYS = 30;
+    private static final int INSPECTION_BONUS = 2;
 
     private final UserProfileRepository userProfileRepository;
     private final NotificationClient notificationClient;
@@ -50,6 +51,7 @@ public class CreditEventService {
             case ON_TIME_PAYMENT -> handleOnTimePayment(profile, attributes);
             case EARLY_RETURN -> handleEarlyReturn(profile, attributes);
             case LATE_PAYMENT -> handleLatePayment(profile, attributes);
+            case INSPECTION_COOPERATED -> handleInspectionCooperated(profile, attributes);
             case FRIENDLY_DISPUTE -> handleFriendlyDispute(profile, attributes);
             case MALICIOUS_BEHAVIOR -> handleMaliciousBehavior(profile, attributes);
             default -> throw new BusinessException(ErrorCode.VALIDATION_ERROR, "不支持的信用事件: " + eventType);
@@ -116,6 +118,15 @@ public class CreditEventService {
                 "DISPUTE");
     }
 
+    private void handleInspectionCooperated(UserProfile profile, Map<String, Object> attributes) {
+        profile.applyCreditDelta(INSPECTION_BONUS);
+        String orderNo = attributeAsString(attributes, "orderNo");
+        notifyUser(profile.getUserId(),
+                "巡检配合奖励",
+                buildOrderContext(orderNo, "按要求补充巡检凭证，信用积分 +%d。".formatted(INSPECTION_BONUS)),
+                "CREDIT");
+    }
+
     private void handleMaliciousBehavior(UserProfile profile, Map<String, Object> attributes) {
         profile.applyCreditDelta(MALICIOUS_PENALTY);
         profile.resetPaymentStreak();
@@ -174,4 +185,3 @@ public class CreditEventService {
         return "订单 " + orderNo + " " + message;
     }
 }
-

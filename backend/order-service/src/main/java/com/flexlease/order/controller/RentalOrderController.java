@@ -16,6 +16,7 @@ import com.flexlease.order.dto.OrderContractResponse;
 import com.flexlease.order.dto.OrderContractSignRequest;
 import com.flexlease.order.dto.OrderExtensionApplyRequest;
 import com.flexlease.order.dto.OrderExtensionDecisionRequest;
+import com.flexlease.order.dto.OrderInspectionRequest;
 import com.flexlease.order.dto.OrderMessageRequest;
 import com.flexlease.order.dto.OrderPaymentRequest;
 import com.flexlease.order.dto.OrderPreviewRequest;
@@ -173,6 +174,12 @@ public class RentalOrderController {
     public ApiResponse<RentalOrderResponse> confirmReceive(@PathVariable UUID orderId,
                                                            @Valid @RequestBody OrderActorRequest request) {
         return ApiResponse.success(rentalOrderService.confirmReceive(orderId, request));
+    }
+
+    @PostMapping("/{orderId}/inspection/request")
+    public ApiResponse<RentalOrderResponse> requestInspection(@PathVariable UUID orderId,
+                                                              @Valid @RequestBody OrderInspectionRequest request) {
+        return ApiResponse.success(rentalOrderService.requestInspection(orderId, request));
     }
 
     @PostMapping("/{orderId}/messages")

@@ -65,4 +65,17 @@ public final class SecurityUtils {
             throw new BusinessException(ErrorCode.FORBIDDEN, "缺少权限: " + role);
         }
     }
+
+    public static void requireAnyRole(String... roles) {
+        FlexleasePrincipal principal = requirePrincipal();
+        if (roles == null || roles.length == 0) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "缺少权限");
+        }
+        for (String role : roles) {
+            if (role != null && !role.isBlank() && principal.hasRole(role)) {
+                return;
+            }
+        }
+        throw new BusinessException(ErrorCode.FORBIDDEN, "缺少权限: " + String.join("/", roles));
+    }
 }

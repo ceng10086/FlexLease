@@ -107,7 +107,7 @@
           v-if="previewCredit.requiresManualReview"
           type="warning"
           show-icon
-          message="信用预警：提交后需平台人工复核"
+          message="信用预警：平台将关注该订单，请在倒计时内完成支付"
         />
       </div>
       <div class="cart-preview__items">
@@ -438,8 +438,7 @@ const closePreview = () => {
 const handleAutoPayment = async (order: RentalOrderDetail, userId: string) => {
   try {
     if (order.requiresManualReview) {
-      message.info('订单已提交，待人工审核后由平台发起支付');
-      return;
+      message.warning('信用预警：平台可能会抽检该订单，但不影响支付');
     }
     const deposit = order.depositAmount ?? 0;
     const rent = order.rentAmount ?? 0;

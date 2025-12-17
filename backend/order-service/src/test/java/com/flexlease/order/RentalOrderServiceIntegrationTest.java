@@ -27,12 +27,14 @@ import com.flexlease.order.domain.OrderStatus;
 import com.flexlease.order.dto.AddCartItemRequest;
 import com.flexlease.order.dto.CartItemResponse;
 import com.flexlease.order.dto.CreateOrderRequest;
+import com.flexlease.order.dto.OrderDisputeAppealRequest;
 import com.flexlease.order.dto.OrderDisputeCreateRequest;
 import com.flexlease.order.dto.OrderDisputeEscalateRequest;
 import com.flexlease.order.dto.OrderDisputeResolveRequest;
 import com.flexlease.order.dto.OrderDisputeResponse;
 import com.flexlease.order.dto.OrderDisputeResponseRequest;
 import com.flexlease.order.dto.OrderActorRequest;
+import com.flexlease.order.dto.OrderInspectionRequest;
 import com.flexlease.order.dto.OrderBuyoutApplyRequest;
 import com.flexlease.order.dto.OrderExtensionApplyRequest;
 import com.flexlease.order.dto.OrderExtensionDecisionRequest;
@@ -373,6 +375,168 @@ class RentalOrderServiceIntegrationTest {
         assertThat(resolved.status()).isEqualTo(OrderDisputeStatus.CLOSED);
         assertThat(resolved.userCreditDelta()).isEqualTo(-12);
         Mockito.verify(userProfileClient).adjustCredit(Mockito.eq(userId), Mockito.eq(-12), Mockito.anyString());
+    }
+
+    @Test
+    void shouldAllowAdminResolveAppealedDispute() {
+        UUID userId = UUID.randomUUID();
+        UUID vendorId = UUID.randomUUID();
+        UUID vendorAccountId = UUID.randomUUID();
+        UUID productId = UUID.randomUUID();
+        UUID skuId = UUID.randomUUID();
+        UUID planId = UUID.randomUUID();
+
+        OrderItemRequest itemRequest = new OrderItemRequest(
+                productId,
+                skuId,
+                planId,
+                "复核纠纷商品",
+                "SKU-REVIEW",
+                null,
+                1,
+                new BigDecimal("199.00"),
+                new BigDecimal("399.00"),
+                null
+        );
+
+        stubProductCatalog(productId, vendorId, planId, skuId);
+        RentalOrderResponse created = rentalOrderService.createOrder(new CreateOrderRequest(
+                userId,
+                vendorId,
+                "STANDARD",
+                null,
+                null,
+                List.of(itemRequest),
+                List.of(),
+                null
+        ));
+
+        OrderDisputeResponse opened;
+        try (SecurityContextHandle ignored = withPrincipal(userId, "review-user", "USER")) {
+            opened = orderDisputeService.create(created.id(), new OrderDisputeCreateRequest(
+                    userId,
+                    DisputeResolutionOption.PARTIAL_REFUND,
+                    "测试申诉",
+                    null,
+                    null,
+                    null
+            ));
+        }
+
+        try (SecurityContextHandle ignored = withPrincipal(vendorAccountId, vendorId, "review-vendor", "VENDOR")) {
+            orderDisputeService.respond(created.id(), opened.id(), new OrderDisputeResponseRequest(
+                    vendorAccountId,
+                    DisputeResolutionOption.REDELIVER,
+                    false,
+                    "先走换货",
+                    null,
+                    null
+            ));
+        }
+
+        UUID adminId = UUID.randomUUID();
+        try (SecurityContextHandle ignored = withPrincipal(adminId, "admin", "ADMIN")) {
+            orderDisputeService.resolve(created.id(), opened.id(), new OrderDisputeResolveRequest(
+                    DisputeResolutionOption.PARTIAL_REFUND,
+                    0,
+                    "第一次裁决",
+                    false
+            ));
+        }
+
+        OrderDisputeResponse appealed;
+        try (SecurityContextHandle ignored = withPrincipal(userId, "review-user", "USER")) {
+            appealed = orderDisputeService.appeal(created.id(), opened.id(), new OrderDisputeAppealRequest(
+                    userId,
+                    "申请复核"
+            ));
+        }
+        assertThat(appealed.status()).isEqualTo(OrderDisputeStatus.PENDING_REVIEW_PANEL);
+
+        try (SecurityContextHandle ignored = withPrincipal(adminId, "admin", "ADMIN")) {
+            OrderDisputeResponse finalResolved = orderDisputeService.resolve(created.id(), opened.id(), new OrderDisputeResolveRequest(
+                    DisputeResolutionOption.PARTIAL_REFUND,
+                    0,
+                    "复核裁决",
+                    false
+            ));
+            assertThat(finalResolved.status()).isEqualTo(OrderDisputeStatus.CLOSED);
+        }
+    }
+
+    @Test
+    void shouldRewardInspectionAfterVendorRequest() {
+        UUID userId = UUID.randomUUID();
+        UUID vendorId = UUID.randomUUID();
+        UUID vendorAccountId = UUID.randomUUID();
+        UUID productId = UUID.randomUUID();
+        UUID skuId = UUID.randomUUID();
+        UUID planId = UUID.randomUUID();
+
+        OrderItemRequest itemRequest = new OrderItemRequest(
+                productId,
+                skuId,
+                planId,
+                "巡检商品",
+                "SKU-INSPECT",
+                Map.of("termMonths", 12).toString(),
+                1,
+                new BigDecimal("299.00"),
+                new BigDecimal("500.00"),
+                null
+        );
+
+        stubProductCatalog(productId, vendorId, planId, skuId);
+        RentalOrderResponse created = rentalOrderService.createOrder(new CreateOrderRequest(
+                userId,
+                vendorId,
+                "STANDARD",
+                null,
+                null,
+                List.of(itemRequest),
+                List.of(),
+                null
+        ));
+
+        UUID transactionId = UUID.randomUUID();
+        Mockito.when(paymentClient.loadTransaction(transactionId)).thenReturn(new PaymentTransactionView(
+                transactionId,
+                "P-INSPECT",
+                created.id(),
+                userId,
+                vendorId,
+                PaymentScene.DEPOSIT,
+                PaymentStatus.SUCCEEDED,
+                new BigDecimal("799.00"),
+                null,
+                List.of()
+        ));
+        rentalOrderService.confirmPayment(created.id(), new OrderPaymentRequest(userId, transactionId.toString(), new BigDecimal("799.00")));
+
+        uploadShipmentProofBundle(created.id(), vendorAccountId, vendorId);
+        try (SecurityContextHandle ignored = withPrincipal(vendorAccountId, vendorId, "inspect-vendor", "VENDOR")) {
+            rentalOrderService.shipOrder(created.id(), new OrderShipmentRequest(vendorId, "SF", "SF-INSPECT", null));
+        }
+        uploadReceiveProofBundle(created.id(), userId);
+        rentalOrderService.confirmReceive(created.id(), new OrderActorRequest(userId));
+
+        Mockito.clearInvocations(userProfileClient);
+
+        try (SecurityContextHandle ignored = withPrincipal(vendorAccountId, vendorId, "inspect-vendor", "VENDOR")) {
+            rentalOrderService.requestInspection(created.id(), new OrderInspectionRequest(vendorId, "例行巡检"));
+        }
+
+        try (SecurityContextHandle ignored = withPrincipal(userId, "inspect-user", "USER")) {
+            MockMultipartFile photo = new MockMultipartFile(
+                    "file",
+                    "inspection-1.jpg",
+                    "image/jpeg",
+                    new byte[]{9, 9, 9}
+            );
+            orderProofService.upload(created.id(), userId, OrderProofType.INSPECTION, "巡检照片", photo);
+        }
+
+        Mockito.verify(userProfileClient).recordCreditEvent(Mockito.eq(userId), Mockito.eq("INSPECTION_COOPERATED"), Mockito.any());
     }
 
     @Test

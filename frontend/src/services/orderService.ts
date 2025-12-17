@@ -90,6 +90,11 @@ export type OrderActorPayload = {
   actorId: string;
 };
 
+export type OrderInspectionPayload = {
+  vendorId: string;
+  remark?: string;
+};
+
 export type OrderExtensionApplyPayload = {
   userId: string;
   additionalMonths: number;
@@ -323,6 +328,7 @@ export type ResolveOrderDisputePayload = {
   decision: DisputeResolutionOption;
   penalizeUserDelta?: number | null;
   remark?: string;
+  maliciousBehavior?: boolean;
 };
 
 export type OrderContractStatus = 'DRAFT' | 'SIGNED';
@@ -464,6 +470,14 @@ export const confirmOrderReceive = async (
   payload: OrderActorPayload
 ) : Promise<RentalOrderDetail> => {
   const response = await http.post<ApiResponse<RentalOrderDetail>>(`/orders/${orderId}/confirm-receive`, payload);
+  return response.data.data;
+};
+
+export const requestOrderInspection = async (
+  orderId: string,
+  payload: OrderInspectionPayload
+): Promise<RentalOrderDetail> => {
+  const response = await http.post<ApiResponse<RentalOrderDetail>>(`/orders/${orderId}/inspection/request`, payload);
   return response.data.data;
 };
 
