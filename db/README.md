@@ -5,7 +5,7 @@ FlexLease 采用 **Flyway + PostgreSQL** 管理多租户 schema。每个微服�
 ## 拆分策略
 
 - 业务域与 schema 一一对应：`auth`、`users`、`product`、`order`、`payment`、`notification`。
-- 所有主键使用 `UUID`，时间采用 `TIMESTAMP WITH TIME ZONE`，金额统一 `NUMERIC(18,2)`。
+- 所有主键使用 `UUID`，时间采用 `TIMESTAMP WITH TIME ZONE`；金额字段以 `NUMERIC(18,2)` 为主（部分比例/快照字段会使用更适合的精度，例如抽成比例 `NUMERIC(5,4)`）。
 - 公共 schema（如 `platform-common`）仅包含视图/序列，不直接建表。
 
 ## 目录布局
@@ -14,7 +14,7 @@ FlexLease 采用 **Flyway + PostgreSQL** 管理多租户 schema。每个微服�
 - `backend/<service>/src/main/resources/db/migration`：服务内实际执行的 Flyway 脚本，包含 DDL、种子数据及热修复脚本。
 - 迁移命名规则：`V<版本号>__<描述>.sql`，版本号递增、三位补零，例如 `V003__add_order_dispute_tables.sql`。执行顺序完全由文件名决定。
 
-> 提交新特性时，请同时在对应服务的 `db/migration` 中新增脚本，并按需在根目录 `db/migration/<schema>` 下更新文档用示例，保证两侧结构一致。
+> 约定：以 `backend/<service>/src/main/resources/db/migration` 为权威来源；根目录 `db/migration/<schema>` 更偏向“文档快照/精选脚本”，用于阅读与讲解，不要求覆盖每一次演进（如需对外分享或课设汇报，可按需同步更新）。
 
 ## 执行方式
 
@@ -35,4 +35,4 @@ FlexLease 采用 **Flyway + PostgreSQL** 管理多租户 schema。每个微服�
 - 所有脚本需保持幂等（避免重复创建资源），必要时可补充数据修复语句。
 - 优先使用约束/索引命名规范：`idx_<table>_<column>`、`fk_<from>_<to>` 等，便于排查。
 - 对历史数据有破坏性的迁移请在脚本顶部写明背景与回滚方式，并在 PR 描述中同步。
-- 生成表结构示意或对外分享时，优先引用 `db/migration/` 中的脚本，以确保与代码实现一致。
+- 需要核对最终结构时，以各服务实际运行的 Flyway 脚本为准；`docs/数据库设计.md` 也会对关键表做说明。

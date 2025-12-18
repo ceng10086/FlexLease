@@ -9,12 +9,14 @@
 > }
 > ```
 > 认证方式为 **JWT（Access/Refresh）**：访问令牌放置在 `Authorization: Bearer <token>` 头部，令牌由 `auth-service` 的 `/auth/token`（JSON 请求体）签发并可通过 `/auth/token/refresh` 刷新。除 `auth` 模块外，其余接口均需鉴权。角色控制通过 RBAC 校验。
+>
+> 说明：大多数业务接口返回 `ApiResponse` 包装；少数“文件下载/内部直连”接口会直接返回资源流或内部 DTO（例如 `/proofs/{fileName}`、`/internal/vendors/{vendorId}/performance-metrics`），以对应调用方实现为准。
 
 - **分页**：使用 `PagedResponse` 包装，字段包含 `content`、`page`、`size`、`totalElements`、`totalPages`。
 
 ## 1. 公共与约定
 - **HTTP 状态码**：200 成功；4xx 客户端错误；5xx 服务错误。
-- **分页参数**：`page`（从 1 起）、`size`（当前实现固定按 `createdAt desc` 排序，不暴露 `sort` 参数）。
+- **分页参数**：`page`（从 1 起）、`size`（默认按 `createdAt desc` 排序；个别列表会提供额外的业务排序参数，例如 Catalog 的 `rentSort`）。
 - **时间格式**：ISO 8601（UTC），示例 `2025-01-15T08:00:00Z`。
 - **幂等**：下单、支付相关接口支持 Idempotency-Key 请求头。
 - **错误码**（参考 `platform-common` 枚举）：
@@ -24,7 +26,7 @@
   - `1003` 资源已存在
   - `2001` 未认证
   - `2003` 无权访问
-  - `2004` 凭证错误
+  - `2004` 用户名或密码错误
   - `5000` 系统异常
 
 ## 2. 认证与账号
@@ -47,12 +49,13 @@
 
 ### 2.3 内部接口
 > 内部接口供微服务之间调用，需在请求头中携带 `X-Internal-Token`，默认值可在配置中覆盖。
+>
+> 本小节为 **auth-service** 内部接口（账号状态/厂商绑定）。
 
 | 方法 | URL | 描述 | 备注 |
 | ---- | --- | ---- | ---- |
 | PATCH | `/internal/users/{userId}/status` | 更新指定账号状态 | 典型用例：厂商入驻审核通过后将账号从 `PENDING_REVIEW` 调整为 `ENABLED`；支持 `ENABLED`/`DISABLED`，请求体 `{ "status": "ENABLED" }` |
 | PATCH | `/internal/users/{userId}/vendor` | 绑定认证账号与厂商 ID | 审核通过后由用户服务调用，确保 JWT 与 `/auth/me` 返回 `vendorId`，请求体 `{ "vendorId": "UUID" }` |
-| POST | `/internal/users/{userId}/credit-events` | 记录信用事件，`eventType` 取值 `KYC_VERIFIED/ON_TIME_PAYMENT/EARLY_RETURN/LATE_PAYMENT/INSPECTION_COOPERATED/FRIENDLY_DISPUTE/MALICIOUS_BEHAVIOR`，`attributes` 可携带 `orderNo/disputeId/reason` 等上下文 | 仅 `INTERNAL` 角色可调用，用于触发信用分加减与站内信提醒，恶意行为会附带冻结信息 |
 
 ## 3. 用户 & 厂商管理（user-service）
 ### 3.1 厂商入驻
@@ -92,7 +95,10 @@
 ### 3.4 内部接口
 | 方法 | URL | 角色 | 描述 | 备注 |
 | ---- | --- | ---- | ---- | ---- |
-| GET | `/api/v1/internal/vendors/{vendorId}/commission-profile` | INTERNAL | 供支付/订单等服务读取厂商当前抽成配置 | 返回行业分类、基准费率、信用档、最近一次 SLA 评分等字段，调用方根据该信息计算 `commissionRate` |
+| GET | `/internal/vendors/{vendorId}/commission-profile` | INTERNAL | 供支付/订单等服务读取厂商当前抽成配置 | 返回行业分类、基准费率、信用档、最近一次 SLA 评分等字段，调用方根据该信息计算 `commissionRate` |
+| GET | `/internal/users/{userId}/credit` | INTERNAL | 供订单等服务读取用户信用档案（下单试算、风控展示） | 返回 `UserCreditResponse`（`userId/creditScore/creditTier`） |
+| POST | `/internal/users/{userId}/credit-events` | INTERNAL | 记录信用事件并自动更新信用分/冻结状态 | 请求体 `{ eventType, attributes? }`；`eventType` 支持 `KYC_VERIFIED/ON_TIME_PAYMENT/EARLY_RETURN/LATE_PAYMENT/INSPECTION_COOPERATED/FRIENDLY_DISPUTE/MALICIOUS_BEHAVIOR` |
+| POST | `/internal/users/{userId}/credit-adjustments` | INTERNAL | 内部服务人工调整信用分（用于纠纷裁决、补偿等） | 请求体 `{ delta, reason? }`；返回最新 `UserCreditResponse` |
 
 ## 4. 商品与租赁方案（product-service）
 ### 4.1 商品管理（B 端）
@@ -305,12 +311,11 @@
 ## 8. 网关与前端约定
 - 所有微服务注册到 Eureka（`registry-service`，端口 8761），网关根据路径转发：
   - `/api/v1/auth/**` → auth-service
-  - `/api/v1/users/**` `/api/v1/vendors/**`（除 `/api/v1/vendors/*/inquiries/**`） → user-service
-  - `/api/v1/products/**` `/api/v1/catalog/**` `/api/v1/vendors/*/inquiries/**` → product-service
-  - `/api/v1/orders/**` `/api/v1/cart/**` → order-service
-  - `/api/v1/payments/**` → payment-service
+  - `/api/v1/users/**` `/api/v1/admin/users/**` `/api/v1/vendors/**` `/api/v1/vendors/applications/**` `/api/v1/customers/profile/**` `/api/v1/internal/vendors/**` → user-service
+  - `/api/v1/products/**` `/api/v1/catalog/**` `/api/v1/admin/products/**` `/api/v1/vendors/*/products/**` `/api/v1/vendors/*/inquiries/**` → product-service
+  - `/api/v1/orders/**` `/api/v1/admin/orders/**` `/api/v1/analytics/**` `/api/v1/cart/**` `/api/v1/proofs/**` `/api/v1/proof-policy` → order-service
+  - `/api/v1/payments/**` `/api/v1/internal/payments/**` → payment-service
   - `/api/v1/notifications/**` → notification-service
-  - `/api/v1/analytics/**` → order-service
 - 前端 SPA 使用 axios 拦截器统一注入 token 与错误提示。
 
 ## 9. 事件与集成接口

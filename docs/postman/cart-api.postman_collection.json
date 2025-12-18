@@ -3,7 +3,17 @@
     "_postman_id": "f7f9e4f9-6c0d-4b87-92fd-5cfa17225ce4",
     "name": "FlexLease Cart & Order Flow",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Collection covering cart CRUD and cart-driven order checkout for FlexLease."
+    "description": "Collection covering cart CRUD and cart-driven order checkout for FlexLease.\n\nUsage:\n- Start the full stack via docker compose (recommended), then set `baseUrl` to `http://localhost:8080`.\n- Set `accessToken` to a valid JWT from `POST /api/v1/auth/token`.\n- For admin/internal calls that require `userId`, fill the corresponding variables."
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
   },
   "item": [
     {
@@ -166,7 +176,11 @@
   "variable": [
     {
       "key": "baseUrl",
-      "value": "http://localhost:9004"
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "accessToken",
+      "value": ""
     },
     {
       "key": "userId",
