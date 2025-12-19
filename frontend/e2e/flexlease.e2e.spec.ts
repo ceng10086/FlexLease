@@ -1,5 +1,5 @@
 /// <reference types="node" />
-import { test, expect, chromium, type Browser, type Page } from '@playwright/test';
+import { test, expect, chromium, type Browser, type Page, type Locator } from '@playwright/test';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
@@ -340,7 +340,7 @@ async function adminApproveLatestVendorApplication(page: Page) {
   await expect(page.getByText('已通过申请')).toBeVisible();
 }
 
-async function vendorCreateAndSubmitProduct(page: Page, productName: string): Promise<string> {
+async function vendorCreateAndSubmitProduct(page: Page, productName: string) {
   await gotoPath(page, '/app/vendor/workbench/products');
   await expect(page.getByRole('heading', { name: '商品集合' })).toBeVisible();
 
@@ -354,26 +354,7 @@ async function vendorCreateAndSubmitProduct(page: Page, productName: string): Pr
 
   await createDrawer.locator('input[type="file"]').setInputFiles(asset('product-cover.jpg'));
 
-  const createProductResponse = page.waitForResponse((resp) => {
-    try {
-      const url = new URL(resp.url());
-      return (
-        resp.request().method() === 'POST' &&
-        resp.status() === 200 &&
-        /\/api\/v1\/vendors\/[^/]+\/products$/.test(url.pathname)
-      );
-    } catch {
-      return false;
-    }
-  });
   await createDrawer.getByRole('button', { name: '创建商品' }).click();
-
-  const createResp = await createProductResponse;
-  const created = (await createResp.json().catch(() => null)) as any;
-  const productId = created?.data?.id as string | undefined;
-  if (!productId) {
-    throw new Error('未能从创建商品接口响应中解析 productId');
-  }
 
   // 进入详情抽屉
   const detailDrawer = page.locator('.ant-drawer').filter({ hasText: productName }).first();
@@ -412,26 +393,11 @@ async function vendorCreateAndSubmitProduct(page: Page, productName: string): Pr
 
   // 提交审核
   await detailDrawer.getByRole('tab', { name: '基础资料' }).click();
-  const submitResponse = page.waitForResponse((resp) => {
-    try {
-      const url = new URL(resp.url());
-      return (
-        resp.request().method() === 'POST' &&
-        resp.status() === 200 &&
-        url.pathname.endsWith(`/api/v1/vendors/${(created?.data?.vendorId as string) ?? ''}/products/${productId}/submit`)
-      );
-    } catch {
-      return false;
-    }
-  });
   await detailDrawer.getByRole('button', { name: /提\s*交\s*审\s*核/ }).click();
-  await submitResponse.catch(() => undefined);
   await expect(detailDrawer.getByRole('button', { name: /提\s*交\s*审\s*核/ })).toBeDisabled({ timeout: 30_000 });
 
   // 关闭抽屉
   await detailDrawer.locator('button[aria-label="Close"], .ant-drawer-close').first().click().catch(() => undefined);
-
-  return productId;
 }
 
 async function adminApproveProductByUi(page: Page, productName: string) {
@@ -495,6 +461,18 @@ async function readCreditScoreFromProfile(page: Page): Promise<number> {
   return Number(match[1]);
 }
 
+async function readOrderNoFromOrderDetail(page: Page): Promise<string> {
+  const eyebrow = page.locator('.detail-header__eyebrow').first();
+  await expect(eyebrow).toBeVisible({ timeout: 60_000 });
+  await expect(eyebrow).not.toHaveText(/加载中/, { timeout: 60_000 });
+  const text = ((await eyebrow.textContent().catch(() => '')) ?? '').trim();
+  const match = text.match(/订单号\s*(\S+)/);
+  if (!match) {
+    throw new Error(`无法从订单详情页解析订单号: ${text}`);
+  }
+  return match[1];
+}
+
 async function userCreateOrderFromCatalog(
   page: Page,
   productName: string,
@@ -522,18 +500,7 @@ async function userCreateOrderFromCatalog(
   await page.waitForURL('**/app/checkout**');
 
   await page.getByPlaceholder('例如发货时间、配送注意事项（选填）').fill(remark);
-  const createOrderResponse = page.waitForResponse((resp) => {
-    try {
-      const url = new URL(resp.url());
-      return resp.request().method() === 'POST' && resp.status() === 200 && url.pathname === '/api/v1/orders';
-    } catch {
-      return false;
-    }
-  });
   await page.getByRole('button', { name: '提交订单' }).click();
-  const orderResp = await createOrderResponse;
-  const orderJson = (await orderResp.json().catch(() => null)) as any;
-  const orderNoFromApi = (orderJson?.data?.orderNo ?? '') as string;
 
   // 创建订单后跳转到订单详情
   await page.waitForURL('**/app/orders/**/overview', { timeout: 60_000 });
@@ -545,10 +512,7 @@ async function userCreateOrderFromCatalog(
   }
   const orderId = match[1];
 
-  const orderNo = orderNoFromApi;
-  if (!orderNo) {
-    throw new Error('无法从创建订单接口响应中解析 orderNo');
-  }
+  const orderNo = await readOrderNoFromOrderDetail(page);
 
   return { orderId, orderNo };
 }
@@ -812,7 +776,41 @@ async function adminResolveDispute(page: Page, orderNo: string, penalizeDelta: n
   await drawer.locator('button[aria-label="Close"], .ant-drawer-close').first().click().catch(() => undefined);
 }
 
-async function userCreateOrderFromCart(page: Page, productName: string) {
+async function pickOrderCardByUi(page: Page, options?: { excludeOrderNos?: string[] }) {
+  const exclude = new Set(options?.excludeOrderNos ?? []);
+
+  const parseCardOrderNo = async (card: Locator) => {
+    const raw = ((await card.locator('.order-card__no').first().textContent().catch(() => '')) ?? '').trim();
+    const match = raw.match(/订单号：\s*(\S+)/);
+    return match?.[1] ?? '';
+  };
+
+  // 默认页 size=6，最多点几次“查看更多”即可找到新增订单
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const cards = page.locator('article.order-card');
+    const count = await cards.count();
+    for (let i = 0; i < count; i += 1) {
+      const card = cards.nth(i);
+      const orderNo = await parseCardOrderNo(card);
+      if (!orderNo) continue;
+      if (!exclude.has(orderNo)) {
+        return { card, orderNo };
+      }
+    }
+
+    const loadMore = page.getByRole('button', { name: '查看更多' });
+    if (await loadMore.isVisible().catch(() => false)) {
+      await loadMore.click();
+      await page.waitForTimeout(200);
+    } else {
+      break;
+    }
+  }
+
+  throw new Error(`无法在订单墙中找到目标订单卡片（exclude=${Array.from(exclude).join(',') || 'n/a'}）`);
+}
+
+async function userCreateOrderFromCart(page: Page, productName: string, options?: { excludeOrderNos?: string[] }) {
   await gotoPath(page, '/app/catalog');
   await expect(page.getByRole('heading', { name: '逛逛精选' })).toBeVisible();
 
@@ -830,38 +828,24 @@ async function userCreateOrderFromCart(page: Page, productName: string) {
   await page.getByRole('button', { name: '生成订单' }).click();
   await expect(page.getByText('订单试算')).toBeVisible({ timeout: 30_000 });
 
-  const createOrderResponse = page.waitForResponse((resp) => {
-    try {
-      const url = new URL(resp.url());
-      return resp.request().method() === 'POST' && resp.status() === 200 && url.pathname === '/api/v1/orders';
-    } catch {
-      return false;
-    }
-  });
   await page.getByRole('button', { name: '确认创建订单' }).click();
-  const resp = await createOrderResponse;
-  const json = (await resp.json().catch(() => null)) as any;
-  const orderNo = (json?.data?.orderNo ?? '') as string;
-  const orderId = (json?.data?.id ?? '') as string;
-  if (!orderId || !orderNo) {
-    throw new Error('无法从购物车下单响应中解析 orderId/orderNo');
-  }
   await page.waitForURL('**/app/orders**', { timeout: 60_000 });
 
-  // headed 下 toast/抽屉文本可能导致 getByText 正则 strict 冲突；改为在订单墙中定位订单号。
-  const orderCard = page.locator('article.order-card', { hasText: orderNo }).first();
-  for (let i = 0; i < 6; i += 1) {
-    if (await orderCard.isVisible().catch(() => false)) {
-      break;
-    }
-    const loadMore = page.getByRole('button', { name: '查看更多' });
-    if (await loadMore.isVisible().catch(() => false)) {
-      await loadMore.click();
-    } else {
-      break;
-    }
+  await expect(page.getByRole('heading', { name: '订单时间线' })).toBeVisible({ timeout: 30_000 });
+
+  // 只从 UI 上找订单卡片，不从网络响应取数。
+  const picked = await pickOrderCardByUi(page, { excludeOrderNos: options?.excludeOrderNos });
+  await expect(picked.card).toBeVisible({ timeout: 60_000 });
+  await picked.card.getByRole('button', { name: '查看详情' }).click();
+
+  await page.waitForURL('**/app/orders/**/overview', { timeout: 60_000 });
+  const orderUrl = page.url();
+  const match = orderUrl.match(/\/app\/orders\/([^/]+)\/overview/);
+  if (!match) {
+    throw new Error(`无法从 URL 解析 orderId: ${orderUrl}`);
   }
-  await expect(orderCard).toBeVisible({ timeout: 60_000 });
+  const orderId = match[1];
+  const orderNo = await readOrderNoFromOrderDetail(page);
   return { orderId, orderNo };
 }
 
@@ -1113,7 +1097,7 @@ test.describe.serial('FlexLease E2E（由 playwright-mcp 操作转换）', () =>
     await login(vendorPage, vendorEmail, passwords.vendor);
 
     // 厂商创建商品并提交审核 + 管理员审核上架
-    const productId = await vendorCreateAndSubmitProduct(vendorPage, productName);
+    await vendorCreateAndSubmitProduct(vendorPage, productName);
     await adminApproveProductByUi(adminPage, productName);
 
     const inquiryMessage = '请问大概多久可以发货？';
@@ -1155,7 +1139,7 @@ test.describe.serial('FlexLease E2E（由 playwright-mcp 操作转换）', () =>
     expect(creditAfterPenalty).toBeLessThanOrEqual(creditBeforePenalty - 5);
 
     // 旅程 C：购物车试算下单（第二单）
-    const order2 = await userCreateOrderFromCart(userPage, productName);
+    const order2 = await userCreateOrderFromCart(userPage, productName, { excludeOrderNos: [order1.orderNo] });
     await vendorShipOrder(vendorPage, order2.orderId, order2.orderNo);
     await userReceiveAndConfirm(userPage, order2.orderId);
     await userApplyBuyout(userPage, order2.orderId);
