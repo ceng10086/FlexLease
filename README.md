@@ -49,6 +49,7 @@ FlexLease 面向 B2C 场景，为厂商与消费者提供从入驻、商品配�
   - `/orders/{id}/messages` 支持用户与厂商在订单抽屉直接沟通（自动写入时间线），`OrderProofService`（`backend/order-service/src/main/java/com/flexlease/order/service/OrderProofService.java`）提供发货/收货/退租/巡检/其他凭证上传、`/api/v1/proofs/{fileName}` 鉴权下载（前端预览通过拉取 blob 生成本地 URL）以及和 Notification Service 的互通提醒；厂商也可通过 `/orders/{id}/inspection/request` 发起巡检请求，用户上传巡检凭证后自动触发信用加分。
   - `ProofPolicyService` 对外暴露 `/api/v1/proof-policy`，统一告知各阶段最小凭证数量与拍摄角度，并由 `ProofStorageService` 对图片自动打水印；其中 `watermarkExample` 为水印说明文本（前端按文本展示，若为 URL 则打开示例资源）。为保证中文水印正常显示，`order-service` 镜像包含 `fonts-noto-cjk` 字体包。
   - `OrderDisputeService`（`backend/order-service/src/main/java/com/flexlease/order/service/OrderDisputeService.java`）封装纠纷创建→协商→升级仲裁→平台裁决→信用扣分→满意度调查的全流程，管理员可在 `/api/v1/admin/orders/{id}/disputes/{disputeId}/resolve` 直接裁决，并支持 `maliciousBehavior` 标志自动触发恶意行为惩罚；双方在发起/回应纠纷时可同步上传多媒体附件与电话纪要，信息将写入时间线与抽屉附件列表。
+  - 纠纷进入平台仲裁后，管理员可一键生成“LLM 仲裁建议”（结构化 JSON，包含事实摘要/缺失证据/建议裁决/话术草稿），接口为 `/api/v1/admin/orders/{id}/disputes/{disputeId}/ai-suggestion`；配置方式见 `docs/纠纷仲裁智能助手.md`。
   - 纠纷调度新增多阶段倒计时提醒（24小时、6小时、1小时前各提醒一次）与超时自动升级逻辑；用户二次申诉进入 `PENDING_REVIEW_PANEL` 状态可由 `ADMIN` 或 `REVIEW_PANEL` 角色裁决，避免“申诉后无人结案”卡死。
   - 满意度调研由 `OrderSurveyService` 定时激活 `/orders/{id}/surveys` 调查，支持双方打分与评价，并追加时间线+站内信提醒。
   - 平台/厂商运营指标、管理员强制关闭、待支付订单自动取消调度。
@@ -95,6 +96,7 @@ FlexLease 面向 B2C 场景，为厂商与消费者提供从入驻、商品配�
 - `FLEXLEASE_PAYMENT_AUTO_CONFIRM`（或 `flexlease.payment.auto-confirm`）控制支付是否自动成功；`FLEXLEASE_ORDER_MAINTENANCE_PENDING_PAYMENT_EXPIRE_MINUTES` 与 `FLEXLEASE_ORDER_MAINTENANCE_SCAN_INTERVAL_MS` 调整待支付超时策略；`FLEXLEASE_MESSAGING_ENABLED` 与 `FLEXLEASE_REDIS_ENABLED` 可在开发环境禁用 RabbitMQ 或 Redis 依赖。
 - `flexlease.notification-service.base-url` 被多个服务用于调用通知服务（站内信），如需联调自定义域名请统一覆盖相关服务配置。
 - `flexlease.order.proof-policy.*`（含 `shipment-photo-required/receive-photo-required/return-photo-required` 等字段）与 `FLEXLEASE_ORDER_PROOF_ROOT` 控制取证最低数量与存储目录，可按实际履约规范调整照片/视频要求及水印文案。
+- 如需使用“LLM 仲裁建议”（或运行包含该步骤的 E2E），在仓库根目录创建 `.env` 并填写 `FLEXLEASE_LLM_API_KEY`（参考 `.env.example`），详见 `docs/纠纷仲裁智能助手.md`。
 
 ## 多角色能力速览
 
@@ -191,7 +193,7 @@ docker compose up --build
 - 订单沟通（双方聊天）
 - 履约证明（发货/收货凭证上传）
 - 巡检请求与信用加分校验
-- 纠纷升级 → 管理员裁决（信用扣分）
+- 纠纷升级 → 管理员生成仲裁建议并裁决（信用扣分）
 - 买断申请 → 厂商审批
 - 结算中心（平台抽成）/驾驶舱（信用与纠纷）/通知中心（CREDIT/DISPUTE）
 
@@ -199,7 +201,9 @@ docker compose up --build
 
 1. 保证网关与前端可访问：打开 http://localhost:8080 能看到登录页。
    - 推荐直接使用 `docker compose up --build` 拉起全套环境。
-2. 安装前端依赖与 Playwright 浏览器：
+   - 启动后建议等待约 60 秒，确保全部服务完成注册与初始化。
+2. 如需跑包含“生成仲裁建议”的步骤，准备 LLM 配置：`cp .env.example .env` 并填写 `FLEXLEASE_LLM_API_KEY`。
+3. 安装前端依赖与 Playwright 浏览器：
 
 ```powershell
 cd frontend
@@ -253,6 +257,7 @@ npm run test:e2e -- --headed
 - 《数据库设计》：`docs/数据库设计.md`
 - 《用例设计》：`docs/用例设计.md`
 - 《测试与质量策略》：`docs/测试与质量策略.md`
+- 《纠纷仲裁智能助手》：`docs/纠纷仲裁智能助手.md`
 
 更多细节及迭代路线可参考 `docs/` 目录。
 

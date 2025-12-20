@@ -505,16 +505,38 @@ async function userCreateOrderFromCatalog(
   // 创建订单后跳转到订单详情
   await page.waitForURL('**/app/orders/**/overview', { timeout: 60_000 });
 
-  const orderUrl = page.url();
-  const match = orderUrl.match(/\/app\/orders\/([^/]+)\/overview/);
-  if (!match) {
-    throw new Error(`无法从 URL 解析 orderId: ${orderUrl}`);
-  }
-  const orderId = match[1];
-
   const orderNo = await readOrderNoFromOrderDetail(page);
 
-  return { orderId, orderNo };
+  return { orderNo };
+}
+
+async function openOrderDetailByOrderNo(page: Page, orderNo: string) {
+  await gotoPath(page, '/app/orders');
+  await expect(page.getByRole('heading', { name: '订单时间线' })).toBeVisible({ timeout: 30_000 });
+
+  const card = page.locator('article.order-card', { hasText: orderNo }).first();
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    if (await card.isVisible().catch(() => false)) {
+      break;
+    }
+    const loadMore = page.getByRole('button', { name: '查看更多' });
+    if (await loadMore.isVisible().catch(() => false)) {
+      await loadMore.click();
+      await page.waitForTimeout(250);
+    } else {
+      break;
+    }
+  }
+  await expect(card).toBeVisible({ timeout: 60_000 });
+  await card.getByRole('button', { name: '查看详情' }).click();
+  await page.waitForURL('**/app/orders/**/overview', { timeout: 60_000 });
+  await expect(page.locator('.detail-header__eyebrow', { hasText: orderNo }).first()).toBeVisible({ timeout: 60_000 });
+}
+
+async function switchOrderTab(page: Page, tabLabel: '概览' | '聊天' | '凭证' | '时间线') {
+  const tab = page.getByRole('tab', { name: tabLabel });
+  await expect(tab).toBeVisible({ timeout: 30_000 });
+  await tab.click({ timeout: 30_000, force: true });
 }
 
 async function vendorReplyInquiry(page: Page, inquiryMessage: string, replyText: string) {
@@ -552,8 +574,9 @@ async function userAssertInquiryReply(page: Page, productName: string, replyText
   await expect(page.locator('.history-reply-text', { hasText: replyText }).first()).toBeVisible({ timeout: 60_000 });
 }
 
-async function userSendOrderChat(page: Page, orderId: string, messageText: string) {
-  await gotoPath(page, `/app/orders/${orderId}/chat`);
+async function userSendOrderChat(page: Page, orderNo: string, messageText: string) {
+  await openOrderDetailByOrderNo(page, orderNo);
+  await switchOrderTab(page, '聊天');
   await expect(page.getByRole('heading', { name: '聊天' })).toBeVisible({ timeout: 30_000 });
 
   const input = page.getByPlaceholder('输入要发送的内容…');
@@ -565,7 +588,6 @@ async function userSendOrderChat(page: Page, orderId: string, messageText: strin
 
 async function vendorShipOrder(
   page: Page,
-  orderId: string,
   orderNo: string,
   chat?: { expectInbound?: string; reply?: string }
 ) {
@@ -636,17 +658,8 @@ async function vendorShipOrder(
     assetPayload('proof-shipment-3.jpg', 'image/jpeg'),
     assetPayload('proof-video.mp4', 'video/mp4')
   ]);
-  const orderReloadAfterUpload = page.waitForResponse((resp) => {
-    try {
-      const url = new URL(resp.url());
-      return resp.request().method() === 'GET' && resp.status() === 200 && /\/api\/v1\/orders\/[0-9a-f\-]+$/.test(url.pathname);
-    } catch {
-      return false;
-    }
-  });
   await proofSection.getByRole('button', { name: '上传全部' }).click();
   await expect(page.getByText('凭证已上传').first()).toBeVisible({ timeout: 60_000 });
-  await orderReloadAfterUpload.catch(() => undefined);
 
   // 提交发货（纯 UI 操作）
   const shipCard = drawer.locator('.action-card', { hasText: '发货' }).first();
@@ -670,8 +683,9 @@ async function vendorShipOrder(
   await drawer.locator('button[aria-label="Close"], .ant-drawer-close').first().click().catch(() => undefined);
 }
 
-async function userReceiveAndConfirm(page: Page, orderId: string) {
-  await gotoPath(page, `/app/orders/${orderId}/proofs`);
+async function userReceiveAndConfirm(page: Page, orderNo: string) {
+  await openOrderDetailByOrderNo(page, orderNo);
+  await switchOrderTab(page, '凭证');
   await expect(page.getByRole('heading', { name: '凭证墙' })).toBeVisible();
 
   // 上传收货凭证：至少 2 张照片 + 1 段视频
@@ -685,7 +699,7 @@ async function userReceiveAndConfirm(page: Page, orderId: string) {
   await expect(page.getByText('已上传凭证').first()).toBeVisible({ timeout: 60_000 });
 
   // 确认收货
-  await gotoPath(page, `/app/orders/${orderId}/overview`);
+  await switchOrderTab(page, '概览');
   await page.getByRole('button', { name: '确认收货' }).click();
 
   const confirmModal = page.locator('.ant-modal-confirm').filter({ hasText: '确认已收到货物？' }).first();
@@ -741,8 +755,9 @@ async function vendorRequestInspection(page: Page, orderNo: string) {
   await drawer.locator('button[aria-label="Close"], .ant-drawer-close').first().click().catch(() => undefined);
 }
 
-async function userUploadInspectionProof(page: Page, orderId: string) {
-  await gotoPath(page, `/app/orders/${orderId}/proofs`);
+async function userUploadInspectionProof(page: Page, orderNo: string) {
+  await openOrderDetailByOrderNo(page, orderNo);
+  await switchOrderTab(page, '凭证');
   await expect(page.getByRole('heading', { name: '凭证墙' })).toBeVisible();
 
   await page.locator('.ant-radio-button-wrapper', { hasText: '巡检' }).click();
@@ -765,6 +780,10 @@ async function adminResolveDispute(page: Page, orderNo: string, penalizeDelta: n
 
   const disputeCard = drawer.locator('.dispute-card').first();
   await expect(disputeCard).toBeVisible({ timeout: 60_000 });
+
+  await disputeCard.getByRole('button', { name: '生成仲裁建议' }).click({ timeout: 30_000, force: true });
+  await expect(disputeCard.locator('[data-testid^="dispute-ai-suggest-result-"]')).toBeVisible({ timeout: 120_000 });
+  await expect(disputeCard.getByText('事实摘要')).toBeVisible({ timeout: 30_000 });
 
   const penalizeInput = disputeCard.locator('.ant-input-number-input').first();
   await expect(penalizeInput).toBeVisible({ timeout: 30_000 });
@@ -839,18 +858,13 @@ async function userCreateOrderFromCart(page: Page, productName: string, options?
   await picked.card.getByRole('button', { name: '查看详情' }).click();
 
   await page.waitForURL('**/app/orders/**/overview', { timeout: 60_000 });
-  const orderUrl = page.url();
-  const match = orderUrl.match(/\/app\/orders\/([^/]+)\/overview/);
-  if (!match) {
-    throw new Error(`无法从 URL 解析 orderId: ${orderUrl}`);
-  }
-  const orderId = match[1];
   const orderNo = await readOrderNoFromOrderDetail(page);
-  return { orderId, orderNo };
+  return { orderNo };
 }
 
-async function userApplyBuyout(page: Page, orderId: string) {
-  await gotoPath(page, `/app/orders/${orderId}/overview`);
+async function userApplyBuyout(page: Page, orderNo: string) {
+  await openOrderDetailByOrderNo(page, orderNo);
+  await switchOrderTab(page, '概览');
   await expect(page.getByRole('heading', { name: '租赁摘要' })).toBeVisible({ timeout: 30_000 });
 
   await page.getByRole('button', { name: '申请买断' }).click();
@@ -925,8 +939,9 @@ async function userAssertNotificationHasContextType(page: Page, contextType: str
   });
 }
 
-async function userDisputeAndEscalate(page: Page, orderId: string) {
-  await gotoPath(page, `/app/orders/${orderId}/timeline`);
+async function userDisputeAndEscalate(page: Page, orderNo: string) {
+  await openOrderDetailByOrderNo(page, orderNo);
+  await switchOrderTab(page, '时间线');
   await expect(page.getByRole('heading', { name: '纠纷与仲裁' })).toBeVisible();
 
   await page.getByRole('button', { name: '发起纠纷' }).click();
@@ -1057,26 +1072,6 @@ test.describe.serial('FlexLease E2E（由 playwright-mcp 操作转换）', () =>
       await positionDemoWindows(adminPage, vendorPage, userPage);
     }
 
-    vendorPage.on('request', (req) => {
-      if (req.url().includes('/api/v1/vendors/applications')) {
-        const authHeader = req.headers()['authorization'] ?? '';
-        console.log('[vendor] request', req.method(), req.url(), authHeader ? 'Authorization=YES' : 'Authorization=NO');
-      }
-    });
-    vendorPage.on('response', async (resp) => {
-      if (resp.url().includes('/api/v1/vendors/applications')) {
-        console.log('[vendor] response', resp.status(), resp.url());
-        if (resp.status() >= 400) {
-          try {
-            const text = await resp.text();
-            console.log('[vendor] response body', text.slice(0, 500));
-          } catch {
-            // ignore
-          }
-        }
-      }
-    });
-
     await ensureE2EBaseUp(adminPage);
 
     // 注册/登录
@@ -1117,32 +1112,32 @@ test.describe.serial('FlexLease E2E（由 playwright-mcp 操作转换）', () =>
     // 主题：沟通（咨询回复 + 订单聊天）
     await vendorReplyInquiry(vendorPage, inquiryMessage, inquiryReply);
     await userAssertInquiryReply(userPage, productName, inquiryReply);
-    await userSendOrderChat(userPage, order1.orderId, userChatMessage);
+    await userSendOrderChat(userPage, order1.orderNo, userChatMessage);
 
     // 旅程 E：履约与售后（发货/收货/巡检/纠纷）
-    await vendorShipOrder(vendorPage, order1.orderId, order1.orderNo, {
+    await vendorShipOrder(vendorPage, order1.orderNo, {
       expectInbound: userChatMessage,
       reply: vendorChatReply
     });
-    await userReceiveAndConfirm(userPage, order1.orderId);
+    await userReceiveAndConfirm(userPage, order1.orderNo);
 
     const creditBeforeInspection = await readCreditScoreFromProfile(userPage);
     await vendorRequestInspection(vendorPage, order1.orderNo);
-    await userUploadInspectionProof(userPage, order1.orderId);
+    await userUploadInspectionProof(userPage, order1.orderNo);
     const creditAfterInspection = await readCreditScoreFromProfile(userPage);
     expect(creditAfterInspection).toBeGreaterThanOrEqual(creditBeforeInspection + 2);
 
     const creditBeforePenalty = await readCreditScoreFromProfile(userPage);
-    await userDisputeAndEscalate(userPage, order1.orderId);
+    await userDisputeAndEscalate(userPage, order1.orderNo);
     await adminResolveDispute(adminPage, order1.orderNo, 5);
     const creditAfterPenalty = await readCreditScoreFromProfile(userPage);
     expect(creditAfterPenalty).toBeLessThanOrEqual(creditBeforePenalty - 5);
 
     // 旅程 C：购物车试算下单（第二单）
     const order2 = await userCreateOrderFromCart(userPage, productName, { excludeOrderNos: [order1.orderNo] });
-    await vendorShipOrder(vendorPage, order2.orderId, order2.orderNo);
-    await userReceiveAndConfirm(userPage, order2.orderId);
-    await userApplyBuyout(userPage, order2.orderId);
+    await vendorShipOrder(vendorPage, order2.orderNo);
+    await userReceiveAndConfirm(userPage, order2.orderNo);
+    await userApplyBuyout(userPage, order2.orderNo);
     await vendorApproveBuyout(vendorPage, order2.orderNo);
 
     // 旅程 F：结算与运营

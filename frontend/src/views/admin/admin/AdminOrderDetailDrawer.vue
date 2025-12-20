@@ -43,21 +43,28 @@
             </PageSection>
 
             <PageSection title="纠纷仲裁">
-              <div v-if="order.disputes?.length" class="dispute-list">
-                <div v-for="item in order.disputes" :key="item.id" class="dispute-card">
-                  <div class="dispute-card__header">
-                    <div>
-                      <strong>{{ disputeStatusLabel(item.status) }}</strong>
-                      <p>发起人：{{ disputeActorLabel(item.initiatorRole) }}</p>
+                <div v-if="order.disputes?.length" class="dispute-list">
+                  <div v-for="item in order.disputes" :key="item.id" class="dispute-card">
+                    <div class="dispute-card__header">
+                      <div>
+                        <strong>{{ disputeStatusLabel(item.status) }}</strong>
+                        <p>发起人：{{ disputeActorLabel(item.initiatorRole) }}</p>
+                      </div>
+                      <a-tag :color="disputeStatusColor(item.status)">{{ item.status }}</a-tag>
                     </div>
-                    <a-tag :color="disputeStatusColor(item.status)">{{ item.status }}</a-tag>
-                  </div>
-                  <p>诉求：{{ disputeOptionLabel(item.initiatorOption) }} · {{ item.initiatorReason }}</p>
-                  <div class="dispute-actions">
-                    <a-select
-                      v-model:value="disputeForms[item.id].decision"
-                      :options="disputeOptions"
-                      style="width: 200px"
+                    <p>诉求：{{ disputeOptionLabel(item.initiatorOption) }} · {{ item.initiatorReason }}</p>
+                    <div class="dispute-actions">
+                      <a-button
+                        :data-testid="`dispute-ai-suggest-${item.id}`"
+                        :loading="aiLoading[item.id]"
+                        @click="handleGenerateAiSuggestion(item)"
+                      >
+                        生成仲裁建议
+                      </a-button>
+                      <a-select
+                        v-model:value="disputeForms[item.id].decision"
+                        :options="disputeOptions"
+                        style="width: 200px"
                     />
                     <a-checkbox v-model:checked="disputeForms[item.id].malicious">
                       判定恶意行为（冻结 30 天）
@@ -73,15 +80,55 @@
                     <a-button
                       type="primary"
                       :loading="disputeForms[item.id].loading"
-                      @click="handleResolveDispute(item)"
+                        @click="handleResolveDispute(item)"
+                      >
+                        裁决
+                      </a-button>
+                    </div>
+                    <a-alert
+                      v-if="aiSuggestions[item.id]"
+                      class="dispute-ai-card"
+                      type="info"
+                      :message="`AI 仲裁建议（${aiSuggestions[item.id]?.model ?? 'LLM'}）`"
+                      show-icon
+                      :data-testid="`dispute-ai-suggest-result-${item.id}`"
                     >
-                      裁决
-                    </a-button>
+                      <template #description>
+                        <div class="dispute-ai-card__body">
+                          <div class="dispute-ai-card__section">
+                            <strong>事实摘要</strong>
+                            <div class="text-muted">{{ aiSuggestions[item.id]?.summary }}</div>
+                          </div>
+                          <div v-if="aiSuggestions[item.id]?.missingEvidence?.length" class="dispute-ai-card__section">
+                            <strong>缺失证据</strong>
+                            <ul class="dispute-ai-card__list">
+                              <li v-for="(row, index) in aiSuggestions[item.id]?.missingEvidence" :key="index">
+                                <span class="tag-pill">{{ row.who }}</span>
+                                {{ row.need }}（{{ row.why }}）
+                              </li>
+                            </ul>
+                          </div>
+                          <div v-if="aiSuggestions[item.id]?.recommendedDecision" class="dispute-ai-card__section">
+                            <strong>建议裁决</strong>
+                            <div class="text-muted">
+                              {{ disputeOptionLabel(aiSuggestions[item.id]!.recommendedDecision!.option) }}
+                              <span v-if="aiSuggestions[item.id]!.recommendedDecision!.creditDelta !== null && aiSuggestions[item.id]!.recommendedDecision!.creditDelta !== undefined">
+                                · 信用 {{ aiSuggestions[item.id]!.recommendedDecision!.creditDelta! > 0 ? '扣分' : '加分' }}
+                                {{ Math.abs(aiSuggestions[item.id]!.recommendedDecision!.creditDelta!) }}
+                              </span>
+                              <span v-if="aiSuggestions[item.id]!.recommendedDecision!.maliciousBehavior"> · 恶意行为</span>
+                            </div>
+                            <div v-if="aiSuggestions[item.id]!.recommendedDecision!.rationale" class="text-muted">
+                              {{ aiSuggestions[item.id]!.recommendedDecision!.rationale }}
+                            </div>
+                          </div>
+                        </div>
+                      </template>
+                    </a-alert>
                   </div>
                 </div>
-              </div>
-              <p v-else class="text-muted">暂无纠纷。</p>
-            </PageSection>
+                <p v-else class="text-muted">暂无纠纷。</p>
+              </PageSection>
 
             <PageSection title="时间线">
               <TimelineList :events="order.events" />
@@ -120,9 +167,11 @@ import {
   postOrderMessage,
   forceCloseOrder,
   resolveOrderDispute,
+  generateDisputeAiSuggestion,
   uploadOrderProof,
   type RentalOrderDetail,
   type OrderDispute,
+  type DisputeAiSuggestion,
   type DisputeResolutionOption
 } from '../../../services/orderService';
 import { friendlyErrorMessage } from '../../../utils/error';
@@ -150,6 +199,8 @@ const order = ref<RentalOrderDetail | null>(null);
 const loading = ref(false);
 const forceCloseForm = reactive({ reason: '', loading: false });
 const disputeForms = reactive<Record<string, { decision: DisputeResolutionOption; remark: string; penalize: number | null; malicious: boolean; loading: boolean }>>({});
+const aiSuggestions = reactive<Record<string, DisputeAiSuggestion | null>>({});
+const aiLoading = reactive<Record<string, boolean>>({});
 const chatSending = ref(false);
 const adminQuickPhrases = [
   '平台已介入处理，请保持与对方沟通。',
@@ -185,6 +236,12 @@ const loadOrder = async () => {
           malicious: false,
           loading: false
         };
+      }
+      if (aiSuggestions[item.id] === undefined) {
+        aiSuggestions[item.id] = null;
+      }
+      if (aiLoading[item.id] === undefined) {
+        aiLoading[item.id] = false;
       }
     });
   } catch (error) {
@@ -302,6 +359,36 @@ const handleResolveDispute = async (dispute: OrderDispute) => {
   }
 };
 
+const handleGenerateAiSuggestion = async (dispute: OrderDispute) => {
+  if (!order.value) {
+    return;
+  }
+  aiLoading[dispute.id] = true;
+  try {
+    const suggestion = await generateDisputeAiSuggestion(order.value.id, dispute.id, { tone: 'NEUTRAL' });
+    aiSuggestions[dispute.id] = suggestion;
+    const decision = suggestion.recommendedDecision;
+    const form = disputeForms[dispute.id];
+    if (decision?.option) {
+      form.decision = decision.option;
+    }
+    if (decision?.maliciousBehavior) {
+      form.malicious = true;
+      form.penalize = 0;
+    } else if (decision?.creditDelta !== null && decision?.creditDelta !== undefined) {
+      form.penalize = decision.creditDelta;
+    }
+    if (decision?.rationale) {
+      form.remark = decision.rationale;
+    }
+    message.success('已生成仲裁建议');
+  } catch (error) {
+    message.error(friendlyErrorMessage(error, '生成失败'));
+  } finally {
+    aiLoading[dispute.id] = false;
+  }
+};
+
 const previewProof = async (proof: { fileUrl: string }) => {
   try {
     await openProofInNewTab(proof.fileUrl);
@@ -361,6 +448,38 @@ const previewProof = async (proof: { fileUrl: string }) => {
   gap: var(--space-2);
   flex-wrap: wrap;
   margin-top: var(--space-2);
+}
+
+.dispute-ai-card {
+  margin-top: var(--space-3);
+}
+
+.dispute-ai-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.dispute-ai-card__section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dispute-ai-card__list {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--color-text-secondary);
+}
+
+.tag-pill {
+  display: inline-block;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.12);
+  color: rgba(59, 130, 246, 0.9);
+  margin-right: 6px;
+  font-size: 12px;
 }
 
 .side-column {

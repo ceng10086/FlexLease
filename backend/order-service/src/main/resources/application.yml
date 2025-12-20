@@ -37,6 +37,13 @@ eureka:
   instance:
     prefer-ip-address: true
 flexlease:
+  llm:
+    enabled: ${FLEXLEASE_LLM_ENABLED:false}
+    base-url: ${FLEXLEASE_LLM_BASE_URL:https://api.deepseek.com}
+    api-key: ${FLEXLEASE_LLM_API_KEY:}
+    model: ${FLEXLEASE_LLM_MODEL:deepseek-chat}
+    connect-timeout-ms: ${FLEXLEASE_LLM_CONNECT_TIMEOUT_MS:3000}
+    read-timeout-ms: ${FLEXLEASE_LLM_READ_TIMEOUT_MS:120000}
   payment-service:
     base-url: ${FLEXLEASE_PAYMENT_SERVICE_BASE_URL:http://localhost:9005/api/v1}
   notification-service:

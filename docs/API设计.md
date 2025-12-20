@@ -248,6 +248,7 @@
 | POST | `/orders/{orderId}/disputes/{disputeId}/responses` | USER/VENDOR | 针对纠纷给出方案或确认 | `{ actorId, option, accept, remark?, phoneMemo?, attachmentProofIds? }`，双方轮流响应，附件规则同上 |
 | POST | `/orders/{orderId}/disputes/{disputeId}/escalate` | USER/VENDOR | 升级平台仲裁 | `{ actorId, reason? }`，系统也会在截止时间到期后自动升级 |
 | POST | `/orders/{orderId}/disputes/{disputeId}/appeal` | USER/VENDOR | 对已结案纠纷发起申诉 | `{ actorId, reason? }`，最多一次 |
+| POST | `/admin/orders/{orderId}/disputes/{disputeId}/ai-suggestion` | ADMIN | 生成“LLM 仲裁建议”（只读，不改变纠纷状态） | 请求体 `{ tone?, force? }`；`force=true` 可跳过缓存强制重算；返回结构化建议（事实摘要/缺失证据/建议裁决/通知话术），依赖外部 LLM 配置 |
 | POST | `/admin/orders/{orderId}/disputes/{disputeId}/resolve` | ADMIN | 平台裁决 | `{ decision, penalizeUserDelta?, remark? }`；`penalizeUserDelta` 为信用扣分，正数代表扣减 |
 
 > 纠纷的每个阶段都会同步写入时间线，且通过 Notification Service 向双方推送站内信；平台裁决后会自动触发满意度调查。

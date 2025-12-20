@@ -331,6 +331,30 @@ export type ResolveOrderDisputePayload = {
   maliciousBehavior?: boolean;
 };
 
+export type DisputeAiSuggestionRequest = {
+  tone?: string;
+  force?: boolean;
+};
+
+export type DisputeAiSuggestion = {
+  summary: string;
+  keyFacts?: string[];
+  missingEvidence?: Array<{ who: string; need: string; why: string }>;
+  recommendedDecision?: {
+    option: DisputeResolutionOption;
+    creditDelta?: number | null;
+    maliciousBehavior?: boolean | null;
+    rationale?: string | null;
+  };
+  draftMessages?: {
+    toUser?: string | null;
+    toVendor?: string | null;
+  };
+  riskNotes?: string[];
+  model?: string;
+  generatedAt?: string;
+};
+
 export type OrderContractStatus = 'DRAFT' | 'SIGNED';
 
 export type OrderContract = {
@@ -625,6 +649,18 @@ export const resolveOrderDispute = async (
   const response = await http.post<ApiResponse<OrderDispute>>(
     `/admin/orders/${orderId}/disputes/${disputeId}/resolve`,
     payload
+  );
+  return response.data.data;
+};
+
+export const generateDisputeAiSuggestion = async (
+  orderId: string,
+  disputeId: string,
+  payload?: DisputeAiSuggestionRequest
+): Promise<DisputeAiSuggestion> => {
+  const response = await http.post<ApiResponse<DisputeAiSuggestion>>(
+    `/admin/orders/${orderId}/disputes/${disputeId}/ai-suggestion`,
+    payload ?? {}
   );
   return response.data.data;
 };
