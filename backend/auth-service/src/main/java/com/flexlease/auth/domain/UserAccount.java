@@ -42,7 +42,7 @@ public class UserAccount {
     private OffsetDateTime updatedAt;
 
     protected UserAccount() {
-        // JPA
+        // JPA 需要无参构造
     }
 
     private UserAccount(UUID id, String username, String passwordHash, UserStatus status) {

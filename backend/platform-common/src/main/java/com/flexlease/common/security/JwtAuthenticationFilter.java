@@ -23,6 +23,12 @@ import org.springframework.security.web.authentication.WebAuthenticationDetailsS
 import org.springframework.util.AntPathMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+/**
+ * JWT 鉴权过滤器。
+ * <p>
+ * 优先校验内部调用的 {@code X-Internal-Token}，否则校验 {@code Authorization: Bearer <token>}，
+ * 并把解析后的身份写入 Spring Security 的 {@link SecurityContextHolder}。
+ */
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private static final String INTERNAL_TOKEN_HEADER = "X-Internal-Token";
@@ -115,7 +121,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             ApiResponse<Void> body = ApiResponse.failure(ErrorCode.UNAUTHORIZED.code(), message);
             response.getWriter().write(objectMapper.writeValueAsString(body));
         } catch (IOException ignored) {
-            // ignore writing error
+            // 忽略写响应异常
         }
     }
 }

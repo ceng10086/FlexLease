@@ -8,6 +8,6 @@ class GatewayServiceApplicationTests {
 
     @Test
     void contextLoads() {
-        // Context load verification
+        // 确保 Spring 上下文能够启动
     }
 }

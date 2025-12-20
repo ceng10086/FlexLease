@@ -123,7 +123,7 @@ const ensurePreviewLoaded = async (proof: OrderProof) => {
   }
 };
 
-// Keep this function to trigger lazy loading when needed.
+// 保留这个函数：在渲染时触发懒加载（必要时自动拉取 blob）
 const previewUrl = (proof: OrderProof) => {
   void ensurePreviewLoaded(proof);
   return objectUrls[proof.id] ?? '';
@@ -135,7 +135,7 @@ watch(
     const prevIds = new Set((prev ?? '').split(',').filter(Boolean));
     const nextIds = new Set((next ?? '').split(',').filter(Boolean));
 
-    // Revoke removed URLs
+    // 回收已移除条目的 ObjectURL
     for (const id of prevIds) {
       if (!nextIds.has(id) && objectUrls[id]) {
         URL.revokeObjectURL(objectUrls[id]);
@@ -145,7 +145,7 @@ watch(
       }
     }
 
-    // Warm cache for current proofs
+    // 预热当前凭证的预览缓存
     props.proofs.forEach((proof) => {
       void previewUrl(proof);
     });

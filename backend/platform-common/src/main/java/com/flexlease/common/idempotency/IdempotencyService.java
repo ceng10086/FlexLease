@@ -9,10 +9,9 @@ import java.util.function.Supplier;
 import org.springframework.stereotype.Component;
 
 /**
- * Very lightweight in-memory idempotency helper that keeps the first successful
- * result for a given key within a small time window and replays it for repeated
- * requests. The implementation is intentionally simple to satisfy the project
- * requirements without introducing external storage.
+ * 极简的内存幂等工具：在一个很短的时间窗口内缓存首次成功结果，对相同 key 的重复请求直接返回缓存结果。
+ * <p>
+ * 为了符合课程项目的 KISS 原则，这里不引入 Redis 等外部存储。
  */
 @Component
 public class IdempotencyService {
@@ -20,9 +19,7 @@ public class IdempotencyService {
     private final ConcurrentMap<String, CacheEntry> storage = new ConcurrentHashMap<>();
 
     /**
-     * Executes the supplied action once per key within the provided TTL. When the
-     * same key is seen again before the TTL elapses, the cached result is returned
-     * instead of invoking the action.
+     * 在给定 TTL 内，同一个 key 只执行一次 action；TTL 未过期前重复调用会直接返回缓存结果。
      */
     public <T> T execute(String key, Duration ttl, Supplier<T> action) {
         Objects.requireNonNull(key, "Idempotency key must not be null");

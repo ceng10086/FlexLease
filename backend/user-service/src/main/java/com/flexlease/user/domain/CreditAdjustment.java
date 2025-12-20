@@ -32,7 +32,7 @@ public class CreditAdjustment {
     private OffsetDateTime createdAt;
 
     protected CreditAdjustment() {
-        // JPA
+        // JPA 需要无参构造
     }
 
     private CreditAdjustment(UUID id, UUID userId, int delta, String reason, UUID operatorId) {

@@ -16,7 +16,7 @@ public class UserRoleId implements Serializable {
     private UUID roleId;
 
     protected UserRoleId() {
-        // JPA
+        // JPA 需要无参构造
     }
 
     public UserRoleId(UUID userId, UUID roleId) {

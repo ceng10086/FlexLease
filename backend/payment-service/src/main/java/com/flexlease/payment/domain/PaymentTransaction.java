@@ -81,7 +81,7 @@ public class PaymentTransaction {
     private List<RefundTransaction> refunds = new ArrayList<>();
 
     protected PaymentTransaction() {
-        // JPA
+        // JPA 需要无参构造
     }
 
     private PaymentTransaction(UUID orderId,

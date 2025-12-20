@@ -57,7 +57,7 @@ public class ProductInquiry {
     private OffsetDateTime createdAt;
 
     protected ProductInquiry() {
-        // JPA
+        // JPA 需要无参构造
     }
 
     private ProductInquiry(Product product,

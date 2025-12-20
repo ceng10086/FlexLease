@@ -120,7 +120,7 @@ public class OrderDispute {
     private OffsetDateTime updatedAt;
 
     protected OrderDispute() {
-        // JPA
+        // JPA 需要无参构造
     }
 
     private OrderDispute(OrderActorRole initiatorRole,
@@ -310,7 +310,7 @@ public class OrderDispute {
         if (accept) {
             this.status = OrderDisputeStatus.RESOLVED;
         } else {
-            // keep open for further沟通
+            // 保持开启状态，留给双方继续沟通
             this.status = OrderDisputeStatus.OPEN;
             this.deadlineAt = OffsetDateTime.now().plus(ESCALATION_WINDOW);
         }
@@ -408,7 +408,7 @@ public class OrderDispute {
             try {
                 result.add(java.util.UUID.fromString(part.trim()));
             } catch (IllegalArgumentException ignored) {
-                // skip malformed entry to avoid breaking remaining ids
+                // 跳过格式异常的条目，避免影响剩余 id 解析
             }
         }
         return java.util.Collections.unmodifiableList(result);

@@ -24,7 +24,7 @@ ARG ARTIFACT_NAME
 ENV JAVA_HOME=/opt/java-runtime \
     PATH="/opt/java-runtime/bin:${PATH}"
 
-# Required by java.desktop font rendering used in image watermarking.
+# 取证图片水印依赖 java.desktop 的字体渲染；精简镜像需要额外安装字体包。
 RUN apt-get update \
     && apt-get install -y --no-install-recommends fontconfig fonts-dejavu-core fonts-noto-cjk \
     && rm -rf /var/lib/apt/lists/*

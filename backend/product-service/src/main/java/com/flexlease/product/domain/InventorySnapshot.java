@@ -45,7 +45,7 @@ public class InventorySnapshot {
     private OffsetDateTime createdAt;
 
     protected InventorySnapshot() {
-        // JPA
+        // JPA 需要无参构造
     }
 
     private InventorySnapshot(ProductSku sku,

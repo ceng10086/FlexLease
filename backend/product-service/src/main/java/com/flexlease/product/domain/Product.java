@@ -69,7 +69,7 @@ public class Product {
     private Set<MediaAsset> mediaAssets = new LinkedHashSet<>();
 
     protected Product() {
-        // JPA
+        // JPA 需要无参构造
     }
 
     private Product(UUID vendorId,

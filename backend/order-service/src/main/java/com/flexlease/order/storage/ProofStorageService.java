@@ -28,6 +28,11 @@ import org.springframework.web.multipart.MultipartFile;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 
+/**
+ * 取证文件的本地存储服务。
+ * <p>
+ * 上传文件落盘到配置的根目录；下载时按文件名读取；图片类文件会尽力添加水印（失败不影响主流程）。
+ */
 @Component
 public class ProofStorageService {
 
@@ -140,7 +145,7 @@ public class ProofStorageService {
             String format = "png".equals(extension) ? "png" : "jpg";
             ImageIO.write(image, format, path.toFile());
         } catch (Throwable ex) {
-            // watermark is best-effort; don't fail the upload if font/image processing is unavailable
+            // 水印是“尽力而为”：字体/图片处理不可用时也不应导致上传失败
             LOG.warn("Failed to apply watermark to proof {}: {}", storedName, ex.toString());
         }
     }
@@ -154,7 +159,7 @@ public class ProofStorageService {
     }
 
     private Font resolveWatermarkFont(int size) {
-        // Prefer fonts that can render Chinese glyphs when running in slim containers.
+        // 在精简容器里优先选择能渲染中文的字体，避免水印出现方块。
         String[] preferredFamilies = {
                 "Noto Sans CJK SC",
                 "Noto Sans CJK",
@@ -171,7 +176,7 @@ public class ProofStorageService {
                 }
             }
         } catch (Exception ignored) {
-            // fallback
+            // 兜底：字体列表获取失败时使用默认字体
         }
         return new Font(Font.SANS_SERIF, Font.BOLD, size);
     }

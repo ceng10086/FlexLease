@@ -54,7 +54,7 @@ public class RefundTransaction {
     private OffsetDateTime updatedAt;
 
     protected RefundTransaction() {
-        // JPA
+        // JPA 需要无参构造
     }
 
     private RefundTransaction(BigDecimal amount, String reason) {

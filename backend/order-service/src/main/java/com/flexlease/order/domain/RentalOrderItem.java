@@ -62,7 +62,7 @@ public class RentalOrderItem {
     private OffsetDateTime updatedAt;
 
     protected RentalOrderItem() {
-        // JPA
+        // JPA 需要无参构造
     }
 
     private RentalOrderItem(UUID productId,

@@ -58,7 +58,7 @@ public class NotificationLog {
     private OffsetDateTime createdAt;
 
     protected NotificationLog() {
-        // JPA
+        // JPA 需要无参构造
     }
 
     private NotificationLog(String templateCode,

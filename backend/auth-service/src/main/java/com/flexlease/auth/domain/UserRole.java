@@ -17,7 +17,7 @@ public class UserRole {
     private OffsetDateTime grantedAt;
 
     protected UserRole() {
-        // JPA
+        // JPA 需要无参构造
     }
 
     private UserRole(UserRoleId id, OffsetDateTime grantedAt) {

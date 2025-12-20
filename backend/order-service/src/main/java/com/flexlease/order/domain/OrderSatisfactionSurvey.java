@@ -66,7 +66,7 @@ public class OrderSatisfactionSurvey {
     private OffsetDateTime updatedAt;
 
     protected OrderSatisfactionSurvey() {
-        // JPA
+        // JPA 需要无参构造
     }
 
     private OrderSatisfactionSurvey(OrderActorRole targetRole, UUID targetRef, OffsetDateTime availableAt) {

@@ -118,7 +118,7 @@ public class PaymentController {
         FlexleasePrincipal principal = SecurityUtils.requirePrincipal();
         UUID effectiveVendorId = vendorId;
         if (principal.hasRole("ADMIN")) {
-            // admin can query any vendor, including null for all
+            // 管理员可查询任意厂商；vendorId 为空表示查询全量
         } else if (principal.hasRole("VENDOR")) {
             if (principal.vendorId() == null) {
                 throw new BusinessException(ErrorCode.UNAUTHORIZED, "当前身份缺少厂商标识");

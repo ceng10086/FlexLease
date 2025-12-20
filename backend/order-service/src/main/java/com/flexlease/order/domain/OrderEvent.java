@@ -43,7 +43,7 @@ public class OrderEvent {
     private OffsetDateTime createdAt;
 
     protected OrderEvent() {
-        // JPA
+        // JPA 需要无参构造
     }
 
     private OrderEvent(OrderEventType eventType, String description, UUID createdBy, OrderActorRole actorRole) {

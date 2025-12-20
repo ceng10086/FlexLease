@@ -102,7 +102,7 @@ class OrderSurveyServiceIntegrationTest {
                 .findFirst()
                 .orElseThrow();
 
-        // submit as user
+        // 以用户身份提交问卷
         FlexleasePrincipal principal = new FlexleasePrincipal(
                 userId,
                 null,

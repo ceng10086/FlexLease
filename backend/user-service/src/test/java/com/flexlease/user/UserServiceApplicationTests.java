@@ -245,7 +245,7 @@ class UserServiceApplicationTests {
         UUID userId = UUID.randomUUID();
         String internalToken = TestJwtTokens.bearerToken(UUID.randomUUID(), "scheduler", "INTERNAL");
 
-        // ensure profile exists
+        // 确保 profile 已存在（首次访问会触发懒创建）
         mockMvc.perform(get("/api/v1/customers/profile")
                 .header(HttpHeaders.AUTHORIZATION, TestJwtTokens.bearerToken(userId, "user", "USER")))
             .andExpect(status().isOk());

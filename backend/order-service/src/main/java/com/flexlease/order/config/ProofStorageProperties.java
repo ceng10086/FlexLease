@@ -6,7 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class ProofStorageProperties {
 
     /**
-     * Root directory for storing uploaded order proofs.
+     * 订单取证文件存储根目录。
      */
     private String root = "storage/order-proofs";
 

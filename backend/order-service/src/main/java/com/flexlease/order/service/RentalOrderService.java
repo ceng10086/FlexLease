@@ -224,7 +224,7 @@ public class RentalOrderService {
                 try {
                     inventoryReservationClient.release(order.getId(), reservationCommands);
                 } catch (RuntimeException ignored) {
-                    // release failure will be surfaced via monitoring, original exception still thrown
+                    // 释放库存失败会被监控捕获；这里仍抛出原始异常
                 }
             }
             throw ex;

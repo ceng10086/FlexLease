@@ -54,7 +54,7 @@ public class OrderContract {
     private OffsetDateTime updatedAt;
 
     protected OrderContract() {
-        // JPA
+        // JPA 需要无参构造
     }
 
     private OrderContract(RentalOrder order,

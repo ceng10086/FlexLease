@@ -1,34 +1,36 @@
 import http from './http';
 
+/**
+ * 将后端返回的 fileUrl 归一化为可直接被 http(axios) 请求的路径。
+ */
 const normalizeProofPath = (fileUrl: string) => {
   try {
     const url = new URL(fileUrl, window.location.origin);
     let path = url.pathname;
 
-    // We call through axios instance with baseURL = /api/v1.
-    // So we must pass paths like /proofs/{fileName} (without the /api/v1 prefix).
+    // http(axios) 的 baseURL = /api/v1，因此这里统一把输入归一化为 `/proofs/{fileName}`（不带 /api/v1 前缀）。
     if (path.startsWith('/api/v1/')) {
       path = path.slice('/api/v1'.length);
     }
 
-    // Backward compatibility: older records may store /proofs/{fileName}
+    // 兼容旧数据：历史记录可能存的是 `/proofs/{fileName}`
     if (path.startsWith('/proofs/')) {
       return path;
     }
 
-    // Canonical API: /proofs/{fileName} is the internal path under baseURL.
+    // 规范形式：`/proofs/{fileName}`
     if (path.startsWith('/proofs')) {
       return path;
     }
 
-    // If caller passes /api/v1/proofs/{fileName} it becomes /proofs/{fileName}
+    // 如果调用方传的是 `/api/v1/proofs/{fileName}`，前面已去掉 `/api/v1`，最终也会变成 `/proofs/{fileName}`
     if (path.startsWith('/proofs/')) {
       return path;
     }
 
     return path;
   } catch {
-    // Fallback for odd inputs
+    // 兜底：处理不规范输入
     return fileUrl.startsWith('/api/v1/') ? fileUrl.slice('/api/v1'.length) : fileUrl;
   }
 };
@@ -47,6 +49,6 @@ export const createObjectUrlFromProof = async (fileUrl: string): Promise<string>
 export const openProofInNewTab = async (fileUrl: string) => {
   const objectUrl = await createObjectUrlFromProof(fileUrl);
   window.open(objectUrl, '_blank', 'noopener,noreferrer');
-  // Best-effort cleanup.
+  // 尽力清理：避免 ObjectURL 长时间占用内存
   window.setTimeout(() => URL.revokeObjectURL(objectUrl), 5 * 60 * 1000);
 };

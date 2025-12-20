@@ -58,7 +58,7 @@ public class ProductSku {
     private long version;
 
     protected ProductSku() {
-        // JPA
+        // JPA 需要无参构造
     }
 
     private ProductSku(Product product,

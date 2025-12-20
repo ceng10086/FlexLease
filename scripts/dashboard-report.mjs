@@ -2,7 +2,7 @@
 
 /**
  * 简易仪表盘报表脚本
- * Usage:
+ * 用法：
  *   FLEXLEASE_API_BASE=http://localhost:8080/api/v1 FLEXLEASE_API_TOKEN=xxx node scripts/dashboard-report.mjs
  */
 

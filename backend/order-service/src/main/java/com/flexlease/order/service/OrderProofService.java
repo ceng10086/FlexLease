@@ -31,6 +31,11 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.core.io.Resource;
 
+/**
+ * 订单取证服务：负责上传/读取取证文件，并把取证动作写入订单时间线。
+ * <p>
+ * 上传成功后会通知对方（站内信）；巡检类取证会触发信用奖励。
+ */
 @Service
 @Transactional
 public class OrderProofService {
@@ -104,7 +109,7 @@ public class OrderProofService {
             );
             proofStorageService.applyWatermark(stored.storedName(), stored.contentType(), watermark);
         } catch (RuntimeException ex) {
-            // best-effort watermark; don't block upload
+            // 水印尽力而为，不阻塞上传
         }
         try {
             OrderProof proof = OrderProof.create(
@@ -170,7 +175,7 @@ public class OrderProofService {
         try {
             actualSize = resource.contentLength();
         } catch (Exception ignored) {
-            // fallback to stored value
+            // 读取真实大小失败时回退到数据库记录
         }
         return new ProofFileResource(storedName, contentType, actualSize, resource);
     }
@@ -265,7 +270,7 @@ public class OrderProofService {
         try {
             notificationClient.send(request);
         } catch (RuntimeException ex) {
-            // degrade quietly,不会影响主流程
+            // 降级处理：通知失败不影响主流程
         }
     }
 
@@ -281,7 +286,7 @@ public class OrderProofService {
         try {
             notificationClient.send(request);
         } catch (RuntimeException ex) {
-            // ignore
+            // 忽略通知异常
         }
     }
 

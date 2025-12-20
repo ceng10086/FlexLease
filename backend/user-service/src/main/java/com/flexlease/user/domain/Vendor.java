@@ -77,7 +77,7 @@ public class Vendor {
     private OffsetDateTime updatedAt;
 
     protected Vendor() {
-        // JPA
+        // JPA 需要无参构造
     }
 
     private Vendor(UUID id,

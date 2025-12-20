@@ -6,8 +6,8 @@ const fallbackUuid = () =>
   `${randomHex()}${randomHex()}-${randomHex()}-${randomHex()}-${randomHex()}-${randomHex()}${randomHex()}${randomHex()}`;
 
 /**
- * Generate a best-effort UUID string for Idempotency-Key headers.
- * Optionally accept a namespace prefix to aid debugging/tracing.
+ * 生成 Idempotency-Key 请求头用的 UUID（尽力而为）。
+ * 可选传入 namespace 前缀，便于排查/追踪。
  */
 export const generateIdempotencyKey = (namespace?: string): string => {
   const key =

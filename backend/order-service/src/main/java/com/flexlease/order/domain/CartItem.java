@@ -61,7 +61,7 @@ public class CartItem {
     private OffsetDateTime updatedAt;
 
     protected CartItem() {
-        // JPA
+        // JPA 需要无参构造
     }
 
     private CartItem(UUID userId,

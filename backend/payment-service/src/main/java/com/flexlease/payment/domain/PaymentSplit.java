@@ -39,7 +39,7 @@ public class PaymentSplit {
     private OffsetDateTime createdAt;
 
     protected PaymentSplit() {
-        // JPA
+        // JPA 需要无参构造
     }
 
     private PaymentSplit(PaymentSplitType splitType, BigDecimal amount, String beneficiary) {

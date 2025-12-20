@@ -48,7 +48,7 @@ public class DisputeAiSuggestion {
     private OffsetDateTime createdAt;
 
     protected DisputeAiSuggestion() {
-        // JPA
+        // JPA 需要无参构造
     }
 
     private DisputeAiSuggestion(RentalOrder order,
@@ -144,4 +144,3 @@ public class DisputeAiSuggestion {
         this.createdAt = OffsetDateTime.now();
     }
 }
-

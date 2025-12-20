@@ -120,7 +120,7 @@ public class RentalOrder {
     private List<OrderSatisfactionSurvey> surveys = new ArrayList<>();
 
     protected RentalOrder() {
-        // JPA
+        // JPA 需要无参构造
     }
 
     private RentalOrder(UUID userId,

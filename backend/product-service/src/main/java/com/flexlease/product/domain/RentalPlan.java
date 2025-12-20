@@ -72,7 +72,7 @@ public class RentalPlan {
     private Set<ProductSku> skus = new LinkedHashSet<>();
 
     protected RentalPlan() {
-        // JPA
+        // JPA 需要无参构造
     }
 
     private RentalPlan(Product product,

@@ -130,7 +130,7 @@ export default defineConfig((configEnv: ConfigEnv) => {
           }
         }
       },
-      // isolate the Ant Design vendor slab while keeping warnings focused on unexpected chunks
+      // 将 Ant Design 单独拆包，避免 chunk 体积告警干扰其它模块
       chunkSizeWarningLimit: 1600
     }
   };

@@ -6,7 +6,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 public class StorageProperties {
 
     /**
-     * Root directory for storing uploaded media assets.
+     * 媒体文件上传存储根目录。
      */
     private String root = "storage/uploads";
 

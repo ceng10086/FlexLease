@@ -336,7 +336,7 @@ public class DisputeAiSuggestionService {
         try {
             return DisputeResolutionOption.valueOf(normalized);
         } catch (IllegalArgumentException ignored) {
-            // tolerate historical / free-form outputs
+            // 兼容历史/自由格式输出
         }
         if (normalized.contains("PARTIAL")) {
             return DisputeResolutionOption.PARTIAL_REFUND;
@@ -350,7 +350,7 @@ public class DisputeAiSuggestionService {
         if (normalized.contains("BUYOUT") || normalized.contains("DISCOUNT")) {
             return DisputeResolutionOption.DISCOUNTED_BUYOUT;
         }
-        // Chinese hints
+        // 中文关键词兜底
         if (raw.contains("补发") || raw.contains("重发")) {
             return DisputeResolutionOption.REDELIVER;
         }

@@ -14,12 +14,12 @@ public class InventoryConcurrencyProperties {
 
     public static class Concurrency {
         /**
-         * Maximum retry attempts when optimistic locking conflicts occur.
+         * 乐观锁冲突时的最大重试次数。
          */
         private int maxAttempts = 40;
 
         /**
-         * Base backoff duration applied between retries. The wait time grows linearly with the attempt count.
+         * 每次重试之间的基础退避时间；等待时长会随着重试次数线性增长。
          */
         private Duration backoff = Duration.ofMillis(2);
 

@@ -290,7 +290,7 @@ class RentalOrderServiceIntegrationTest {
                         org.mockito.ArgumentMatchers.argThat(amount -> amount.compareTo(preview.depositAmount()) == 0),
                         org.mockito.ArgumentMatchers.anyString());
 
-        // After completion, buyout should not be allowed; expect validation error
+        // 完成后不允许再买断；预期抛出校验异常
         org.assertj.core.api.Assertions.assertThatThrownBy(() ->
                 rentalOrderService.applyBuyout(created.id(), new OrderBuyoutApplyRequest(userId, BigDecimal.TEN, "买断")))
                 .isInstanceOf(BusinessException.class);

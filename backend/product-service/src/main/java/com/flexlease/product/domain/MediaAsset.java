@@ -46,7 +46,7 @@ public class MediaAsset {
     private OffsetDateTime updatedAt;
 
     protected MediaAsset() {
-        // JPA
+        // JPA 需要无参构造
     }
 
     private MediaAsset(Product product,

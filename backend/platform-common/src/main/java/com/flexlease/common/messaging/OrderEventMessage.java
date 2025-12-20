@@ -5,8 +5,8 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Payload published by order-service to describe domain events that should be
- * consumed by other services asynchronously.
+ * order-service 发布的订单领域事件消息体，
+ * 供其他服务异步订阅与消费。
  */
 public record OrderEventMessage(
         UUID orderId,

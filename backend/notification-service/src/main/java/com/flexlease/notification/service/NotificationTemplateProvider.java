@@ -25,6 +25,6 @@ public class NotificationTemplateProvider {
 
     @CacheEvict(cacheNames = CACHE_NAME, key = "#code")
     public void evict(String code) {
-        // eviction helper invoked when template updates are introduced
+        // 模板更新后用于清理缓存（避免读到旧模板）
     }
 }

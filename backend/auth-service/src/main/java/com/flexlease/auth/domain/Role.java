@@ -24,7 +24,7 @@ public class Role {
     private String description;
 
     protected Role() {
-        // JPA
+        // JPA 需要无参构造
     }
 
     public Role(UUID id, String code, String name, String description) {

@@ -52,7 +52,7 @@ public class OrderExtensionRequest {
     private OffsetDateTime updatedAt;
 
     protected OrderExtensionRequest() {
-        // JPA
+        // JPA 需要无参构造
     }
 
     private OrderExtensionRequest(int additionalMonths, UUID requestedBy, String remark) {

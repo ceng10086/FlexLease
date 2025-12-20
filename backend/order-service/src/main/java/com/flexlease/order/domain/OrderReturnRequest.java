@@ -58,7 +58,7 @@ public class OrderReturnRequest {
     private OffsetDateTime updatedAt;
 
     protected OrderReturnRequest() {
-        // JPA
+        // JPA 需要无参构造
     }
 
     private OrderReturnRequest(String reason,

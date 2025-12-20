@@ -36,7 +36,7 @@ public class NotificationTemplate {
     private OffsetDateTime createdAt;
 
     protected NotificationTemplate() {
-        // JPA
+        // JPA 需要无参构造
     }
 
     public NotificationTemplate(String code,

@@ -8,6 +8,6 @@ class RegistryServiceApplicationTests {
 
     @Test
     void contextLoads() {
-        // context initialization ensures Eureka server configuration is valid
+        // 确保 Eureka Server 配置正确且可启动
     }
 }

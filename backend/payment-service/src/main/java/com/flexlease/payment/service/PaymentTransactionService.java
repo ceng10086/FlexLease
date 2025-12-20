@@ -562,7 +562,7 @@ public class PaymentTransactionService {
                 case BUYOUT -> buyout = buyout.add(vendorPortion);
                 case PENALTY -> penalty = penalty.add(vendorPortion);
                 case DEPOSIT -> {
-                    // normally vendor portion should be zero for pure押金，但若存在则归入租金统计以便对账
+                    // 正常情况下押金不应分配给厂商；若出现则归入租金统计，便于对账
                     rent = rent.add(vendorPortion);
                 }
             }

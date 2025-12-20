@@ -75,7 +75,7 @@ const setWindowBounds = async (page: Page, bounds: WindowBounds) => {
       }
     });
   } catch {
-    // ignore
+    // 忽略异常
   }
 };
 
@@ -108,7 +108,7 @@ const detectWindowManagerScale = async (page: Page) => {
       return { width: window.outerWidth ?? 0, height: window.outerHeight ?? 0 };
     })) as { width: number; height: number };
   } catch {
-    // ignore
+    // 忽略异常
   }
 
   const safeOuterW = Math.max(1, outer.width);
@@ -173,7 +173,7 @@ const positionDemoWindows = async (adminPage: Page, vendorPage: Page, userPage: 
     const avail = primary?.availWidth ?? primary?.workArea?.width ?? 0;
     screenAvailWidthPx = typeof avail === 'number' ? avail : 0;
   } catch {
-    // ignore
+    // 忽略异常
   }
 
   if (screenAvailWidthPx > 0 && b1 && b2 && b3) {
@@ -200,7 +200,7 @@ const positionDemoWindows = async (adminPage: Page, vendorPage: Page, userPage: 
         `adminOuter=${adminOuter.w}x${adminOuter.h} adminBounds=${JSON.stringify(adminBounds?.bounds ?? null)} screenAvailWidthPx=${screenAvailWidthPx || 'n/a'}`
     );
   } catch {
-    // ignore
+    // 忽略异常
   }
 };
 
@@ -371,7 +371,7 @@ async function vendorCreateAndSubmitProduct(page: Page, productName: string) {
   await planModal.locator('.ant-form-item', { hasText: '押金 (¥)' }).locator('input').fill('2000');
   await planModal.locator('.ant-form-item', { hasText: '月租金 (¥)' }).locator('input').fill('300');
 
-  // OK/确定
+  // 点击“确定”按钮（兼容 OK 文案）
   await planModal.getByRole('button', { name: /确\s*定|OK/ }).click();
   await expect(planModal).toBeHidden({ timeout: 30_000 });
   await expect(detailDrawer.getByRole('button', { name: '新增 SKU' }).first()).toBeVisible({ timeout: 30_000 });

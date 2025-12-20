@@ -69,7 +69,7 @@ public class UserProfile {
     private OffsetDateTime updatedAt;
 
     protected UserProfile() {
-        // JPA
+        // JPA 需要无参构造
     }
 
     private UserProfile(UUID id,

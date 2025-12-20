@@ -55,7 +55,7 @@ public class OrderProof {
     private OffsetDateTime uploadedAt;
 
     protected OrderProof() {
-        // JPA
+        // JPA 需要无参构造
     }
 
     private OrderProof(OrderProofType proofType,

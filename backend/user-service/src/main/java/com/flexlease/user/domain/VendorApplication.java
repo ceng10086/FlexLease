@@ -69,7 +69,7 @@ public class VendorApplication {
     private OffsetDateTime updatedAt;
 
     protected VendorApplication() {
-        // JPA
+        // JPA 需要无参构造
     }
 
     private VendorApplication(UUID ownerUserId,
