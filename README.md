@@ -130,7 +130,7 @@ docker compose up --build
 
 ### 本地开发
 
-1. **后端单服务**：`SPRING_PROFILES_ACTIVE=dev` 使用 H2 + 自动建 schema，或 `postgres` profile 连接本地数据库。
+1. **后端单服务**：`SPRING_PROFILES_ACTIVE=dev` 使用 H2 + 自动建 schema，或 `postgres` profile 连接本地数据库；服务间调用默认走 Eureka 服务发现，若要联调请优先使用 Compose（或至少启动 `registry-service` + 依赖服务）。
    ```bash
    ./mvnw -pl backend/order-service -am spring-boot:run
    ```

@@ -45,13 +45,13 @@ flexlease:
     connect-timeout-ms: ${FLEXLEASE_LLM_CONNECT_TIMEOUT_MS:3000}
     read-timeout-ms: ${FLEXLEASE_LLM_READ_TIMEOUT_MS:120000}
   payment-service:
-    base-url: ${FLEXLEASE_PAYMENT_SERVICE_BASE_URL:http://localhost:9005/api/v1}
+    base-url: ${FLEXLEASE_PAYMENT_SERVICE_BASE_URL:http://payment-service/api/v1}
   notification-service:
-    base-url: ${FLEXLEASE_NOTIFICATION_SERVICE_BASE_URL:http://localhost:9006/api/v1}
+    base-url: ${FLEXLEASE_NOTIFICATION_SERVICE_BASE_URL:http://notification-service/api/v1}
   product-service:
-    base-url: ${FLEXLEASE_PRODUCT_SERVICE_BASE_URL:http://localhost:9003/api/v1}
+    base-url: ${FLEXLEASE_PRODUCT_SERVICE_BASE_URL:http://product-service/api/v1}
   user-service:
-    base-url: ${FLEXLEASE_USER_SERVICE_BASE_URL:http://localhost:9002/api/v1}
+    base-url: ${FLEXLEASE_USER_SERVICE_BASE_URL:http://user-service/api/v1}
   proof-storage:
     root: ${FLEXLEASE_ORDER_PROOF_ROOT:storage/order-proofs}
   order:

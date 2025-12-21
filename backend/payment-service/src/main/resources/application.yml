@@ -31,11 +31,11 @@ server:
   port: ${SERVER_PORT:9005}
 flexlease:
   notification-service:
-    base-url: ${FLEXLEASE_NOTIFICATION_SERVICE_BASE_URL:http://localhost:9006/api/v1}
+    base-url: ${FLEXLEASE_NOTIFICATION_SERVICE_BASE_URL:http://notification-service/api/v1}
   order-service:
-    base-url: ${FLEXLEASE_ORDER_SERVICE_BASE_URL:http://localhost:9004/api/v1}
+    base-url: ${FLEXLEASE_ORDER_SERVICE_BASE_URL:http://order-service/api/v1}
   user-service:
-    base-url: ${FLEXLEASE_USER_SERVICE_BASE_URL:http://localhost:9002/api/v1}
+    base-url: ${FLEXLEASE_USER_SERVICE_BASE_URL:http://user-service/api/v1}
   payment:
     auto-confirm: ${FLEXLEASE_PAYMENT_AUTO_CONFIRM:true}
 management:
