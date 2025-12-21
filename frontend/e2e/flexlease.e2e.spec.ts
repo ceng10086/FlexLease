@@ -781,7 +781,12 @@ async function adminResolveDispute(page: Page, orderNo: string, penalizeDelta: n
   const disputeCard = drawer.locator('.dispute-card').first();
   await expect(disputeCard).toBeVisible({ timeout: 60_000 });
 
-  await disputeCard.getByRole('button', { name: '生成仲裁建议' }).click({ timeout: 30_000, force: true });
+  // headless 下如果仍用 force click，可能点到旁边的下拉框导致请求未触发（Playwright 不做命中校验）。
+  // 这里显式确保按钮可交互，再点击触发请求。
+  const aiSuggestBtn = disputeCard.locator('[data-testid^="dispute-ai-suggest-"]').first();
+  await expect(aiSuggestBtn).toBeVisible({ timeout: 30_000 });
+  await expect(aiSuggestBtn).toBeEnabled({ timeout: 30_000 });
+  await aiSuggestBtn.click({ timeout: 30_000 });
   await expect(disputeCard.locator('[data-testid^="dispute-ai-suggest-result-"]')).toBeVisible({ timeout: 120_000 });
   await expect(disputeCard.getByText('事实摘要')).toBeVisible({ timeout: 30_000 });
 
