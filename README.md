@@ -15,7 +15,7 @@ FlexLease 面向 B2C 场景，为厂商与消费者提供从入驻、商品配�
 | --- | --- | --- |
 | frontend | 8080（对外暴露） | 管理端 SPA；Nginx 反代 `/api/**` → `gateway-service:8080`，`/media/**` → `product-service:9003` |
 | registry-service | 8761（对外暴露） | Eureka Server，所有微服务注册发现入口 |
-| gateway-service | 8080（仅容器/本地） | Spring Cloud Gateway，统一 JWT 校验与路由转发（`/api/v1/**`）；Compose 中通过前端 Nginx 访问 |
+| gateway-service | 8080（仅容器/本地） | Spring Cloud Gateway，统一路由转发（`/api/v1/**`）；JWT 校验由各微服务完成，Compose 中通过前端 Nginx 访问 |
 | auth-service | 9001（仅容器/本地） | 账号注册/登录、密码重置、刷新令牌、内部账号绑定 vendorId |
 | user-service | 9002（仅容器/本地） | 厂商入驻与资料、用户档案、管理员用户冻结/解冻 |
 | product-service | 9003（仅容器/本地） | 商品/Rental Plan/SKU/库存、媒体文件管理、对前台提供目录查询与内部库存接口 |

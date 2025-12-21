@@ -39,6 +39,7 @@ security:
     secret: ${SECURITY_JWT_SECRET:flexlease-default-secret-please-change}
     access-token-ttl-seconds: ${SECURITY_JWT_ACCESS_TOKEN_TTL_SECONDS:3600}
     issuer: ${SECURITY_JWT_ISSUER:flexlease-auth-service}
+    internal-access-token: ${SECURITY_JWT_INTERNAL:flexlease-internal-secret}
 
 logging:
   level:
