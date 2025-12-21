@@ -3,7 +3,11 @@
 /**
  * 简易仪表盘报表脚本
  * 用法：
+ *   # 方式 1：管理员 JWT（推荐）
  *   FLEXLEASE_API_BASE=http://localhost:8080/api/v1 FLEXLEASE_API_TOKEN=xxx node scripts/dashboard-report.mjs
+ *
+ *   # 方式 2：内部调用（X-Internal-Token）
+ *   FLEXLEASE_API_BASE=http://localhost:8080/api/v1 FLEXLEASE_INTERNAL_TOKEN=xxx node scripts/dashboard-report.mjs
  */
 
 import fs from 'node:fs/promises';
@@ -11,18 +15,20 @@ import path from 'node:path';
 
 const API_BASE = process.env.FLEXLEASE_API_BASE ?? 'http://localhost:8080/api/v1';
 const TOKEN = process.env.FLEXLEASE_API_TOKEN;
+const INTERNAL_TOKEN = process.env.FLEXLEASE_INTERNAL_TOKEN;
 const OUTPUT_DIR = process.env.FLEXLEASE_REPORT_DIR ?? 'reports';
 
 const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
 const outputPath = path.join(process.cwd(), OUTPUT_DIR, `dashboard-${timestamp}.md`);
 
 async function fetchDashboard() {
+  const headers = TOKEN
+    ? { Authorization: `Bearer ${TOKEN}` }
+    : INTERNAL_TOKEN
+      ? { 'X-Internal-Token': INTERNAL_TOKEN }
+      : undefined;
   const response = await fetch(`${API_BASE}/analytics/dashboard`, {
-    headers: TOKEN
-      ? {
-          Authorization: `Bearer ${TOKEN}`
-        }
-      : undefined
+    headers
   });
   if (!response.ok) {
     throw new Error(`请求失败：${response.status} ${response.statusText}`);

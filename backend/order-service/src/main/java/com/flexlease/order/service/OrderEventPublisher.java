@@ -11,6 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -21,12 +22,12 @@ public class OrderEventPublisher {
 
     private static final Logger LOG = LoggerFactory.getLogger(OrderEventPublisher.class);
 
-    private final RabbitTemplate rabbitTemplate;
+    private final ObjectProvider<RabbitTemplate> rabbitTemplateProvider;
     private final boolean messagingEnabled;
 
-    public OrderEventPublisher(RabbitTemplate rabbitTemplate,
+    public OrderEventPublisher(ObjectProvider<RabbitTemplate> rabbitTemplateProvider,
                                @Value("${flexlease.messaging.enabled:true}") boolean messagingEnabled) {
-        this.rabbitTemplate = rabbitTemplate;
+        this.rabbitTemplateProvider = rabbitTemplateProvider;
         this.messagingEnabled = messagingEnabled;
     }
 
@@ -63,6 +64,11 @@ public class OrderEventPublisher {
     }
 
     private void dispatchEvent(OrderEventMessage payload, OrderEventType eventType, String orderNo) {
+        RabbitTemplate rabbitTemplate = rabbitTemplateProvider.getIfAvailable();
+        if (rabbitTemplate == null) {
+            LOG.debug("Skip publishing order event {} because RabbitTemplate is not available.", eventType);
+            return;
+        }
         String routingKey = MessagingConstants.ORDER_EVENTS_ROUTING_KEY_PREFIX + eventType.name().toLowerCase();
         try {
             rabbitTemplate.convertAndSend(MessagingConstants.ORDER_EVENTS_EXCHANGE, routingKey, payload);
