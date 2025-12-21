@@ -251,7 +251,7 @@ npm run test:e2e -- --headed
 
 ## 文档索引
 
-- 《项目说明》：`docs/项目说明.md`
+- 《项目说明》：`docs/项目说明-原始.md`
 - 《项目规划与任务分解》：`docs/项目规划与任务分解.md`
 - 《API 设计》：`docs/API设计.md`
 - 《数据库设计》：`docs/数据库设计.md`

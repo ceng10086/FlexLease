@@ -48,7 +48,7 @@ public class NotificationController {
         NotificationStatus statusEnum = null;
         if (status != null && !status.isBlank()) {
             try {
-                statusEnum = NotificationStatus.valueOf(status.toUpperCase());
+                statusEnum = NotificationStatus.valueOf(status.toUpperCase(Locale.ROOT));
             } catch (IllegalArgumentException ex) {
                 throw new BusinessException(ErrorCode.VALIDATION_ERROR, "非法状态值: " + status);
             }

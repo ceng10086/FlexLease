@@ -12,6 +12,7 @@ import com.flexlease.user.dto.VendorApplicationReviewRequest;
 import com.flexlease.user.service.VendorApplicationService;
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -66,7 +67,7 @@ public class VendorApplicationController {
         VendorApplicationStatus statusEnum = null;
         if (StringUtils.hasText(status)) {
             try {
-                statusEnum = VendorApplicationStatus.valueOf(status.toUpperCase());
+                statusEnum = VendorApplicationStatus.valueOf(status.toUpperCase(Locale.ROOT));
             } catch (IllegalArgumentException ex) {
                 throw new BusinessException(ErrorCode.VALIDATION_ERROR, "非法状态值: " + status);
             }
