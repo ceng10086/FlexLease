@@ -1,12 +1,11 @@
 # 数据库迁移说明
 
-FlexLease 采用 **Flyway + PostgreSQL** 管理多租户 schema。每个微服务在启动时都会校验/创建自身 schema 与表结构，根目录下的 `db/` 目录则用于集中存放示例脚本及跨服务协作时的基线设计。
+FlexLease 采用 **Flyway + PostgreSQL**，按微服务拆分 schema。每个微服务在启动时都会校验/创建自身 schema 与表结构；根目录下的 `db/` 目录用于集中存放示例脚本及跨服务协作时的基线设计。
 
 ## 拆分策略
 
 - 业务域与 schema 一一对应：`auth`、`users`、`product`、`order`、`payment`、`notification`。
 - 所有主键使用 `UUID`，时间采用 `TIMESTAMP WITH TIME ZONE`；金额字段以 `NUMERIC(18,2)` 为主（部分比例/快照字段会使用更适合的精度，例如抽成比例 `NUMERIC(5,4)`）。
-- 公共 schema（如 `platform-common`）仅包含视图/序列，不直接建表。
 
 ## 目录布局
 

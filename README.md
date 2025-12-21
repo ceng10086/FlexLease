@@ -95,8 +95,8 @@ FlexLease 面向 B2C 场景，为厂商与消费者提供从入驻、商品配�
 - `flexlease.bootstrap.admin.username/password` 控制认证服务默认管理员账号；`FLEXLEASE_STORAGE_ROOT` 指定商品媒体文件目录；`FLEXLEASE_*_BASE_URL` 用于跨服务调用（order→product/payment/notification 等）。
 - `FLEXLEASE_PAYMENT_AUTO_CONFIRM`（或 `flexlease.payment.auto-confirm`）控制支付是否自动成功；`FLEXLEASE_ORDER_MAINTENANCE_PENDING_PAYMENT_EXPIRE_MINUTES` 与 `FLEXLEASE_ORDER_MAINTENANCE_SCAN_INTERVAL_MS` 调整待支付超时策略；`FLEXLEASE_MESSAGING_ENABLED` 与 `FLEXLEASE_REDIS_ENABLED` 可在开发环境禁用 RabbitMQ 或 Redis 依赖。
 - `flexlease.notification-service.base-url` 被多个服务用于调用通知服务（站内信），如需联调自定义域名请统一覆盖相关服务配置。
-- `flexlease.order.proof-policy.*`（含 `shipment-photo-required/receive-photo-required/return-photo-required` 等字段）与 `FLEXLEASE_ORDER_PROOF_ROOT` 控制取证最低数量与存储目录，可按实际履约规范调整照片/视频要求及水印文案。
-- 如需使用“LLM 仲裁建议”（或运行包含该步骤的 E2E），在仓库根目录创建 `.env` 并填写 `FLEXLEASE_LLM_API_KEY`（参考 `.env.example`），详见 `docs/纠纷仲裁智能助手.md`。
+- `flexlease.order.proof-policy.*`（如 `shipment-photo-required/shipment-video-required/receive-photo-required/receive-video-required/return-photo-required/return-video-required`）与 `FLEXLEASE_ORDER_PROOF_ROOT` 控制取证最低数量与存储目录，可按实际履约规范调整照片/视频要求及水印文案。
+- 如需使用“LLM 仲裁建议”（或运行包含该步骤的 E2E），在仓库根目录创建 `.env` 并填写 `FLEXLEASE_LLM_API_KEY`（参考 `.env.example`）。`order-service` 本地默认关闭该能力（`FLEXLEASE_LLM_ENABLED=false`）；若用 Compose 且无外部 LLM Key/网络，请显式关闭并避免点击“生成仲裁建议”。详见 `docs/纠纷仲裁智能助手.md`。
 
 ## 多角色能力速览
 
