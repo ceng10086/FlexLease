@@ -124,6 +124,45 @@ class AuthServiceApplicationTests {
     }
 
     @Test
+    void phoneRegistrationFlow() throws Exception {
+        String customerPhone = "15812345678";
+        String vendorPhone = "15912345678";
+        String password = "Password1";
+
+        mockMvc.perform(post("/api/v1/auth/register/customer")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(java.util.Map.of(
+                                "username", customerPhone,
+                                "password", password
+                        ))))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/auth/token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(java.util.Map.of(
+                                "username", customerPhone,
+                                "password", password
+                        ))))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/auth/register/vendor")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(java.util.Map.of(
+                                "username", vendorPhone,
+                                "password", password
+                        ))))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/auth/token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(java.util.Map.of(
+                                "username", vendorPhone,
+                                "password", password
+                        ))))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void passwordResetAndTokenRefreshFlow() throws Exception {
         String username = "tester" + java.util.UUID.randomUUID() + "@example.com";
         String password = "Initial1";
