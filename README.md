@@ -50,6 +50,7 @@ FlexLease 面向 B2C 场景，为厂商与消费者提供从入驻、商品配�
   - `ProofPolicyService` 对外暴露 `/api/v1/proof-policy`，统一告知各阶段最小凭证数量与拍摄角度，并由 `ProofStorageService` 对图片自动打水印；其中 `watermarkExample` 为水印说明文本（前端按文本展示，若为 URL 则打开示例资源）。为保证中文水印正常显示，`order-service` 镜像包含 `fonts-noto-cjk` 字体包。
   - `OrderDisputeService`（`backend/order-service/src/main/java/com/flexlease/order/service/OrderDisputeService.java`）封装纠纷创建→协商→升级仲裁→平台裁决→信用扣分→满意度调查的全流程，管理员可在 `/api/v1/admin/orders/{id}/disputes/{disputeId}/resolve` 直接裁决，并支持 `maliciousBehavior` 标志自动触发恶意行为惩罚；双方在发起/回应纠纷时可同步上传多媒体附件与电话纪要，信息将写入时间线与抽屉附件列表。
   - 纠纷进入平台仲裁后，管理员可一键生成“LLM 仲裁建议”（结构化 JSON，包含事实摘要/缺失证据/建议裁决/话术草稿），接口为 `/api/v1/admin/orders/{id}/disputes/{disputeId}/ai-suggestion`；配置方式见 `docs/纠纷仲裁智能助手.md`。
+    - 说明：仲裁建议的自然语言内容默认按 **中文** 输出（枚举值如 `recommendedDecision.option` 仍为固定英文枚举）。
   - 纠纷调度新增多阶段倒计时提醒（24小时、6小时、1小时前各提醒一次）与超时自动升级逻辑；用户二次申诉进入 `PENDING_REVIEW_PANEL` 状态可由 `ADMIN` 或 `REVIEW_PANEL` 角色裁决，避免“申诉后无人结案”卡死。
   - 满意度调研由 `OrderSurveyService` 定时激活 `/orders/{id}/surveys` 调查，支持双方打分与评价，并追加时间线+站内信提醒。
   - 平台/厂商运营指标、管理员强制关闭、待支付订单自动取消调度。
@@ -96,7 +97,7 @@ FlexLease 面向 B2C 场景，为厂商与消费者提供从入驻、商品配�
 - `FLEXLEASE_PAYMENT_AUTO_CONFIRM`（或 `flexlease.payment.auto-confirm`）控制支付是否自动成功；`FLEXLEASE_ORDER_MAINTENANCE_PENDING_PAYMENT_EXPIRE_MINUTES` 与 `FLEXLEASE_ORDER_MAINTENANCE_SCAN_INTERVAL_MS` 调整待支付超时策略；`FLEXLEASE_MESSAGING_ENABLED` 与 `FLEXLEASE_REDIS_ENABLED` 可在开发环境禁用 RabbitMQ 或 Redis 依赖。
 - `flexlease.notification-service.base-url` 被多个服务用于调用通知服务（站内信），如需联调自定义域名请统一覆盖相关服务配置。
 - `flexlease.order.proof-policy.*`（如 `shipment-photo-required/shipment-video-required/receive-photo-required/receive-video-required/return-photo-required/return-video-required`）与 `FLEXLEASE_ORDER_PROOF_ROOT` 控制取证最低数量与存储目录，可按实际履约规范调整照片/视频要求及水印文案。
-- 如需使用“LLM 仲裁建议”（或运行包含该步骤的 E2E），在仓库根目录创建 `.env` 并填写 `FLEXLEASE_LLM_API_KEY`（参考 `.env.example`）。`order-service` 本地默认关闭该能力（`FLEXLEASE_LLM_ENABLED=false`）；若用 Compose 且无外部 LLM Key/网络，请显式关闭并避免点击“生成仲裁建议”。详见 `docs/纠纷仲裁智能助手.md`。
+- 如需使用“LLM 仲裁建议”（或运行包含该步骤的 E2E），在仓库根目录创建 `.env` 并填写 `FLEXLEASE_LLM_API_KEY`（参考 `.env.example`）。`order-service` 本地默认关闭该能力（`FLEXLEASE_LLM_ENABLED=false`）；若用 Compose 且无外部 LLM Key/网络，请显式关闭并避免点击“生成仲裁建议”。详见 `docs/纠纷仲裁智能助手.md`（含中文输出约束）。
 
 ## 多角色能力速览
 

@@ -44,7 +44,7 @@ import org.springframework.util.StringUtils;
 public class DisputeAiSuggestionService {
 
     private static final Logger LOG = LoggerFactory.getLogger(DisputeAiSuggestionService.class);
-    private static final String PROMPT_VERSION = "v1";
+    private static final String PROMPT_VERSION = "v2";
 
     private static final Pattern PHONE_PATTERN = Pattern.compile("(\\b\\d{3})\\d{4}(\\d{4}\\b)");
     private static final Pattern EMAIL_PATTERN = Pattern.compile("([A-Za-z0-9._%+-]{1,3})[A-Za-z0-9._%+-]*(@[A-Za-z0-9.-]+\\.[A-Za-z]{2,})");
@@ -85,7 +85,9 @@ public class DisputeAiSuggestionService {
         if (!force) {
             var existing = suggestionRepository.findByDisputeId(disputeId).orElse(null);
             if (existing != null) {
-                return parseStored(existing.getOutputJson(), existing.getModel(), existing.getCreatedAt());
+                if (PROMPT_VERSION.equals(existing.getPromptVersion())) {
+                    return parseStored(existing.getOutputJson(), existing.getModel(), existing.getCreatedAt());
+                }
             }
         }
 
@@ -475,34 +477,47 @@ public class DisputeAiSuggestionService {
 
     private String buildSystemPrompt() {
         return """
-                You are an "order dispute arbitration assistant" for a rental marketplace.
-                The user will provide an input JSON that contains order / dispute / evidence / timeline / policy data.
-                Please read it and output a JSON object ONLY (no markdown, no extra text).
+                                你是一个面向共享租赁平台的“订单纠纷仲裁助手”。
+                                用户会提供一段输入 JSON，包含订单 / 纠纷 / 取证材料元信息 / 时间线 / 取证政策 / 平台规则等数据。
+                                你需要阅读输入并输出“仲裁建议”。
 
-                IMPORTANT: The output must be a valid json object. Fill missing fields with empty strings/arrays.
-                Do NOT fabricate facts that are not present in the input.
+                                输出要求（非常重要）：
+                                1) 只输出一个 JSON 对象（不要输出 Markdown、不要输出解释、不要输出额外文本）。
+                                2) 必须是严格有效的 JSON（双引号、无注释、无尾随逗号）。
+                                3) 除枚举值/字段名等固定值外，所有自然语言内容必须使用中文输出。
+                                     - 允许的“非中文”仅包括：字段名、JSON 结构、recommendedDecision.option 的枚举值（例如 REDELIVER）。
+                                4) 不要编造输入中不存在的事实；对于不确定/缺失的信息，请在 missingEvidence 中说明需要谁补充什么证据以及原因。
+                                5) 字段缺失时用空字符串/空数组补齐，保持结构完整。
 
-                EXAMPLE JSON OUTPUT:
+                                结构约束：
+                                - recommendedDecision.option 必须是 input.platformRules.disputeResolutionOptions 之一。
+                                - recommendedDecision.creditDelta 范围为 [-30, 30]；正数表示扣分，负数表示加分。
+                                - recommendedDecision.maliciousBehavior 为布尔值；如判断存在恶意行为，请置为 true 并在理由中说明依据。
+
+                                示例输出（仅示例，内容请以输入为准）：
                 {
-                  "summary": "Short factual summary that can be verified.",
-                  "keyFacts": ["fact1", "fact2"],
-                  "missingEvidence": [{"who":"USER","need":"...","why":"..."}],
-                  "recommendedDecision": {"option":"REDELIVER","creditDelta":0,"maliciousBehavior":false,"rationale":"..."},
-                  "draftMessages": {"toUser":"...","toVendor":"..."},
-                  "riskNotes": ["..."]
+                                    "summary": "对纠纷事实的简要、可核验的中文摘要。",
+                                    "keyFacts": ["要点1", "要点2"],
+                                    "missingEvidence": [{"who":"USER","need":"需要补充的证据","why":"为什么需要该证据"}],
+                                    "recommendedDecision": {"option":"REDELIVER","creditDelta":0,"maliciousBehavior":false,"rationale":"给出中文理由，引用输入中的证据/时间线"},
+                                    "draftMessages": {"toUser":"给用户的中文通知话术草稿","toVendor":"给商家的中文通知话术草稿"},
+                                    "riskNotes": ["风险提示（中文）"]
                 }
                 """.trim();
     }
 
     private String buildUserPrompt(String tone, String inputJson) {
         return """
-                Please generate the arbitration suggestion in json format. tone=%s
+                请根据输入生成“纠纷仲裁建议”的 JSON 输出。语气参数 tone=%s（用于控制措辞风格，但请保持客观、克制、可执行）。
 
-                Constraints:
-                - option must be one of input.platformRules.disputeResolutionOptions
-                - creditDelta range is [-30,30] (positive=penalty, negative=reward)
+                约束：
+                - 只输出一个 JSON 对象，且必须是严格有效 JSON。
+                - 除 recommendedDecision.option 的枚举值外，所有自然语言字段必须用中文。
+                - recommendedDecision.option 必须是 input.platformRules.disputeResolutionOptions 之一。
+                - recommendedDecision.creditDelta 范围为 [-30,30]（正数=扣分，负数=加分）。
+                - 不要编造事实；缺失信息请放到 missingEvidence。
 
-                INPUT JSON:
+                输入 JSON：
                 %s
                 """.formatted(tone, inputJson).trim();
     }
