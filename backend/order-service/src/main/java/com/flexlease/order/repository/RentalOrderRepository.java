@@ -53,17 +53,40 @@ public interface RentalOrderRepository extends JpaRepository<RentalOrder, UUID>,
     @Query("select o.status as status, count(o) as count from RentalOrder o where o.vendorId = :vendorId group by o.status")
     List<OrderStatusCount> aggregateStatusByVendor(@Param("vendorId") UUID vendorId);
 
-    @Query("select coalesce(sum(o.totalAmount), 0) from RentalOrder o where o.status in :statuses")
+    @Query("""
+            select coalesce(sum(
+                o.totalAmount +
+                case when o.status = com.flexlease.order.domain.OrderStatus.BUYOUT_COMPLETED
+                     then coalesce(o.buyoutAmount, 0)
+                     else 0 end
+            ), 0)
+            from RentalOrder o
+            where o.status in :statuses
+            """)
     BigDecimal sumTotalAmountByStatusIn(@Param("statuses") Collection<OrderStatus> statuses);
 
-    @Query("select coalesce(sum(o.totalAmount), 0) from RentalOrder o where o.vendorId = :vendorId and o.status in :statuses")
+    @Query("""
+            select coalesce(sum(
+                o.totalAmount +
+                case when o.status = com.flexlease.order.domain.OrderStatus.BUYOUT_COMPLETED
+                     then coalesce(o.buyoutAmount, 0)
+                     else 0 end
+            ), 0)
+            from RentalOrder o
+            where o.vendorId = :vendorId and o.status in :statuses
+            """)
     BigDecimal sumTotalAmountByVendorIdAndStatusIn(@Param("vendorId") UUID vendorId,
                                                    @Param("statuses") Collection<OrderStatus> statuses);
 
     @Query("""
             select cast(coalesce(o.leaseStartAt, o.createdAt) as date) as day,
                    count(o) as orderCount,
-                   coalesce(sum(o.totalAmount), 0) as totalAmount
+                     coalesce(sum(
+                          o.totalAmount +
+                          case when o.status = com.flexlease.order.domain.OrderStatus.BUYOUT_COMPLETED
+                                then coalesce(o.buyoutAmount, 0)
+                                else 0 end
+                     ), 0) as totalAmount
             from RentalOrder o
             where coalesce(o.leaseStartAt, o.createdAt) between :start and :end
             group by cast(coalesce(o.leaseStartAt, o.createdAt) as date)
@@ -74,7 +97,12 @@ public interface RentalOrderRepository extends JpaRepository<RentalOrder, UUID>,
     @Query("""
             select cast(coalesce(o.leaseStartAt, o.createdAt) as date) as day,
                    count(o) as orderCount,
-                   coalesce(sum(o.totalAmount), 0) as totalAmount
+                     coalesce(sum(
+                          o.totalAmount +
+                          case when o.status = com.flexlease.order.domain.OrderStatus.BUYOUT_COMPLETED
+                                then coalesce(o.buyoutAmount, 0)
+                                else 0 end
+                     ), 0) as totalAmount
             from RentalOrder o
             where o.vendorId = :vendorId and coalesce(o.leaseStartAt, o.createdAt) between :start and :end
             group by cast(coalesce(o.leaseStartAt, o.createdAt) as date)
@@ -87,7 +115,12 @@ public interface RentalOrderRepository extends JpaRepository<RentalOrder, UUID>,
     @Query("""
             select coalesce(o.planType, 'UNKNOWN') as planType,
                    count(o) as orderCount,
-                   coalesce(sum(o.totalAmount), 0) as totalAmount
+                     coalesce(sum(
+                          o.totalAmount +
+                          case when o.status = com.flexlease.order.domain.OrderStatus.BUYOUT_COMPLETED
+                                then coalesce(o.buyoutAmount, 0)
+                                else 0 end
+                     ), 0) as totalAmount
             from RentalOrder o
             group by coalesce(o.planType, 'UNKNOWN')
             """)
@@ -96,7 +129,12 @@ public interface RentalOrderRepository extends JpaRepository<RentalOrder, UUID>,
     @Query("""
             select coalesce(o.planType, 'UNKNOWN') as planType,
                    count(o) as orderCount,
-                   coalesce(sum(o.totalAmount), 0) as totalAmount
+                     coalesce(sum(
+                          o.totalAmount +
+                          case when o.status = com.flexlease.order.domain.OrderStatus.BUYOUT_COMPLETED
+                                then coalesce(o.buyoutAmount, 0)
+                                else 0 end
+                     ), 0) as totalAmount
             from RentalOrder o
             where o.vendorId = :vendorId
             group by coalesce(o.planType, 'UNKNOWN')

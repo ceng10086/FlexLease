@@ -73,16 +73,24 @@ class OrderAnalyticsServiceIntegrationTest {
         );
         cancelled.cancel();
         rentalOrderRepository.save(cancelled);
+
+        RentalOrder buyoutCompleted = createBuyoutCompletedOrder(
+            new BigDecimal("120.00"),
+            new BigDecimal("80.00"),
+            "RENT_TO_OWN",
+            now.minusDays(1)
+        );
+        rentalOrderRepository.save(buyoutCompleted);
     }
 
     @Test
     void shouldCalculateDashboardMetrics() {
         DashboardMetricsResponse response = orderAnalyticsService.getDashboardMetrics();
-        assertThat(response.totalOrders()).isEqualTo(4);
+        assertThat(response.totalOrders()).isEqualTo(5);
         assertThat(response.activeOrders()).isEqualTo(3);
         assertThat(response.inLeaseCount()).isEqualTo(1);
         assertThat(response.pendingReturns()).isEqualTo(1);
-        assertThat(response.totalGmv()).isEqualByComparingTo("600.00");
+        assertThat(response.totalGmv()).isEqualByComparingTo("800.00");
         assertThat(response.ordersByStatus().get(OrderStatus.RETURN_REQUESTED)).isEqualTo(1);
         assertThat(response.recentTrend()).hasSize(7);
         assertThat(response.recentTrend().getLast().gmv()).isNotNull();
@@ -90,7 +98,7 @@ class OrderAnalyticsServiceIntegrationTest {
                 .extracting(PlanTypeMetric::planType)
                 .contains("STANDARD", "RENT_TO_OWN", "LEASE_TO_SALE");
         assertThat(response.creditMetrics()).isNotNull();
-        assertThat(response.creditMetrics().tierDistribution().get(CreditTier.STANDARD)).isEqualTo(4);
+        assertThat(response.creditMetrics().tierDistribution().get(CreditTier.STANDARD)).isEqualTo(5);
         assertThat(response.disputeMetrics()).isNotNull();
         assertThat(response.surveyMetrics()).isNotNull();
     }
@@ -98,15 +106,26 @@ class OrderAnalyticsServiceIntegrationTest {
     @Test
     void shouldCalculateVendorMetrics() {
         VendorMetricsResponse response = orderAnalyticsService.getVendorMetrics(vendorId);
-        assertThat(response.totalOrders()).isEqualTo(4);
+        assertThat(response.totalOrders()).isEqualTo(5);
         assertThat(response.activeOrders()).isEqualTo(3);
         assertThat(response.pendingReturns()).isEqualTo(1);
-        assertThat(response.totalGmv()).isEqualByComparingTo("600.00");
+        assertThat(response.totalGmv()).isEqualByComparingTo("800.00");
         assertThat(response.recentTrend()).hasSize(7);
         assertThat(response.planBreakdown()).isNotEmpty();
         assertThat(response.creditMetrics()).isNotNull();
         assertThat(response.disputeMetrics()).isNotNull();
         assertThat(response.surveyMetrics()).isNotNull();
+    }
+
+    private RentalOrder createBuyoutCompletedOrder(BigDecimal totalAmount,
+                                                   BigDecimal buyoutAmount,
+                                                   String planType,
+                                                   OffsetDateTime leaseStart) {
+        RentalOrder order = createOrder(OrderStatus.IN_LEASE, totalAmount, planType, leaseStart);
+        order.requestBuyout();
+        order.updateBuyoutAmount(buyoutAmount);
+        order.confirmBuyout();
+        return order;
     }
 
     private RentalOrder createOrder(OrderStatus targetStatus,

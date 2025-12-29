@@ -117,6 +117,8 @@
                 </div>
                 <div class="action-card" v-if="isBuyoutRequested">
                   <h4>买断审批</h4>
+                  <p v-if="order.buyoutAmount != null">买断金额：¥{{ formatCurrency(order.buyoutAmount) }}</p>
+                  <p v-else class="text-muted">用户未填写买断金额。</p>
                   <a-space>
                     <a-button :loading="buyoutDecision.loading" @click="handleBuyoutDecision(false)">
                       驳回
