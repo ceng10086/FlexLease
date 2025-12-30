@@ -248,18 +248,18 @@ public class PaymentTransactionService {
             throw new BusinessException(ErrorCode.VALIDATION_ERROR, "退款开始时间不能晚于结束时间");
         }
         Specification<PaymentTransaction> specification = (root, query, cb) -> {
-            var predicates = cb.conjunction();
-            predicates.getExpressions().add(cb.equal(root.get("status"), PaymentStatus.SUCCEEDED));
+            var predicates = new ArrayList<jakarta.persistence.criteria.Predicate>();
+            predicates.add(cb.equal(root.get("status"), PaymentStatus.SUCCEEDED));
             if (vendorId != null) {
-                predicates.getExpressions().add(cb.equal(root.get("vendorId"), vendorId));
+                predicates.add(cb.equal(root.get("vendorId"), vendorId));
             }
             if (from != null) {
-                predicates.getExpressions().add(cb.greaterThanOrEqualTo(root.get("paidAt"), from));
+                predicates.add(cb.greaterThanOrEqualTo(root.get("paidAt"), from));
             }
             if (to != null) {
-                predicates.getExpressions().add(cb.lessThanOrEqualTo(root.get("paidAt"), to));
+                predicates.add(cb.lessThanOrEqualTo(root.get("paidAt"), to));
             }
-            return predicates;
+            return cb.and(predicates.toArray(jakarta.persistence.criteria.Predicate[]::new));
         };
         List<PaymentTransaction> transactions = paymentTransactionRepository.findAll(specification, Sort.by(Sort.Direction.ASC, "paidAt"));
         Map<UUID, SettlementAccumulator> grouped = new LinkedHashMap<>();

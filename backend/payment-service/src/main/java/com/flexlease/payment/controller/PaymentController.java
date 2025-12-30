@@ -106,14 +106,14 @@ public class PaymentController {
     }
 
     @GetMapping("/settlements")
-    public ApiResponse<List<PaymentSettlementResponse>> settlements(@RequestParam(required = false) UUID vendorId,
-                                                                    @RequestParam(required = false)
+    public ApiResponse<List<PaymentSettlementResponse>> settlements(@RequestParam(value = "vendorId", required = false) UUID vendorId,
+                                                                    @RequestParam(value = "from", required = false)
                                                                     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime from,
-                                                                    @RequestParam(required = false)
+                                                                    @RequestParam(value = "to", required = false)
                                                                     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime to,
-                                                                    @RequestParam(required = false)
+                                                                    @RequestParam(value = "refundFrom", required = false)
                                                                     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime refundFrom,
-                                                                    @RequestParam(required = false)
+                                                                    @RequestParam(value = "refundTo", required = false)
                                                                     @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) OffsetDateTime refundTo) {
         FlexleasePrincipal principal = SecurityUtils.requirePrincipal();
         UUID effectiveVendorId = vendorId;
