@@ -106,9 +106,6 @@ public class VendorApplicationService {
         if (existing.getStatus() == VendorApplicationStatus.SUBMITTED) {
             throw new BusinessException(ErrorCode.DUPLICATE_RESOURCE, "申请正在审核中，请勿重复提交");
         }
-        if (existing.getStatus() == VendorApplicationStatus.APPROVED) {
-            throw new BusinessException(ErrorCode.DUPLICATE_RESOURCE, "申请已通过，无需重复提交");
-        }
         boolean codeChanged = request.unifiedSocialCode() != null
                 && !request.unifiedSocialCode().equalsIgnoreCase(existing.getUnifiedSocialCode());
         if (codeChanged && vendorApplicationRepository.existsByUnifiedSocialCode(request.unifiedSocialCode())) {

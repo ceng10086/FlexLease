@@ -26,6 +26,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import com.flexlease.user.repository.VendorRepository;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
 
 @ActiveProfiles("test")
 @TestPropertySource(properties = {
@@ -77,7 +78,7 @@ class UserServiceApplicationTests {
             .andExpect(status().isOk())
             .andReturn();
 
-        JsonNode submitNode = objectMapper.readTree(submitResult.getResponse().getContentAsString());
+        JsonNode submitNode = readJson(submitResult);
         String applicationId = submitNode.at("/data/id").asText();
         assertThat(applicationId).isNotBlank();
 
@@ -90,22 +91,66 @@ class UserServiceApplicationTests {
             .andExpect(status().isOk())
             .andReturn();
 
-        JsonNode approveNode = objectMapper.readTree(approveResult.getResponse().getContentAsString());
+        JsonNode approveNode = readJson(approveResult);
         assertThat(approveNode.at("/data/status").asText()).isEqualTo("APPROVED");
 
-        verify(authServiceClient).activateAccount(ownerId);
+        verify(authServiceClient, times(1)).activateAccount(ownerId);
 
         UUID vendorId = vendorRepository.findAll().stream()
                 .findFirst()
                 .map(com.flexlease.user.domain.Vendor::getId)
                 .orElseThrow();
 
-        verify(authServiceClient).assignVendor(ownerId, vendorId);
+        verify(authServiceClient, times(1)).assignVendor(ownerId, vendorId);
+
+        var changeRequestPayload = java.util.Map.of(
+            "companyName", "测试科技有限公司（变更）",
+            "unifiedSocialCode", "91330100792301234X",
+            "contactName", "张三（更新）",
+            "contactPhone", "18800009999",
+            "contactEmail", "new-contact@example.com",
+            "province", "浙江省",
+            "city", "杭州市",
+            "address", "未来科技城 2 号楼"
+        );
+
+        MvcResult resubmitResult = mockMvc.perform(post("/api/v1/vendors/applications")
+                .header(HttpHeaders.AUTHORIZATION, vendorToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(changeRequestPayload)))
+            .andExpect(status().isOk())
+            .andReturn();
+
+        JsonNode resubmitNode = readJson(resubmitResult);
+        assertThat(resubmitNode.at("/data/id").asText()).isEqualTo(applicationId);
+        assertThat(resubmitNode.at("/data/status").asText()).isEqualTo("SUBMITTED");
+        assertThat(resubmitNode.at("/data/companyName").asText()).contains("变更");
+
+        MvcResult approveAgainResult = mockMvc.perform(post("/api/v1/vendors/applications/" + applicationId + "/approve")
+                .header(HttpHeaders.AUTHORIZATION, adminToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(java.util.Map.of(
+                    "remark", "变更材料齐全"
+                ))))
+            .andExpect(status().isOk())
+            .andReturn();
+
+        JsonNode approveAgainNode = readJson(approveAgainResult);
+        assertThat(approveAgainNode.at("/data/status").asText()).isEqualTo("APPROVED");
+
+        verify(authServiceClient, times(2)).activateAccount(ownerId);
+        verify(authServiceClient, times(2)).assignVendor(ownerId, vendorId);
 
         mockMvc.perform(get("/api/v1/vendors/" + vendorId)
                 .header(HttpHeaders.AUTHORIZATION, vendorToken))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.data.id").value(vendorId.toString()));
+
+        mockMvc.perform(get("/api/v1/vendors/" + vendorId)
+                .header(HttpHeaders.AUTHORIZATION, vendorToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.companyName").value("测试科技有限公司（变更）"))
+            .andExpect(jsonPath("$.data.contactPhone").value("18800009999"));
 
         var ownerUpdatePayload = java.util.Map.of(
             "contactName", "李运营",

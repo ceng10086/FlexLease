@@ -64,10 +64,10 @@
       <section class="surface-card onboarding-panel">
         <h3>提交新申请</h3>
         <a-alert
-          v-if="!canSubmit"
-          type="info"
+          v-if="submitGuard"
+          :type="submitGuard.type"
           show-icon
-          message="当前申请仍在审核中，如需修改请等待结果后再提交。"
+          :message="submitGuard.message"
           class="mt-3"
         />
         <a-form layout="vertical" class="mt-3" @submit.prevent>
@@ -130,7 +130,7 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, reactive, ref } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import { message } from 'ant-design-vue';
 import PageShell from '../../../components/layout/PageShell.vue';
 import PageHeader from '../../../components/layout/PageHeader.vue';
@@ -173,7 +173,53 @@ const myApplications = computed(() => {
 });
 
 const latestApplication = computed(() => myApplications.value.at(0) ?? null);
-const canSubmit = computed(() => !latestApplication.value || latestApplication.value.status === 'REJECTED');
+const canSubmit = computed(() => {
+  const status = latestApplication.value?.status;
+  return !status || status === 'REJECTED' || status === 'APPROVED';
+});
+
+const submitGuard = computed<null | { type: 'info' | 'success'; message: string }>(() => {
+  const status = latestApplication.value?.status;
+  if (!status || canSubmit.value) {
+    return null;
+  }
+  if (status === 'SUBMITTED') {
+    return { type: 'info', message: '当前申请仍在审核中，如需修改请等待结果后再提交。' };
+  }
+  return { type: 'info', message: '当前申请暂不可重复提交，请等待状态更新。' };
+});
+
+watch(
+  latestApplication,
+  (application) => {
+    if (!application) {
+      return;
+    }
+    const isFormEmpty = !form.companyName
+      && !form.unifiedSocialCode
+      && !form.contactName
+      && !form.contactPhone
+      && !form.contactEmail
+      && !form.province
+      && !form.city
+      && !form.address;
+
+    if (!isFormEmpty) {
+      return;
+    }
+    Object.assign(form, {
+      companyName: application.companyName ?? '',
+      unifiedSocialCode: application.unifiedSocialCode ?? '',
+      contactName: application.contactName ?? '',
+      contactPhone: application.contactPhone ?? '',
+      contactEmail: application.contactEmail ?? '',
+      province: application.province ?? '',
+      city: application.city ?? '',
+      address: application.address ?? ''
+    });
+  },
+  { immediate: true }
+);
 const currentStep = computed(() => {
   const status = latestApplication.value?.status ?? 'DRAFT';
   if (status === 'APPROVED') {
