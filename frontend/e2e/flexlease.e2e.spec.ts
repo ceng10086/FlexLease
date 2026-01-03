@@ -9,6 +9,11 @@ const adminCreds = {
   password: process.env.E2E_ADMIN_PASSWORD ?? 'Admin@123'
 };
 
+const arbitratorCreds = {
+  username: process.env.E2E_ARBITRATOR_USERNAME ?? 'arbitrator@flexlease.test',
+  password: process.env.E2E_ARBITRATOR_PASSWORD ?? 'Arbitrator@123'
+};
+
 const passwords = {
   user: process.env.E2E_USER_PASSWORD ?? 'Test@123456',
   vendor: process.env.E2E_VENDOR_PASSWORD ?? 'Vendor@123456'
@@ -791,9 +796,9 @@ async function userUploadInspectionProof(page: Page, orderNo: string) {
   await expect(page.getByText('已上传凭证').first()).toBeVisible({ timeout: 60_000 });
 }
 
-async function adminResolveDispute(page: Page, orderNo: string, penalizeDelta: number) {
-  await gotoPath(page, '/app/admin/orders');
-  await expect(page.getByRole('main').getByRole('heading', { name: '订单监控' })).toBeVisible();
+async function arbitratorResolveDispute(page: Page, orderNo: string, penalizeDelta: number) {
+  await gotoPath(page, '/app/arbitration/orders');
+  await expect(page.getByRole('main').getByRole('heading', { name: '仲裁中心' })).toBeVisible();
 
   const card = page.locator('.admin-card', { hasText: orderNo }).first();
   await expect(card).toBeVisible({ timeout: 60_000 });
@@ -1180,7 +1185,11 @@ test.describe.serial('FlexLease E2E（由 playwright-mcp 操作转换）', () =>
 
     const creditBeforePenalty = await readCreditScoreFromProfile(userPage);
     await userDisputeAndEscalate(userPage, order1.orderNo);
-    await adminResolveDispute(adminPage, order1.orderNo, 5);
+    await logoutIfNeeded(adminPage);
+    await login(adminPage, arbitratorCreds.username, arbitratorCreds.password);
+    await arbitratorResolveDispute(adminPage, order1.orderNo, 5);
+    await logoutIfNeeded(adminPage);
+    await login(adminPage, adminCreds.username, adminCreds.password);
     const creditAfterPenalty = await readCreditScoreFromProfile(userPage);
     expect(creditAfterPenalty).toBeLessThanOrEqual(creditBeforePenalty - 5);
 

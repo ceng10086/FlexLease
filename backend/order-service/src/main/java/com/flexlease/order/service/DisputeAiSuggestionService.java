@@ -77,7 +77,7 @@ public class DisputeAiSuggestionService {
     }
 
     public DisputeAiSuggestionResponse generate(UUID orderId, UUID disputeId, DisputeAiSuggestionRequest request) {
-        SecurityUtils.requireRole("ADMIN");
+        SecurityUtils.requireRole("ARBITRATOR");
         RentalOrder order = loadOrder(orderId);
         OrderDispute dispute = loadDispute(orderId, disputeId);
 
@@ -117,7 +117,7 @@ public class DisputeAiSuggestionService {
                 "AI 仲裁建议已生成",
                 SecurityUtils.requireUserId(),
                 Map.of("disputeId", disputeId.toString(), "promptVersion", PROMPT_VERSION),
-                OrderActorRole.ADMIN
+                OrderActorRole.ARBITRATOR
         );
 
         return enriched;

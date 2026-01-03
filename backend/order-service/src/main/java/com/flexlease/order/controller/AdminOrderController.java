@@ -44,14 +44,14 @@ public class AdminOrderController {
         UUID userUuid = parseUuid(userId, "userId");
         UUID vendorUuid = parseUuid(vendorId, "vendorId");
         OrderStatus statusEnum = parseStatus(status);
-        SecurityUtils.requireRole("ADMIN");
+        SecurityUtils.requireAnyRole("ADMIN", "ARBITRATOR", "REVIEW_PANEL");
         Pageable pageable = PageRequest.of(Math.max(page - 1, 0), Math.max(1, Math.min(size, 100)), Sort.by(Sort.Direction.DESC, "createdAt"));
         return ApiResponse.success(rentalOrderService.listOrdersForAdmin(userUuid, vendorUuid, statusEnum, manualReviewOnly, pageable));
     }
 
     @GetMapping("/{orderId}")
     public ApiResponse<RentalOrderResponse> getOrder(@PathVariable UUID orderId) {
-        SecurityUtils.requireRole("ADMIN");
+        SecurityUtils.requireAnyRole("ADMIN", "ARBITRATOR", "REVIEW_PANEL");
         return ApiResponse.success(rentalOrderService.getOrder(orderId));
     }
 

@@ -362,8 +362,8 @@ class RentalOrderServiceIntegrationTest {
         }
 
         OrderDisputeResponse resolved;
-        UUID adminId = UUID.randomUUID();
-        try (SecurityContextHandle ignored = withPrincipal(adminId, "admin", "ADMIN")) {
+        UUID arbitratorId = UUID.randomUUID();
+        try (SecurityContextHandle ignored = withPrincipal(arbitratorId, "arbitrator", "ARBITRATOR")) {
             resolved = orderDisputeService.resolve(created.id(), opened.id(), new OrderDisputeResolveRequest(
                     DisputeResolutionOption.PARTIAL_REFUND,
                     12,
@@ -434,8 +434,8 @@ class RentalOrderServiceIntegrationTest {
             ));
         }
 
-        UUID adminId = UUID.randomUUID();
-        try (SecurityContextHandle ignored = withPrincipal(adminId, "admin", "ADMIN")) {
+        UUID arbitratorId = UUID.randomUUID();
+        try (SecurityContextHandle ignored = withPrincipal(arbitratorId, "arbitrator", "ARBITRATOR")) {
             orderDisputeService.resolve(created.id(), opened.id(), new OrderDisputeResolveRequest(
                     DisputeResolutionOption.PARTIAL_REFUND,
                     0,
@@ -453,7 +453,7 @@ class RentalOrderServiceIntegrationTest {
         }
         assertThat(appealed.status()).isEqualTo(OrderDisputeStatus.PENDING_REVIEW_PANEL);
 
-        try (SecurityContextHandle ignored = withPrincipal(adminId, "admin", "ADMIN")) {
+        try (SecurityContextHandle ignored = withPrincipal(arbitratorId, "review-panel", "REVIEW_PANEL")) {
             OrderDisputeResponse finalResolved = orderDisputeService.resolve(created.id(), opened.id(), new OrderDisputeResolveRequest(
                     DisputeResolutionOption.PARTIAL_REFUND,
                     0,
@@ -736,9 +736,9 @@ class RentalOrderServiceIntegrationTest {
                         ));
                 }
 
-                UUID adminId = UUID.randomUUID();
+                UUID arbitratorId = UUID.randomUUID();
                 OrderDisputeResponse resolved;
-                try (SecurityContextHandle ignored = withPrincipal(adminId, "admin", "ADMIN")) {
+                try (SecurityContextHandle ignored = withPrincipal(arbitratorId, "arbitrator", "ARBITRATOR")) {
                         resolved = orderDisputeService.resolve(created.id(), opened.id(), new OrderDisputeResolveRequest(
                                         DisputeResolutionOption.PARTIAL_REFUND,
                                         15,

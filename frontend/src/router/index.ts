@@ -141,6 +141,12 @@ const router = createRouter({
           meta: { roles: ['ADMIN'], navKey: 'admin-orders' }
         },
         {
+          path: 'arbitration/orders',
+          name: 'arbitration-orders',
+          component: () => import('../views/arbitration/ArbitrationOrderMonitorView.vue'),
+          meta: { roles: ['ARBITRATOR', 'REVIEW_PANEL'], navKey: 'arbitration-orders' }
+        },
+        {
           path: 'vendor/onboarding',
           name: 'vendor-onboarding',
           component: () => import('../views/vendor/onboarding/VendorOnboardingView.vue'),

@@ -261,17 +261,17 @@ public class OrderDisputeService {
         RentalOrder order = loadOrder(orderId);
         OrderDispute dispute = loadDispute(orderId, disputeId);
         if (dispute.getStatus() == OrderDisputeStatus.PENDING_REVIEW_PANEL) {
-            SecurityUtils.requireAnyRole("REVIEW_PANEL", "ADMIN");
+            SecurityUtils.requireRole("REVIEW_PANEL");
         } else {
-            SecurityUtils.requireRole("ADMIN");
+            SecurityUtils.requireRole("ARBITRATOR");
         }
-        UUID adminId = SecurityUtils.requireUserId();
+        UUID operatorId = SecurityUtils.requireUserId();
         Integer normalizedDelta = normalizeCreditDelta(request.penalizeUserDelta());
         boolean isMalicious = Boolean.TRUE.equals(request.maliciousBehavior());
         dispute.resolveByAdmin(
             request.decision(),
             StringUtils.hasText(request.remark()) ? request.remark().trim() : null,
-            adminId,
+            operatorId,
             normalizedDelta
         );
         Map<String, Object> resolutionAttributes = new java.util.HashMap<>();
@@ -285,9 +285,9 @@ public class OrderDisputeService {
         timelineService.append(order,
                 OrderEventType.DISPUTE_RESOLVED,
                 buildDecisionMessage(request, normalizedDelta, isMalicious),
-                adminId,
+                operatorId,
                 resolutionAttributes,
-                OrderActorRole.ADMIN);
+                resolvePlatformActorRole());
 
         // 处理恶意行为：扣 30 分并冻结账号 30 天
         if (isMalicious) {
@@ -317,6 +317,14 @@ public class OrderDisputeService {
         notifyResolutionTemplate(order, summary, dispute.getId());
         orderSurveyService.scheduleForDispute(order, dispute);
         return orderAssembler.toDisputeResponse(dispute);
+    }
+
+    private OrderActorRole resolvePlatformActorRole() {
+        FlexleasePrincipal principal = SecurityUtils.requirePrincipal();
+        if (principal.hasRole("REVIEW_PANEL")) {
+            return OrderActorRole.REVIEW_PANEL;
+        }
+        return OrderActorRole.ARBITRATOR;
     }
 
 
@@ -494,7 +502,10 @@ public class OrderDisputeService {
 
     private void ensureReadable(RentalOrder order) {
         FlexleasePrincipal principal = SecurityUtils.requirePrincipal();
-        if (principal.hasRole("ADMIN") || principal.hasRole("INTERNAL")) {
+        if (principal.hasRole("ADMIN")
+                || principal.hasRole("ARBITRATOR")
+                || principal.hasRole("REVIEW_PANEL")
+                || principal.hasRole("INTERNAL")) {
             return;
         }
         if (principal.hasRole("VENDOR")) {
@@ -522,6 +533,12 @@ public class OrderDisputeService {
         }
         if (principal.hasRole("ADMIN")) {
             return OrderActorRole.ADMIN;
+        }
+        if (principal.hasRole("ARBITRATOR")) {
+            return OrderActorRole.ARBITRATOR;
+        }
+        if (principal.hasRole("REVIEW_PANEL")) {
+            return OrderActorRole.REVIEW_PANEL;
         }
         if (principal.hasRole("INTERNAL")) {
             return OrderActorRole.INTERNAL;

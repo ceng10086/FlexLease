@@ -713,7 +713,10 @@ public class RentalOrderService {
 
     private void ensureOrderReadable(RentalOrder order) {
         FlexleasePrincipal principal = SecurityUtils.requirePrincipal();
-        if (principal.hasRole("ADMIN") || principal.hasRole("INTERNAL")) {
+        if (principal.hasRole("ADMIN")
+                || principal.hasRole("ARBITRATOR")
+                || principal.hasRole("REVIEW_PANEL")
+                || principal.hasRole("INTERNAL")) {
             return;
         }
         UUID principalUserId = principal.userId();
@@ -762,8 +765,11 @@ public class RentalOrderService {
 
     private void ensureAdminAccess() {
         FlexleasePrincipal principal = SecurityUtils.requirePrincipal();
-        if (!principal.hasRole("ADMIN") && !principal.hasRole("INTERNAL")) {
-            throw new BusinessException(ErrorCode.FORBIDDEN, "仅管理员可执行该操作");
+        if (!principal.hasRole("ADMIN")
+                && !principal.hasRole("ARBITRATOR")
+                && !principal.hasRole("REVIEW_PANEL")
+                && !principal.hasRole("INTERNAL")) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "仅平台管理/仲裁相关角色可执行该操作");
         }
     }
 
@@ -813,6 +819,12 @@ public class RentalOrderService {
         }
         if (principal.hasRole("ADMIN")) {
             return OrderActorRole.ADMIN;
+        }
+        if (principal.hasRole("ARBITRATOR")) {
+            return OrderActorRole.ARBITRATOR;
+        }
+        if (principal.hasRole("REVIEW_PANEL")) {
+            return OrderActorRole.REVIEW_PANEL;
         }
         if (principal.hasRole("INTERNAL")) {
             return OrderActorRole.INTERNAL;

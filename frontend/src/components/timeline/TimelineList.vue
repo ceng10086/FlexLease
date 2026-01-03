@@ -37,8 +37,10 @@ const ROLE_LABELS: Record<string, string> = {
   USER: '消费者',
   VENDOR: '厂商',
   ADMIN: '管理员',
+  ARBITRATOR: '仲裁管理',
+  REVIEW_PANEL: '复核组',
+  INTERNAL: '平台',
   SYSTEM: '系统',
-  REVIEW_PANEL: '复核组'
 };
 
 const props = defineProps<{

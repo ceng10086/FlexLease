@@ -61,6 +61,11 @@ export const disputeActorLabel = (role?: string | null) => {
     case 'VENDOR':
       return '厂商';
     case 'ADMIN':
+      return '平台管理员';
+    case 'ARBITRATOR':
+      return '仲裁管理';
+    case 'REVIEW_PANEL':
+      return '复核组';
     case 'INTERNAL':
       return '平台';
     default:

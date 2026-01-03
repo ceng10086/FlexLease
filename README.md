@@ -24,7 +24,7 @@ FlexLease 面向 B2C 场景，为厂商与消费者提供从入驻、商品配�
 | notification-service | 9006（仅容器/本地） | 模板管理、通知发送日志、订阅订单事件并向厂商推送站内信 |
 | redis / postgres / rabbitmq | 6379 / 5432 / 5672+15672（对外暴露） | 依赖中间件（Volume 持久化 + 管控台端口映射） |
 
-> 默认管理员账号由认证服务启动时自动创建：`admin@flexlease.test / Admin@123`。所有内部互信调用需在 Header 中附带 `X-Internal-Token:flexlease-internal-secret`，生产部署请通过 `.env` 或 CI/CD 密文覆盖。
+> 默认平台管理员账号由认证服务启动时自动创建：`admin@flexlease.test / Admin@123`。默认仲裁管理人员账号：`arbitrator@flexlease.test / Arbitrator@123`（用于纠纷仲裁与裁决，平台管理员无此权限）。所有内部互信调用需在 Header 中附带 `X-Internal-Token:flexlease-internal-secret`，生产部署请通过 `.env` 或 CI/CD 密文覆盖。
 
 ## 核心能力一览
 
@@ -48,10 +48,10 @@ FlexLease 面向 B2C 场景，为厂商与消费者提供从入驻、商品配�
   - 续租/退租/买断流程及审批、自动库存处理、订单合同生成与签署。
   - `/orders/{id}/messages` 支持用户与厂商在订单抽屉直接沟通（自动写入时间线），`OrderProofService`（`backend/order-service/src/main/java/com/flexlease/order/service/OrderProofService.java`）提供发货/收货/退租/巡检/其他凭证上传、`/api/v1/proofs/{fileName}` 鉴权下载（前端预览通过拉取 blob 生成本地 URL）以及和 Notification Service 的互通提醒；厂商也可通过 `/orders/{id}/inspection/request` 发起巡检请求，用户上传巡检凭证后自动触发信用加分。
   - `ProofPolicyService` 对外暴露 `/api/v1/proof-policy`，统一告知各阶段最小凭证数量与拍摄角度，并由 `ProofStorageService` 对图片自动打水印；其中 `watermarkExample` 为水印说明文本（前端按文本展示，若为 URL 则打开示例资源）。为保证中文水印正常显示，`order-service` 镜像包含 `fonts-noto-cjk` 字体包。
-  - `OrderDisputeService`（`backend/order-service/src/main/java/com/flexlease/order/service/OrderDisputeService.java`）封装纠纷创建→协商→升级仲裁→平台裁决→信用扣分→满意度调查的全流程，管理员可在 `/api/v1/admin/orders/{id}/disputes/{disputeId}/resolve` 直接裁决，并支持 `maliciousBehavior` 标志自动触发恶意行为惩罚；双方在发起/回应纠纷时可同步上传多媒体附件与电话纪要，信息将写入时间线与抽屉附件列表。
-  - 纠纷进入平台仲裁后，管理员可一键生成“LLM 仲裁建议”（结构化 JSON，包含事实摘要/缺失证据/建议裁决/话术草稿），接口为 `/api/v1/admin/orders/{id}/disputes/{disputeId}/ai-suggestion`；配置方式见 `docs/纠纷仲裁智能助手.md`。
+  - `OrderDisputeService`（`backend/order-service/src/main/java/com/flexlease/order/service/OrderDisputeService.java`）封装纠纷创建→协商→升级仲裁→平台裁决→信用扣分→满意度调查的全流程，仲裁管理人员可在 `/api/v1/admin/orders/{id}/disputes/{disputeId}/resolve` 提交裁决，并支持 `maliciousBehavior` 标志自动触发恶意行为惩罚；双方在发起/回应纠纷时可同步上传多媒体附件与电话纪要，信息将写入时间线与抽屉附件列表。
+  - 纠纷进入平台仲裁后，仲裁管理人员可一键生成“LLM 仲裁建议”（结构化 JSON，包含事实摘要/缺失证据/建议裁决/话术草稿），接口为 `/api/v1/admin/orders/{id}/disputes/{disputeId}/ai-suggestion`；配置方式见 `docs/纠纷仲裁智能助手.md`。
     - 说明：仲裁建议的自然语言内容默认按 **中文** 输出（枚举值如 `recommendedDecision.option` 仍为固定英文枚举）。
-  - 纠纷调度新增多阶段倒计时提醒（24小时、6小时、1小时前各提醒一次）与超时自动升级逻辑；用户二次申诉进入 `PENDING_REVIEW_PANEL` 状态可由 `ADMIN` 或 `REVIEW_PANEL` 角色裁决，避免“申诉后无人结案”卡死。
+  - 纠纷调度新增多阶段倒计时提醒（24小时、6小时、1小时前各提醒一次）与超时自动升级逻辑；用户二次申诉进入 `PENDING_REVIEW_PANEL` 状态由 `REVIEW_PANEL` 角色裁决，避免“申诉后无人结案”卡死。
   - 满意度调研由 `OrderSurveyService` 定时激活 `/orders/{id}/surveys` 调查，支持双方打分与评价，并追加时间线+站内信提醒。
   - 平台/厂商运营指标、管理员强制关闭、待支付订单自动取消调度。
   - RabbitMQ 事件总线 + Notification-Service 异步告警。
@@ -194,7 +194,7 @@ docker compose up --build
 - 订单沟通（双方聊天）
 - 履约证明（发货/收货凭证上传）
 - 巡检请求与信用加分校验
-- 纠纷升级 → 管理员生成仲裁建议并裁决（信用扣分）
+- 纠纷升级 → 仲裁管理人员生成仲裁建议并裁决（信用扣分）
 - 买断申请 → 厂商审批
 - 结算中心（平台抽成）/驾驶舱（信用与纠纷）/通知中心（CREDIT/DISPUTE）
 

@@ -210,7 +210,10 @@ public class OrderProofService {
 
     private void ensureReadable(RentalOrder order) {
         FlexleasePrincipal principal = SecurityUtils.requirePrincipal();
-        if (principal.hasRole("ADMIN") || principal.hasRole("INTERNAL")) {
+        if (principal.hasRole("ADMIN")
+                || principal.hasRole("ARBITRATOR")
+                || principal.hasRole("REVIEW_PANEL")
+                || principal.hasRole("INTERNAL")) {
             return;
         }
         if (principal.hasRole("VENDOR")) {
@@ -238,6 +241,12 @@ public class OrderProofService {
         }
         if (principal.hasRole("ADMIN")) {
             return OrderActorRole.ADMIN;
+        }
+        if (principal.hasRole("ARBITRATOR")) {
+            return OrderActorRole.ARBITRATOR;
+        }
+        if (principal.hasRole("REVIEW_PANEL")) {
+            return OrderActorRole.REVIEW_PANEL;
         }
         if (principal.hasRole("INTERNAL")) {
             return OrderActorRole.INTERNAL;

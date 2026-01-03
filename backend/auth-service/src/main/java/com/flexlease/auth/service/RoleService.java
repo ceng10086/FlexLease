@@ -13,6 +13,7 @@ public class RoleService {
     public static final String ROLE_VENDOR = "VENDOR";
     public static final String ROLE_USER = "USER";
     public static final String ROLE_REVIEW_PANEL = "REVIEW_PANEL";
+    public static final String ROLE_ARBITRATOR = "ARBITRATOR";
 
     private final RoleRepository roleRepository;
 

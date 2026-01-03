@@ -1,7 +1,6 @@
 package com.flexlease.order.controller;
 
 import com.flexlease.common.dto.ApiResponse;
-import com.flexlease.common.security.SecurityUtils;
 import com.flexlease.order.dto.DisputeAiSuggestionRequest;
 import com.flexlease.order.dto.DisputeAiSuggestionResponse;
 import com.flexlease.order.dto.OrderDisputeResolveRequest;
@@ -34,7 +33,6 @@ public class AdminOrderDisputeController {
                                                                          @PathVariable UUID disputeId,
                                                                          @RequestBody(required = false)
                                                                          DisputeAiSuggestionRequest request) {
-        SecurityUtils.requireRole("ADMIN");
         return ApiResponse.success(disputeAiSuggestionService.generate(orderId, disputeId, request));
     }
 
@@ -42,7 +40,6 @@ public class AdminOrderDisputeController {
     public ApiResponse<OrderDisputeResponse> resolve(@PathVariable UUID orderId,
                                                      @PathVariable UUID disputeId,
                                                      @Valid @RequestBody OrderDisputeResolveRequest request) {
-        SecurityUtils.requireRole("ADMIN");
         return ApiResponse.success(orderDisputeService.resolve(orderId, disputeId, request));
     }
 }

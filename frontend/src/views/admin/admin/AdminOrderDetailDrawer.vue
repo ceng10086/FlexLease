@@ -33,7 +33,7 @@
               </div>
             </PageSection>
 
-            <PageSection title="管理员操作">
+            <PageSection v-if="canForceClose" title="平台管理员操作">
               <a-textarea v-model:value="forceCloseForm.reason" :rows="3" placeholder="强制关闭原因" />
               <div class="section-actions">
                 <a-button type="primary" danger :loading="forceCloseForm.loading" @click="handleForceClose">
@@ -57,6 +57,7 @@
                       <a-button
                         :data-testid="`dispute-ai-suggest-${item.id}`"
                         :loading="aiLoading[item.id]"
+                        :disabled="!canGenerateAiSuggestion"
                         @click="handleGenerateAiSuggestion(item)"
                       >
                         生成仲裁建议
@@ -65,8 +66,9 @@
                         v-model:value="disputeForms[item.id].decision"
                         :options="disputeOptions"
                         style="width: 200px"
+                        :disabled="!canResolveDispute(item)"
                     />
-                    <a-checkbox v-model:checked="disputeForms[item.id].malicious">
+                    <a-checkbox v-model:checked="disputeForms[item.id].malicious" :disabled="!canResolveDispute(item)">
                       判定恶意行为（冻结 30 天）
                     </a-checkbox>
                     <a-input-number
@@ -74,17 +76,26 @@
                       :min="-30"
                       :max="30"
                       placeholder="扣分(正)/加分(负)"
-                      :disabled="disputeForms[item.id].malicious"
+                      :disabled="!canResolveDispute(item) || disputeForms[item.id].malicious"
                     />
-                    <a-input v-model:value="disputeForms[item.id].remark" placeholder="备注" />
+                    <a-input v-model:value="disputeForms[item.id].remark" placeholder="备注" :disabled="!canResolveDispute(item)" />
                     <a-button
                       type="primary"
                       :loading="disputeForms[item.id].loading"
+                      :disabled="!canResolveDispute(item)"
                         @click="handleResolveDispute(item)"
                       >
                         裁决
                       </a-button>
                     </div>
+                    <a-alert
+                      v-if="!canGenerateAiSuggestion && !canResolveDispute(item)"
+                      type="warning"
+                      show-icon
+                      class="dispute-ai-card"
+                      message="当前账号无仲裁权限"
+                      description="请使用“仲裁管理人员”账号处理仲裁建议/裁决；申诉复核案件由“复核组”处理。"
+                    />
                     <a-alert
                       v-if="aiSuggestions[item.id]"
                       class="dispute-ai-card"
@@ -139,7 +150,7 @@
               <OrderChatPanel
                 :messages="chatEvents"
                 :sending="chatSending"
-                self-role="ADMIN"
+                :self-role="chatSelfRole"
                 :quick-phrases="adminQuickPhrases"
                 @send="handleSendMessage"
               />
@@ -207,6 +218,28 @@ const adminQuickPhrases = [
   '已收到凭证，我们正在核查，请耐心等待。',
   '如需补充资料，请在凭证区上传以便复核。'
 ];
+
+const canForceClose = computed(() => auth.hasRole('ADMIN'));
+const canGenerateAiSuggestion = computed(() => auth.hasRole('ARBITRATOR'));
+const chatSelfRole = computed(() => {
+  if (auth.hasRole('ARBITRATOR')) {
+    return 'ARBITRATOR';
+  }
+  if (auth.hasRole('REVIEW_PANEL')) {
+    return 'REVIEW_PANEL';
+  }
+  return 'ADMIN';
+});
+
+const canResolveDispute = (dispute: OrderDispute) => {
+  if (auth.hasRole('ARBITRATOR')) {
+    return dispute.status === 'PENDING_ADMIN';
+  }
+  if (auth.hasRole('REVIEW_PANEL')) {
+    return dispute.status === 'PENDING_REVIEW_PANEL';
+  }
+  return false;
+};
 
 const drawerWidth = computed(() => {
   if (isMobile.value) {
@@ -324,6 +357,10 @@ const handleForceClose = async () => {
   if (!order.value) {
     return;
   }
+  if (!canForceClose.value) {
+    message.warning('当前账号无强制关闭权限');
+    return;
+  }
   forceCloseForm.loading = true;
   try {
     order.value = await forceCloseOrder(order.value.id, { reason: forceCloseForm.reason || undefined });
@@ -338,6 +375,10 @@ const handleForceClose = async () => {
 
 const handleResolveDispute = async (dispute: OrderDispute) => {
   if (!order.value) {
+    return;
+  }
+  if (!canResolveDispute(dispute)) {
+    message.warning('当前账号无裁决权限');
     return;
   }
   const form = disputeForms[dispute.id];
@@ -361,6 +402,10 @@ const handleResolveDispute = async (dispute: OrderDispute) => {
 
 const handleGenerateAiSuggestion = async (dispute: OrderDispute) => {
   if (!order.value) {
+    return;
+  }
+  if (!canGenerateAiSuggestion.value) {
+    message.warning('当前账号无生成仲裁建议权限');
     return;
   }
   aiLoading[dispute.id] = true;

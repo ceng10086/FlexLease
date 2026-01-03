@@ -24,6 +24,12 @@ public class DataInitializer {
     @Value("${flexlease.bootstrap.admin.password:Admin@123}")
     private String adminPassword;
 
+    @Value("${flexlease.bootstrap.arbitrator.username:arbitrator@flexlease.test}")
+    private String arbitratorUsername;
+
+    @Value("${flexlease.bootstrap.arbitrator.password:Arbitrator@123}")
+    private String arbitratorPassword;
+
     public DataInitializer(RoleService roleService, UserAccountService userAccountService) {
         this.roleService = roleService;
         this.userAccountService = userAccountService;
@@ -34,6 +40,7 @@ public class DataInitializer {
         roleService.ensureRole(RoleService.ROLE_ADMIN, "平台管理员", "平台全局管理员");
         roleService.ensureRole(RoleService.ROLE_VENDOR, "厂商", "B 端厂商用户");
         roleService.ensureRole(RoleService.ROLE_USER, "消费者", "C 端用户");
+        roleService.ensureRole(RoleService.ROLE_ARBITRATOR, "仲裁管理人员", "平台仲裁与纠纷裁决人员（不含平台管理员通用权限）");
         roleService.ensureRole(RoleService.ROLE_REVIEW_PANEL, "复核组", "纠纷申诉后的复核裁决角色");
 
         try {
@@ -43,6 +50,18 @@ public class DataInitializer {
         } catch (com.flexlease.common.exception.BusinessException ex) {
             if (ex.getErrorCode() == com.flexlease.common.exception.ErrorCode.DUPLICATE_RESOURCE) {
                 log.debug("Bootstrap admin already exists: {}", adminUsername);
+            } else {
+                throw ex;
+            }
+        }
+
+        try {
+            userAccountService.register(arbitratorUsername, arbitratorPassword, UserStatus.ENABLED,
+                    Set.of(RoleService.ROLE_ARBITRATOR));
+            log.info("Bootstrap arbitrator account created: {}", arbitratorUsername);
+        } catch (com.flexlease.common.exception.BusinessException ex) {
+            if (ex.getErrorCode() == com.flexlease.common.exception.ErrorCode.DUPLICATE_RESOURCE) {
+                log.debug("Bootstrap arbitrator already exists: {}", arbitratorUsername);
             } else {
                 throw ex;
             }

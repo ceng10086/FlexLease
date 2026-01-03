@@ -165,6 +165,25 @@ const NAV_TREE: NavSection[] = [
         ]
       }
     ]
+  },
+  {
+    key: 'arbitration',
+    label: '仲裁管理',
+    roles: ['ARBITRATOR', 'REVIEW_PANEL'],
+    modules: [
+      {
+        key: 'arbitration-ops',
+        label: '纠纷处理',
+        children: [
+          {
+            key: 'arbitration-orders',
+            label: '仲裁中心',
+            path: '/app/arbitration/orders',
+            icon: 'ControlOutlined'
+          }
+        ]
+      }
+    ]
   }
 ];
 
@@ -273,6 +292,14 @@ const MOBILE_TAB_PRESETS: Record<string, MobileTab[]> = {
     { key: 'dashboard-home', label: '总览', path: '/app/dashboard', icon: 'DashboardOutlined' },
     { key: 'admin-review', label: '审核', path: '/app/admin/review', icon: 'TeamOutlined' },
     { key: 'admin-orders', label: '订单', path: '/app/admin/orders', icon: 'ProfileOutlined' }
+  ],
+  ARBITRATOR: [
+    { key: 'dashboard-home', label: '总览', path: '/app/dashboard', icon: 'DashboardOutlined' },
+    { key: 'arbitration-orders', label: '仲裁', path: '/app/arbitration/orders', icon: 'ControlOutlined' }
+  ],
+  REVIEW_PANEL: [
+    { key: 'dashboard-home', label: '总览', path: '/app/dashboard', icon: 'DashboardOutlined' },
+    { key: 'arbitration-orders', label: '复核', path: '/app/arbitration/orders', icon: 'ControlOutlined' }
   ]
 };
 
