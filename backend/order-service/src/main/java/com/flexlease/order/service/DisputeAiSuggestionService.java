@@ -124,13 +124,59 @@ public class DisputeAiSuggestionService {
     }
 
     private String generateSuggestionJsonStrict(String tone, String inputJson) {
-        String content = chatClient.createChatCompletion(List.of(
-                new ChatMessage("system", buildSystemPrompt()),
-                new ChatMessage("user", buildUserPrompt(tone, inputJson))
+        if (!llmProperties.isEnabled() || !StringUtils.hasText(llmProperties.getApiKey())) {
+            String fallback = buildOfflineSuggestionJson(tone);
+            validateSuggestionJson(fallback);
+            return fallback;
+        }
+
+        try {
+            String content = chatClient.createChatCompletion(List.of(
+                    new ChatMessage("system", buildSystemPrompt()),
+                    new ChatMessage("user", buildUserPrompt(tone, inputJson))
+            ));
+            String extracted = extractJsonObject(content);
+            validateSuggestionJson(extracted);
+            return extracted;
+        } catch (BusinessException ex) {
+            LOG.warn("LLM request failed, falling back to offline suggestion: {}", ex.getMessage());
+            String fallback = buildOfflineSuggestionJson(tone);
+            validateSuggestionJson(fallback);
+            return fallback;
+        } catch (Exception ex) {
+            LOG.warn("LLM request failed, falling back to offline suggestion: {}", ex.getMessage());
+            String fallback = buildOfflineSuggestionJson(tone);
+            validateSuggestionJson(fallback);
+            return fallback;
+        }
+    }
+
+    private String buildOfflineSuggestionJson(String tone) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("summary", "（离线模式）未接入外部 LLM，以下为模板化仲裁建议，仅用于演示与排查。");
+        result.put("keyFacts", List.of(
+                "当前为离线模板输出（tone=%s）".formatted(tone),
+                "建议裁决前补充双方沟通与取证材料"
         ));
-        String extracted = extractJsonObject(content);
-        validateSuggestionJson(extracted);
-        return extracted;
+        result.put("missingEvidence", List.of(
+                Map.of("who", "用户/厂商", "need", "补充发货/收货/退租相关凭证", "why", "用于核对事实与责任归属"),
+                Map.of("who", "平台", "need", "核对订单时间线与支付/物流信息", "why", "用于校验关键节点是否一致")
+        ));
+        result.put("recommendedDecision", Map.of(
+                "option", "CUSTOM",
+                "creditDelta", 0,
+                "maliciousBehavior", false,
+                "rationale", "离线模式无法自动判断责任，建议管理员根据证据人工裁决。"
+        ));
+        result.put("draftMessages", Map.of(
+                "toUser", "平台已收到您的纠纷申请，当前需要补充相关凭证以便核对事实，我们将尽快处理。",
+                "toVendor", "平台已收到该订单纠纷，请补充履约与沟通凭证以便核对事实，我们将尽快处理。"
+        ));
+        result.put("riskNotes", List.of(
+                "离线模式输出不代表最终裁决结论",
+                "裁决前建议核对证据完整性与时间线一致性"
+        ));
+        return writeJson(result);
     }
 
     private void persistSuggestion(RentalOrder order,

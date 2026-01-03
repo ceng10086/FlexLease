@@ -142,7 +142,7 @@ services:
       FLEXLEASE_PRODUCT_SERVICE_BASE_URL: http://product-service/api/v1
       FLEXLEASE_USER_SERVICE_BASE_URL: http://user-service/api/v1
       FLEXLEASE_ORDER_PROOF_ROOT: /app/storage/order-proofs
-      FLEXLEASE_LLM_ENABLED: ${FLEXLEASE_LLM_ENABLED:-true}
+      FLEXLEASE_LLM_ENABLED: ${FLEXLEASE_LLM_ENABLED:-false}
       FLEXLEASE_LLM_BASE_URL: ${FLEXLEASE_LLM_BASE_URL:-https://api.deepseek.com}
       FLEXLEASE_LLM_MODEL: ${FLEXLEASE_LLM_MODEL:-deepseek-chat}
       FLEXLEASE_LLM_API_KEY: ${FLEXLEASE_LLM_API_KEY:-}

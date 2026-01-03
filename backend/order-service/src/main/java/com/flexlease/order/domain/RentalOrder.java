@@ -13,11 +13,11 @@ import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 
 @Entity
 @Table(name = "rental_order", schema = "order")
@@ -452,8 +452,16 @@ public class RentalOrder {
     }
 
     private String generateOrderNo() {
-        String timestamp = OffsetDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss", Locale.CHINA));
-        String tail = UUID.randomUUID().toString().substring(0, 6).toUpperCase(Locale.ROOT);
-        return timestamp + tail;
+        String timePart = leftPad(Long.toString(System.currentTimeMillis(), 36).toUpperCase(Locale.ROOT), 8);
+        long random = ThreadLocalRandom.current().nextLong(36L * 36 * 36 * 36 * 36 * 36);
+        String randomPart = leftPad(Long.toString(random, 36).toUpperCase(Locale.ROOT), 6);
+        return timePart + randomPart;
+    }
+
+    private static String leftPad(String input, int width) {
+        if (input.length() >= width) {
+            return input;
+        }
+        return "0".repeat(width - input.length()) + input;
     }
 }

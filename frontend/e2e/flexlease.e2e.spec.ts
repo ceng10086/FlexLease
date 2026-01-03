@@ -533,6 +533,12 @@ async function openOrderDetailByOrderNo(page: Page, orderNo: string) {
   await gotoPath(page, '/app/orders');
   await expect(page.getByRole('heading', { name: '订单时间线' })).toBeVisible({ timeout: 30_000 });
 
+  await expect
+    .poll(async () => await page.locator('article.order-card').count(), {
+      timeout: 60_000
+    })
+    .toBeGreaterThan(0);
+
   const card = page.locator('article.order-card', { hasText: orderNo }).first();
   for (let attempt = 0; attempt < 8; attempt += 1) {
     if (await card.isVisible().catch(() => false)) {
@@ -827,6 +833,12 @@ async function pickOrderCardByUi(page: Page, options?: { excludeOrderNos?: strin
     const match = raw.match(/订单号：\s*(\S+)/);
     return match?.[1] ?? '';
   };
+
+  await expect
+    .poll(async () => await page.locator('article.order-card').count(), {
+      timeout: 60_000
+    })
+    .toBeGreaterThan(0);
 
   // 默认页 size=6，最多点几次“查看更多”即可找到新增订单
   for (let attempt = 0; attempt < 6; attempt += 1) {

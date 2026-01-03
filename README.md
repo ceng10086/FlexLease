@@ -97,7 +97,7 @@ FlexLease 面向 B2C 场景，为厂商与消费者提供从入驻、商品配�
 - `FLEXLEASE_PAYMENT_AUTO_CONFIRM`（或 `flexlease.payment.auto-confirm`）控制支付是否自动成功；`FLEXLEASE_ORDER_MAINTENANCE_PENDING_PAYMENT_EXPIRE_MINUTES` 与 `FLEXLEASE_ORDER_MAINTENANCE_SCAN_INTERVAL_MS` 调整待支付超时策略；`FLEXLEASE_MESSAGING_ENABLED` 与 `FLEXLEASE_REDIS_ENABLED` 可在开发环境禁用 RabbitMQ 或 Redis 依赖。
 - `flexlease.notification-service.base-url` 被多个服务用于调用通知服务（站内信），如需联调自定义域名请统一覆盖相关服务配置。
 - `flexlease.order.proof-policy.*`（如 `shipment-photo-required/shipment-video-required/receive-photo-required/receive-video-required/return-photo-required/return-video-required`）与 `FLEXLEASE_ORDER_PROOF_ROOT` 控制取证最低数量与存储目录，可按实际履约规范调整照片/视频要求及水印文案。
-- 如需使用“LLM 仲裁建议”（或运行包含该步骤的 E2E），在仓库根目录创建 `.env` 并填写 `FLEXLEASE_LLM_API_KEY`（参考 `.env.example`）。`order-service` 本地默认关闭该能力（`FLEXLEASE_LLM_ENABLED=false`）；若用 Compose 且无外部 LLM Key/网络，请显式关闭并避免点击“生成仲裁建议”。详见 `docs/纠纷仲裁智能助手.md`（含中文输出约束）。
+- “纠纷仲裁建议”默认走离线模板输出（无需外网/Key，便于演示与 E2E）；如需接入外部 LLM，在仓库根目录创建 `.env`（参考 `.env.example`），设置 `FLEXLEASE_LLM_ENABLED=true` 并填写 `FLEXLEASE_LLM_API_KEY`。详见 `docs/纠纷仲裁智能助手.md`。
 
 ## 多角色能力速览
 
@@ -203,7 +203,9 @@ docker compose up --build
 1. 保证网关与前端可访问：打开 http://localhost:8080 能看到登录页。
    - 推荐直接使用 `docker compose up --build` 拉起全套环境。
    - 启动后建议等待约 60 秒，确保全部服务完成注册与初始化。
-2. 如需跑包含“生成仲裁建议”的步骤，准备 LLM 配置：`cp .env.example .env` 并填写 `FLEXLEASE_LLM_API_KEY`。
+2. “生成仲裁建议”支持两种模式：
+   - **离线模板模式（默认）**：无需外网/Key，直接运行即可（输出会标注“离线模式”）。
+   - **外部 LLM 模式（可选）**：`cp .env.example .env`，设置 `FLEXLEASE_LLM_ENABLED=true` 并填写 `FLEXLEASE_LLM_API_KEY`。
 3. 安装前端依赖与 Playwright 浏览器：
 
 ```powershell
