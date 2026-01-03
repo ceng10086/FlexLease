@@ -70,6 +70,18 @@ const router = createRouter({
           meta: { navKey: 'order-chat-center', roles: ['USER'] }
         },
         {
+          path: 'orders/:orderId/contract',
+          name: 'order-contract',
+          component: () => import('../views/orders/detail/OrderContractSignView.vue'),
+          meta: { navKey: 'order-hub', roles: ['USER'] }
+        },
+        {
+          path: 'orders/:orderId/payment',
+          name: 'order-payment',
+          component: () => import('../views/orders/detail/OrderPaymentView.vue'),
+          meta: { navKey: 'order-hub', roles: ['USER'] }
+        },
+        {
           path: 'orders/:orderId',
           component: () => import('../views/orders/detail/OrderDetailShell.vue'),
           meta: { navKey: 'order-hub', roles: ['USER'] },

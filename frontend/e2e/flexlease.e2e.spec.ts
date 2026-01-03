@@ -502,11 +502,30 @@ async function userCreateOrderFromCatalog(
   await page.getByPlaceholder('例如发货时间、配送注意事项（选填）').fill(remark);
   await page.getByRole('button', { name: '提交订单' }).click();
 
-  // 创建订单后跳转到订单详情
+  // 创建订单后先进入合同页
+  await page.waitForURL('**/app/orders/**/contract', { timeout: 60_000 });
+  await expect(page.getByRole('heading', { name: '签署电子合同' })).toBeVisible({ timeout: 60_000 });
+
+  // 合同签署 -> 支付
+  const signatureInput = page.getByPlaceholder('请输入签名');
+  if (await signatureInput.isVisible().catch(() => false)) {
+    await signatureInput.fill('E2E 签名');
+  }
+  await page.getByRole('button', { name: '签署并进入支付' }).click();
+  await page.waitForURL('**/app/orders/**/payment', { timeout: 60_000 });
+  await expect(page.getByRole('heading', { name: '支付订单' })).toBeVisible({ timeout: 60_000 });
+
+  // 支付（演示）-> 订单墙
+  await page.getByRole('button', { name: '我已完成支付（模拟）' }).click();
+  await page.waitForURL('**/app/orders', { timeout: 60_000 });
+  await expect(page.getByRole('heading', { name: '订单时间线' })).toBeVisible({ timeout: 60_000 });
+
+  // 只从 UI 上找最新订单卡片，不从网络响应取数。
+  const picked = await pickOrderCardByUi(page);
+  await expect(picked.card).toBeVisible({ timeout: 60_000 });
+  await picked.card.getByRole('button', { name: '查看详情' }).click();
   await page.waitForURL('**/app/orders/**/overview', { timeout: 60_000 });
-
   const orderNo = await readOrderNoFromOrderDetail(page);
-
   return { orderNo };
 }
 
@@ -853,9 +872,24 @@ async function userCreateOrderFromCart(page: Page, productName: string, options?
   await expect(page.getByText('订单试算')).toBeVisible({ timeout: 30_000 });
 
   await page.getByRole('button', { name: '确认创建订单' }).click();
-  await page.waitForURL('**/app/orders**', { timeout: 60_000 });
 
-  await expect(page.getByRole('heading', { name: '订单时间线' })).toBeVisible({ timeout: 30_000 });
+  // 创建订单后先进入合同页
+  await page.waitForURL('**/app/orders/**/contract', { timeout: 60_000 });
+  await expect(page.getByRole('heading', { name: '签署电子合同' })).toBeVisible({ timeout: 60_000 });
+
+  // 合同签署 -> 支付
+  const signatureInput = page.getByPlaceholder('请输入签名');
+  if (await signatureInput.isVisible().catch(() => false)) {
+    await signatureInput.fill('E2E 签名');
+  }
+  await page.getByRole('button', { name: '签署并进入支付' }).click();
+  await page.waitForURL('**/app/orders/**/payment', { timeout: 60_000 });
+  await expect(page.getByRole('heading', { name: '支付订单' })).toBeVisible({ timeout: 60_000 });
+
+  // 支付（演示）-> 订单墙
+  await page.getByRole('button', { name: '我已完成支付（模拟）' }).click();
+  await page.waitForURL('**/app/orders', { timeout: 60_000 });
+  await expect(page.getByRole('heading', { name: '订单时间线' })).toBeVisible({ timeout: 60_000 });
 
   // 只从 UI 上找订单卡片，不从网络响应取数。
   const picked = await pickOrderCardByUi(page, { excludeOrderNos: options?.excludeOrderNos });

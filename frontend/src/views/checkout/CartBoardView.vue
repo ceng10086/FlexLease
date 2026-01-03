@@ -162,12 +162,10 @@ import {
 import {
   createOrder,
   previewOrder,
-  type OrderPreviewResponse,
-  type RentalOrderDetail
+  type OrderPreviewResponse
 } from '../../services/orderService';
 import { cartItemDeposit, cartItemRent } from '../../utils/orderAmounts';
 import { useAuthStore } from '../../stores/auth';
-import { autoCompleteInitialPayment } from '../../utils/autoPayment';
 import { generateIdempotencyKey } from '../../utils/idempotency';
 import { creditTierColor, creditTierLabel } from '../../types/credit';
 import { parsePlanSnapshot } from '../../utils/planSnapshot';
@@ -415,13 +413,16 @@ const confirmCheckout = async () => {
       },
       { idempotencyKey }
     );
-    await handleAutoPayment(order, userId);
+    if (order.requiresManualReview) {
+      message.warning('信用预警：平台可能会抽检该订单，但不影响支付');
+    }
+    message.success('订单创建成功，请先签署合同');
     selectedIds.value = new Set();
     await loadCart();
     previewVisible.value = false;
     previewData.value = null;
     previewSelectionKey.value = '';
-    router.push({ name: 'orders' });
+    router.push({ name: 'order-contract', params: { orderId: order.id } });
   } catch (error: any) {
     console.error('创建订单失败', error);
     const msg = error?.response?.data?.message ?? '创建订单失败，请稍后再试';
@@ -433,37 +434,6 @@ const confirmCheckout = async () => {
 
 const closePreview = () => {
   previewVisible.value = false;
-};
-
-const handleAutoPayment = async (order: RentalOrderDetail, userId: string) => {
-  try {
-    if (order.requiresManualReview) {
-      message.warning('信用预警：平台可能会抽检该订单，但不影响支付');
-    }
-    const deposit = order.depositAmount ?? 0;
-    const rent = order.rentAmount ?? 0;
-    const buyout = order.buyoutAmount ?? 0;
-    const total = order.totalAmount ?? deposit + rent + buyout;
-    const paymentResult = await autoCompleteInitialPayment({
-      orderId: order.id,
-      vendorId: order.vendorId,
-      userId,
-      amount: total,
-      depositAmount: deposit,
-      rentAmount: rent,
-      buyoutAmount: buyout
-    });
-    if (paymentResult.succeeded) {
-      message.success('订单创建并自动完成支付');
-    } else if (paymentResult.transactionId) {
-      message.info('订单创建成功，支付单已生成，待自动确认');
-    } else {
-      message.success('订单创建成功');
-    }
-  } catch (error) {
-    console.error('自动支付失败', error);
-    message.warning('订单已创建，但自动支付失败，请在订单详情完成付款');
-  }
 };
 
 onMounted(() => {

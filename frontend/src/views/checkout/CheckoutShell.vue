@@ -4,7 +4,7 @@
       <PageHeader
         title="确认订单"
         eyebrow="Checkout"
-        description="核对方案与信用快照后提交订单，系统会自动尝试首付款。"
+        description="核对方案与信用快照后提交订单，随后需先签署合同再进入支付。"
       />
     </template>
 
@@ -126,11 +126,9 @@ import { fetchCatalogProduct, type CatalogProductDetail } from '../../services/c
 import {
   previewOrder,
   createOrder,
-  type OrderPreviewResponse,
-  type RentalOrderDetail
+  type OrderPreviewResponse
 } from '../../services/orderService';
 import { serializePlanSnapshot } from '../../utils/planSnapshot';
-import { autoCompleteInitialPayment } from '../../utils/autoPayment';
 import { friendlyErrorMessage } from '../../utils/error';
 import { creditTierColor, creditTierLabel } from '../../types/credit';
 import { generateIdempotencyKey } from '../../utils/idempotency';
@@ -276,26 +274,7 @@ const handleCreate = async () => {
     if (order.requiresManualReview) {
       message.warning('信用预警：平台可能会抽检该订单，但不影响支付');
     }
-    try {
-      const result = await autoCompleteInitialPayment({
-        orderId: order.id,
-        vendorId: order.vendorId,
-        userId: order.userId,
-        amount: order.totalAmount,
-        depositAmount: order.depositAmount,
-        rentAmount: order.rentAmount,
-        buyoutAmount: order.buyoutAmount ?? undefined,
-        description: '订单首付款'
-      });
-      if (result.succeeded) {
-        message.success('首付款已自动完成');
-      } else {
-        message.info('已生成支付流水，请在订单详情查看进度');
-      }
-    } catch (paymentError) {
-      message.warning(friendlyErrorMessage(paymentError, '自动支付未完成，请前往订单详情补缴'));
-    }
-    router.replace({ name: 'order-overview', params: { orderId: order.id } });
+    router.replace({ name: 'order-contract', params: { orderId: order.id } });
   } catch (error) {
     message.error(friendlyErrorMessage(error, '创建订单失败'));
   } finally {
