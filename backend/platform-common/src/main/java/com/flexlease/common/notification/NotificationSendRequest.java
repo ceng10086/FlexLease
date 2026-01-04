@@ -6,7 +6,6 @@ import java.util.Map;
 
 public record NotificationSendRequest(
         String templateCode,
-        NotificationChannel channel,
         @NotBlank @Size(max = 100) String recipient,
         @Size(max = 200) String subject,
         String content,
@@ -16,12 +15,11 @@ public record NotificationSendRequest(
 ) {
 
     public NotificationSendRequest(String templateCode,
-                                    NotificationChannel channel,
                                     @NotBlank @Size(max = 100) String recipient,
                                     @Size(max = 200) String subject,
                                     String content,
                                     Map<String, Object> variables) {
-        this(templateCode, channel, recipient, subject, content, variables, null, null);
+        this(templateCode, recipient, subject, content, variables, null, null);
     }
 
     public boolean hasTemplate() {

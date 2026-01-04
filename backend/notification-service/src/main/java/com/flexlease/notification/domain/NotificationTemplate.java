@@ -1,10 +1,7 @@
 package com.flexlease.notification.domain;
 
-import com.flexlease.common.notification.NotificationChannel;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
@@ -22,10 +19,6 @@ public class NotificationTemplate {
     @Column(name = "code", nullable = false, unique = true, length = 50)
     private String code;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "channel", nullable = false, length = 20)
-    private NotificationChannel channel;
-
     @Column(name = "subject", nullable = false, length = 200)
     private String subject;
 
@@ -40,12 +33,10 @@ public class NotificationTemplate {
     }
 
     public NotificationTemplate(String code,
-                                NotificationChannel channel,
                                 String subject,
                                 String content) {
         this.id = UUID.randomUUID();
         this.code = code;
-        this.channel = channel;
         this.subject = subject;
         this.content = content;
     }
@@ -66,10 +57,6 @@ public class NotificationTemplate {
 
     public String getCode() {
         return code;
-    }
-
-    public NotificationChannel getChannel() {
-        return channel;
     }
 
     public String getSubject() {

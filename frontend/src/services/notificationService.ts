@@ -1,7 +1,6 @@
 import http from './http';
 
 export type NotificationStatus = 'PENDING' | 'SENT' | 'FAILED';
-export type NotificationChannel = 'IN_APP' | 'EMAIL' | 'SMS';
 
 type ApiResponse<T> = {
   code: number;
@@ -11,7 +10,6 @@ type ApiResponse<T> = {
 
 export type NotificationSendPayload = {
   templateCode?: string;
-  channel?: NotificationChannel;
   recipient: string;
   subject?: string;
   content?: string;
@@ -23,7 +21,6 @@ export type NotificationSendPayload = {
 export type NotificationLog = {
   id: string;
   templateCode?: string | null;
-  channel: NotificationChannel;
   recipient: string;
   subject: string;
   content: string;
@@ -37,7 +34,6 @@ export type NotificationLog = {
 
 export type NotificationLogQuery = {
   status?: NotificationStatus;
-  channel?: NotificationChannel;
   recipient?: string;
   contextType?: string;
 };
@@ -45,7 +41,6 @@ export type NotificationLogQuery = {
 export type NotificationTemplate = {
   id: string;
   code: string;
-  channel: NotificationChannel;
   subject: string;
   content: string;
   createdAt: string;

@@ -2,7 +2,6 @@ package com.flexlease.order.service;
 
 import com.flexlease.common.exception.BusinessException;
 import com.flexlease.common.exception.ErrorCode;
-import com.flexlease.common.notification.NotificationChannel;
 import com.flexlease.common.notification.NotificationSendRequest;
 import com.flexlease.common.security.FlexleasePrincipal;
 import com.flexlease.common.security.SecurityUtils;
@@ -209,7 +208,6 @@ public class OrderSurveyService {
     private void sendSurveyInvite(OrderSatisfactionSurvey survey) {
         NotificationSendRequest request = new NotificationSendRequest(
                 null,
-                NotificationChannel.IN_APP,
                 survey.getTargetRef().toString(),
                 "满意度调查邀请",
                 buildInviteMessage(survey.getTargetRole(), survey.getAvailableAt()),
@@ -225,7 +223,6 @@ public class OrderSurveyService {
     private void sendThankYouNotification(RentalOrder order, OrderSatisfactionSurvey survey, int rating) {
         NotificationSendRequest request = new NotificationSendRequest(
                 null,
-                NotificationChannel.IN_APP,
                 survey.getTargetRef().toString(),
                 "感谢您的反馈",
                 "感谢对订单 %s 的满意度评分：%d 分。".formatted(order.getOrderNo(), rating),

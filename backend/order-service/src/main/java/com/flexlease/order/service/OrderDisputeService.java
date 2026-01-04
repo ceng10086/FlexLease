@@ -2,7 +2,6 @@ package com.flexlease.order.service;
 
 import com.flexlease.common.exception.BusinessException;
 import com.flexlease.common.exception.ErrorCode;
-import com.flexlease.common.notification.NotificationChannel;
 import com.flexlease.common.notification.NotificationSendRequest;
 import com.flexlease.common.security.FlexleasePrincipal;
 import com.flexlease.common.security.SecurityUtils;
@@ -442,7 +441,6 @@ public class OrderDisputeService {
         int absolute = Math.abs(delta);
         NotificationSendRequest request = new NotificationSendRequest(
                 null,
-                NotificationChannel.IN_APP,
                 order.getUserId().toString(),
                 "信用积分变动提醒",
                 "订单 %s 纠纷裁决导致信用%s %d 分。".formatted(order.getOrderNo(), direction, absolute),
@@ -475,7 +473,6 @@ public class OrderDisputeService {
                                           String reference) {
         NotificationSendRequest request = new NotificationSendRequest(
                 templateCode,
-                NotificationChannel.IN_APP,
                 recipient.toString(),
                 null,
                 null,
@@ -577,7 +574,6 @@ public class OrderDisputeService {
     private void notifyUser(RentalOrder order, OrderDispute dispute, String subject, String content) {
         NotificationSendRequest request = new NotificationSendRequest(
                 null,
-                NotificationChannel.IN_APP,
                 order.getUserId().toString(),
                 subject,
                 content,
@@ -595,7 +591,6 @@ public class OrderDisputeService {
     private void notifyVendor(RentalOrder order, OrderDispute dispute, String subject, String content) {
         NotificationSendRequest request = new NotificationSendRequest(
                 null,
-                NotificationChannel.IN_APP,
                 order.getVendorId().toString(),
                 subject,
                 content,

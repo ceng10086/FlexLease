@@ -1,6 +1,5 @@
 package com.flexlease.user.scheduler;
 
-import com.flexlease.common.notification.NotificationChannel;
 import com.flexlease.common.notification.NotificationSendRequest;
 import com.flexlease.common.user.CreditTier;
 import com.flexlease.user.domain.Vendor;
@@ -171,7 +170,6 @@ public class CommissionReviewScheduler {
 
         NotificationSendRequest request = new NotificationSendRequest(
                 null,
-                NotificationChannel.IN_APP,
                 vendor.getOwnerUserId().toString(),
                 "季度抽成费率调整通知",
                 content,

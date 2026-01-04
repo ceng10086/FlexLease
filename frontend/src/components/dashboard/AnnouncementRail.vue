@@ -3,7 +3,7 @@
     <div v-if="items.length" class="announcement-rail__list">
       <article v-for="item in items" :key="item.id" class="announcement">
         <div class="announcement__head">
-          <span class="announcement__channel">{{ channelLabel(item.channel) }}</span>
+          <span class="announcement__channel">站内信</span>
           <small>{{ formatDate(item.createdAt) }}</small>
         </div>
         <h4>{{ item.subject || '系统通知' }}</h4>
@@ -26,17 +26,6 @@ import DataStateBlock from '../feedback/DataStateBlock.vue';
 defineProps<{
   items: NotificationLog[];
 }>();
-
-const channelLabel = (channel: NotificationLog['channel']) => {
-  switch (channel) {
-    case 'EMAIL':
-      return '邮件';
-    case 'SMS':
-      return '短信';
-    default:
-      return '站内信';
-  }
-};
 
 const formatDate = (value?: string | null) => {
   if (!value) {

@@ -289,11 +289,11 @@
 ### 7.1 通知服务
 | 方法 | URL | 描述 | 请求体要点 | 响应 |
 | ---- | --- | ---- | -------- | ---- |
-| POST | `/notifications/send` | 发送单条通知，支持模板渲染或自定义内容 | `{ templateCode?, channel?, recipient, subject?, content?, variables? }`<br>当 `templateCode` 指定时，可省略 `channel/subject/content`，系统按模板渲染；`variables` 为键值对用于替换 `{{key}}` 占位符。 | `NotificationLogResponse`（包含通知 ID、渠道、状态、发送时间等）|
-| GET | `/notifications/logs` | 查询最近 50 条通知记录，可按状态/接收方/上下文过滤 | `status?=PENDING|SENT|FAILED`、`recipient?=<userId/vendorId>`、`contextType?`、`channel?` | `List<NotificationLogResponse>` |
+| POST | `/notifications/send` | 发送单条通知，支持模板渲染或自定义内容 | `{ templateCode?, recipient, subject?, content?, variables?, contextType?, contextReference? }`<br>当 `templateCode` 指定时，可省略 `subject/content`，系统按模板渲染；`variables` 为键值对用于替换 `{{key}}` 占位符。 | `NotificationLogResponse`（包含通知 ID、状态、发送时间等）|
+| GET | `/notifications/logs` | 查询最近 50 条通知记录，可按状态/接收方/上下文过滤 | `status?=PENDING|SENT|FAILED`、`recipient?=<userId/vendorId>`、`contextType?` | `List<NotificationLogResponse>` |
 | GET | `/notifications/templates` | 查看系统内置模板 | - | `List<NotificationTemplateResponse>` |
 
-> 目前通知发送为模拟实现：若渠道为 `EMAIL` 且收件人不为合法邮箱格式，将返回校验错误；其它渠道默认视为发送成功并写入通知日志。`/notifications/logs` 会根据当前角色自动收敛可见范围——消费者仅能查看自身 `userId`，厂商仅能查看其 `vendorId`，管理员/内部可查看任何 `recipient` 或省略参数获取全局 Top 50。可结合 `contextType`（如 `DISPUTE`、`CREDIT`）与 `channel` 精确过滤。
+> 当前通知仅支持站内信：服务端会写入通知日志并标记为 `SENT`。`/notifications/logs` 会根据当前角色自动收敛可见范围——消费者仅能查看自身 `userId`，厂商仅能查看其 `vendorId`，管理员/内部可查看任何 `recipient` 或省略参数获取全局 Top 50。可结合 `contextType`（如 `DISPUTE`、`CREDIT`）精确过滤。
 
 > 说明：运营指标接口实际由订单服务提供，仍透出在 `/api/v1/analytics/**` 路径下，网关/前端需路由至 `order-service`。
 

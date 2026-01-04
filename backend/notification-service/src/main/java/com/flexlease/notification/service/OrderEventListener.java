@@ -3,7 +3,6 @@ package com.flexlease.notification.service;
 import com.flexlease.common.audit.BusinessReplayLogWriter;
 import com.flexlease.common.messaging.MessagingConstants;
 import com.flexlease.common.messaging.OrderEventMessage;
-import com.flexlease.common.notification.NotificationChannel;
 import com.flexlease.common.notification.NotificationSendRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,7 +48,6 @@ public class OrderEventListener {
         }
         NotificationSendRequest request = new NotificationSendRequest(
                 null,
-                NotificationChannel.IN_APP,
                 message.vendorId().toString(),
                 "新订单待处理",
                 "订单 %s 已创建，请尽快确认并安排履约。".formatted(message.orderNo()),

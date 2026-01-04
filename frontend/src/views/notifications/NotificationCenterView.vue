@@ -12,7 +12,7 @@
       </PageHeader>
     </template>
 
-    <PageSection title="筛选器" description="按状态、渠道、上下文快速收敛通知列表。">
+    <PageSection title="筛选器" description="按状态、上下文快速收敛通知列表。">
       <div class="filter-grid">
         <a-select
           v-model:value="filters.status"
@@ -23,16 +23,6 @@
           <a-select-option value="PENDING">待发送</a-select-option>
           <a-select-option value="SENT">已发送</a-select-option>
           <a-select-option value="FAILED">发送失败</a-select-option>
-        </a-select>
-        <a-select
-          v-model:value="filters.channel"
-          allow-clear
-          placeholder="渠道"
-          @change="refresh"
-        >
-          <a-select-option value="IN_APP">站内信</a-select-option>
-          <a-select-option value="EMAIL">邮件</a-select-option>
-          <a-select-option value="SMS">短信</a-select-option>
         </a-select>
         <a-select
           v-model:value="filters.contextType"
@@ -57,10 +47,6 @@
         <div v-for="card in statusCards" :key="card.key" class="summary-card">
           <p>{{ card.label }}</p>
           <strong>{{ statusSummary[card.key] ?? 0 }}</strong>
-        </div>
-        <div v-for="channel in channelCards" :key="channel.key" class="summary-card summary-card--ghost">
-          <p>{{ channel.label }}</p>
-          <strong>{{ channelSummary[channel.key] ?? 0 }}</strong>
         </div>
       </div>
     </PageSection>
@@ -95,7 +81,6 @@ import NotificationCard from '../../components/notifications/NotificationCard.vu
 import DataStateBlock from '../../components/feedback/DataStateBlock.vue';
 import {
   listNotificationLogs,
-  type NotificationChannel,
   type NotificationLog,
   type NotificationStatus
 } from '../../services/notificationService';
@@ -103,7 +88,6 @@ import { useQuery } from '../../composables/useQuery';
 
 const filters = reactive<{
   status?: NotificationStatus;
-  channel?: NotificationChannel;
   contextType?: string;
   keyword: string;
 }>({
@@ -112,11 +96,10 @@ const filters = reactive<{
 
 const { data, loading, refresh } = useQuery<NotificationLog[]>(
   () =>
-    `notification-${filters.status ?? 'all'}-${filters.channel ?? 'all'}-${filters.contextType ?? 'all'}`,
+    `notification-${filters.status ?? 'all'}-${filters.contextType ?? 'all'}`,
   () =>
     listNotificationLogs({
       status: filters.status,
-      channel: filters.channel,
       contextType: filters.contextType
     })
 );
@@ -154,24 +137,10 @@ const statusCards = [
   { key: 'FAILED' as NotificationStatus, label: '发送失败' }
 ];
 
-const channelCards = [
-  { key: 'IN_APP' as NotificationChannel, label: '站内信' },
-  { key: 'EMAIL' as NotificationChannel, label: '邮件' },
-  { key: 'SMS' as NotificationChannel, label: '短信' }
-];
-
 const statusSummary = computed<Record<NotificationStatus, number>>(() => {
   const summary = { SENT: 0, PENDING: 0, FAILED: 0 } as Record<NotificationStatus, number>;
   (data.value ?? []).forEach((item) => {
     summary[item.status] += 1;
-  });
-  return summary;
-});
-
-const channelSummary = computed<Record<NotificationChannel, number>>(() => {
-  const summary = { IN_APP: 0, EMAIL: 0, SMS: 0 } as Record<NotificationChannel, number>;
-  (data.value ?? []).forEach((item) => {
-    summary[item.channel] += 1;
   });
   return summary;
 });

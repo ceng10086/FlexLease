@@ -2,7 +2,6 @@ package com.flexlease.product.service;
 
 import com.flexlease.common.exception.BusinessException;
 import com.flexlease.common.exception.ErrorCode;
-import com.flexlease.common.notification.NotificationChannel;
 import com.flexlease.common.notification.NotificationSendRequest;
 import com.flexlease.product.domain.Product;
 import com.flexlease.product.domain.ProductInquiry;
@@ -108,7 +107,6 @@ public class ProductInquiryService {
     private void notifyVendorNewInquiry(Product product, ProductInquiry inquiry) {
         NotificationSendRequest request = new NotificationSendRequest(
                 null,
-                NotificationChannel.IN_APP,
                 inquiry.getVendorId().toString(),
                 "收到新的商品咨询",
                 "商品 %s 收到新的咨询，请尽快答复。".formatted(product.getName()),
@@ -125,7 +123,6 @@ public class ProductInquiryService {
         }
         NotificationSendRequest request = new NotificationSendRequest(
                 null,
-                NotificationChannel.IN_APP,
                 inquiry.getRequesterId().toString(),
                 "厂商回复了咨询",
                 "您的咨询已有回复，请前往订单前沟通面板查看详情。",

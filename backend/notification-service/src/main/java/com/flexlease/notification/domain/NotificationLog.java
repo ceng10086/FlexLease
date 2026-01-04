@@ -1,6 +1,5 @@
 package com.flexlease.notification.domain;
 
-import com.flexlease.common.notification.NotificationChannel;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -21,10 +20,6 @@ public class NotificationLog {
 
     @Column(name = "template_code", length = 50)
     private String templateCode;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "channel", nullable = false, length = 20)
-    private NotificationChannel channel;
 
     @Column(name = "recipient", nullable = false, length = 100)
     private String recipient;
@@ -62,7 +57,6 @@ public class NotificationLog {
     }
 
     private NotificationLog(String templateCode,
-                             NotificationChannel channel,
                              String recipient,
                              String subject,
                              String content,
@@ -71,7 +65,6 @@ public class NotificationLog {
                              String contextReference) {
         this.id = UUID.randomUUID();
         this.templateCode = templateCode;
-        this.channel = channel;
         this.recipient = recipient;
         this.subject = subject;
         this.content = content;
@@ -82,14 +75,13 @@ public class NotificationLog {
     }
 
     public static NotificationLog draft(String templateCode,
-                                         NotificationChannel channel,
                                          String recipient,
                                          String subject,
                                          String content,
                                          String payload,
                                          String contextType,
                                          String contextReference) {
-        return new NotificationLog(templateCode, channel, recipient, subject, content, payload, contextType, contextReference);
+        return new NotificationLog(templateCode, recipient, subject, content, payload, contextType, contextReference);
     }
 
     @PrePersist
@@ -119,10 +111,6 @@ public class NotificationLog {
 
     public String getTemplateCode() {
         return templateCode;
-    }
-
-    public NotificationChannel getChannel() {
-        return channel;
     }
 
     public String getRecipient() {

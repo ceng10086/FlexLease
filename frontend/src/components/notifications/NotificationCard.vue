@@ -5,7 +5,6 @@
         <p class="notification-card__subject">{{ notification.subject || '系统通知' }}</p>
         <div class="notification-card__pills">
           <a-tag :color="statusColor(notification.status)">{{ statusLabel(notification.status) }}</a-tag>
-          <a-tag>{{ channelLabel(notification.channel) }}</a-tag>
           <a-tag v-if="notification.contextType" color="orange">{{ notification.contextType }}</a-tag>
         </div>
       </div>
@@ -28,7 +27,7 @@
 </template>
 
 <script lang="ts" setup>
-import type { NotificationLog, NotificationStatus, NotificationChannel } from '../../services/notificationService';
+import type { NotificationLog, NotificationStatus } from '../../services/notificationService';
 
 defineProps<{
   notification: NotificationLog;
@@ -53,17 +52,6 @@ const statusColor = (status: NotificationStatus) => {
       return 'red';
     default:
       return 'blue';
-  }
-};
-
-const channelLabel = (channel: NotificationChannel) => {
-  switch (channel) {
-    case 'EMAIL':
-      return '邮件';
-    case 'SMS':
-      return '短信';
-    default:
-      return '站内信';
   }
 };
 

@@ -2,7 +2,6 @@ package com.flexlease.user.service;
 
 import com.flexlease.common.exception.BusinessException;
 import com.flexlease.common.exception.ErrorCode;
-import com.flexlease.common.notification.NotificationChannel;
 import com.flexlease.common.notification.NotificationSendRequest;
 import com.flexlease.user.domain.CreditEventType;
 import com.flexlease.user.domain.UserProfile;
@@ -159,7 +158,6 @@ public class CreditEventService {
                             String contextType) {
         NotificationSendRequest request = new NotificationSendRequest(
                 null,
-                NotificationChannel.IN_APP,
                 userId.toString(),
                 subject,
                 content,

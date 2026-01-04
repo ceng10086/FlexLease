@@ -1,6 +1,5 @@
 package com.flexlease.user.scheduler;
 
-import com.flexlease.common.notification.NotificationChannel;
 import com.flexlease.common.notification.NotificationSendRequest;
 import com.flexlease.user.domain.UserProfile;
 import com.flexlease.user.integration.AuthServiceClient;
@@ -70,7 +69,6 @@ public class AccountUnfreezeScheduler {
     private void notifyAccountUnfrozen(UserProfile profile) {
         NotificationSendRequest request = new NotificationSendRequest(
                 null,
-                NotificationChannel.IN_APP,
                 profile.getUserId().toString(),
                 "账号解冻通知",
                 "您的账号冻结期已满，现已自动解冻。请遵守平台规则，祝您使用愉快。",

@@ -1,6 +1,5 @@
 package com.flexlease.order.service;
 
-import com.flexlease.common.notification.NotificationChannel;
 import com.flexlease.common.notification.NotificationSendRequest;
 import com.flexlease.order.client.InventoryReservationClient;
 import com.flexlease.order.client.InventoryReservationClient.InventoryCommand;
@@ -111,7 +110,6 @@ public class OrderMaintenanceScheduler {
         Map<String, Object> payload = Map.of("orderNo", order.getOrderNo());
         NotificationSendRequest userNotification = new NotificationSendRequest(
                 null,
-                NotificationChannel.IN_APP,
                 order.getUserId().toString(),
                 "订单已自动取消",
                 "订单 %s 因支付超时已被自动取消。".formatted(order.getOrderNo()),
@@ -126,7 +124,6 @@ public class OrderMaintenanceScheduler {
 
         NotificationSendRequest vendorNotification = new NotificationSendRequest(
                 null,
-                NotificationChannel.IN_APP,
                 order.getVendorId().toString(),
                 "订单已自动取消",
                 "订单 %s 因支付超时被系统自动取消，请确认库存记录。".formatted(order.getOrderNo()),

@@ -2,7 +2,6 @@ package com.flexlease.order.service;
 
 import com.flexlease.common.exception.BusinessException;
 import com.flexlease.common.exception.ErrorCode;
-import com.flexlease.common.notification.NotificationChannel;
 import com.flexlease.common.notification.NotificationSendRequest;
 import com.flexlease.common.security.FlexleasePrincipal;
 import com.flexlease.common.security.SecurityUtils;
@@ -270,7 +269,6 @@ public class OrderProofService {
     private void notifyUser(RentalOrder order, String subject, String content) {
         NotificationSendRequest request = new NotificationSendRequest(
                 null,
-                NotificationChannel.IN_APP,
                 order.getUserId().toString(),
                 subject,
                 content,
@@ -286,7 +284,6 @@ public class OrderProofService {
     private void notifyVendor(RentalOrder order, String subject, String content) {
         NotificationSendRequest request = new NotificationSendRequest(
                 null,
-                NotificationChannel.IN_APP,
                 order.getVendorId().toString(),
                 subject,
                 content,

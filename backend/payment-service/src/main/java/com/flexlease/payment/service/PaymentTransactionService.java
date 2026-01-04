@@ -2,7 +2,6 @@ package com.flexlease.payment.service;
 
 import com.flexlease.common.exception.BusinessException;
 import com.flexlease.common.exception.ErrorCode;
-import com.flexlease.common.notification.NotificationChannel;
 import com.flexlease.common.notification.NotificationSendRequest;
 import com.flexlease.common.security.FlexleasePrincipal;
 import com.flexlease.common.security.SecurityUtils;
@@ -429,7 +428,6 @@ public class PaymentTransactionService {
         String sceneName = sceneLabel(context.scene());
         NotificationSendRequest request = new NotificationSendRequest(
                 null,
-                NotificationChannel.IN_APP,
                 context.userId().toString(),
                 "支付成功",
                 "订单 %s 的%s支付 ¥%s 已完成。".formatted(context.orderId(), sceneName, context.amount()),
@@ -441,7 +439,6 @@ public class PaymentTransactionService {
     private void notifyPaymentFailed(PaymentTransaction transaction) {
         NotificationSendRequest request = new NotificationSendRequest(
                 null,
-                NotificationChannel.IN_APP,
                 transaction.getUserId().toString(),
                 "支付失败",
                 "订单 %s 的支付未成功，请检查后重试。".formatted(transaction.getOrderId()),
@@ -453,7 +450,6 @@ public class PaymentTransactionService {
     private void notifyRefundSucceeded(PaymentTransaction transaction, RefundTransaction refund) {
         NotificationSendRequest request = new NotificationSendRequest(
                 null,
-                NotificationChannel.IN_APP,
                 transaction.getUserId().toString(),
                 "退款成功",
                 "订单 %s 的退款 ¥%s 已退回。".formatted(transaction.getOrderId(), refund.getAmount()),

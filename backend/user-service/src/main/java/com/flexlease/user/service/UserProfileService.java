@@ -2,7 +2,6 @@ package com.flexlease.user.service;
 
 import com.flexlease.common.exception.BusinessException;
 import com.flexlease.common.exception.ErrorCode;
-import com.flexlease.common.notification.NotificationChannel;
 import com.flexlease.common.notification.NotificationSendRequest;
 import com.flexlease.common.user.CreditTierRules;
 import com.flexlease.user.domain.CreditAdjustment;
@@ -199,7 +198,6 @@ public class UserProfileService {
         String content = "信用积分 %s，原因：%s。".formatted(deltaText, reason == null ? "无" : reason);
         NotificationSendRequest request = new NotificationSendRequest(
                 null,
-                NotificationChannel.IN_APP,
                 userId.toString(),
                 subject,
                 content,

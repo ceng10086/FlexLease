@@ -4,7 +4,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flexlease.common.exception.BusinessException;
 import com.flexlease.common.exception.ErrorCode;
-import com.flexlease.common.notification.NotificationChannel;
 import com.flexlease.common.notification.NotificationSendRequest;
 import com.flexlease.common.security.FlexleasePrincipal;
 import com.flexlease.common.security.SecurityUtils;
@@ -51,7 +50,6 @@ public class NotificationService {
                     .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "通知模板不存在"));
         }
 
-        NotificationChannel channel = determineChannel(request, template);
         String subject = resolveSubject(request, template);
         String content = resolveContent(request, template);
 
@@ -66,7 +64,6 @@ public class NotificationService {
 
         NotificationLog log = NotificationLog.draft(
                 template != null ? template.getCode() : null,
-                channel,
                 request.recipient(),
                 subject,
                 content,
@@ -75,21 +72,9 @@ public class NotificationService {
             normalizeContextReference(request.contextReference())
         );
 
-        BusinessException businessFailure = null;
-        try {
-            simulateDelivery(channel, request.recipient());
-            log.markSent();
-        } catch (BusinessException ex) {
-            log.markFailed(ex.getMessage());
-            businessFailure = ex;
-        } catch (Exception ex) {
-            log.markFailed(ex.getMessage());
-        }
+        log.markSent();
 
         NotificationLog saved = logRepository.save(log);
-        if (businessFailure != null) {
-            throw businessFailure;
-        }
         return toResponse(saved);
     }
 
@@ -99,13 +84,6 @@ public class NotificationService {
     }
 
     public List<NotificationLogResponse> listLogs(NotificationStatus status, String recipient, String contextType) {
-        return listLogs(status, recipient, contextType, null);
-    }
-
-    public List<NotificationLogResponse> listLogs(NotificationStatus status,
-                                                  String recipient,
-                                                  String contextType,
-                                                  NotificationChannel channel) {
         FlexleasePrincipal principal = SecurityUtils.requirePrincipal();
         boolean hasGlobalAccess = principal.hasRole("ADMIN") || principal.hasRole("INTERNAL");
         String normalizedRecipient = recipient != null && !recipient.isBlank() ? recipient : null;
@@ -139,7 +117,6 @@ public class NotificationService {
                 normalizedRecipient,
                 status,
                 normalizedContextType,
-                channel,
                 PageRequest.of(0, 50)
         );
         return logs.stream().map(this::toResponse).toList();
@@ -152,22 +129,11 @@ public class NotificationService {
                 .map(template -> new NotificationTemplateResponse(
                         template.getId(),
                         template.getCode(),
-                        template.getChannel(),
                         template.getSubject(),
                         template.getContent(),
                         template.getCreatedAt()
                 ))
                 .toList();
-    }
-
-    private NotificationChannel determineChannel(NotificationSendRequest request, NotificationTemplate template) {
-        if (request.channel() != null) {
-            return request.channel();
-        }
-        if (template != null) {
-            return template.getChannel();
-        }
-        return NotificationChannel.IN_APP;
     }
 
     private String resolveSubject(NotificationSendRequest request, NotificationTemplate template) {
@@ -212,17 +178,10 @@ public class NotificationService {
         }
     }
 
-    private void simulateDelivery(NotificationChannel channel, String recipient) {
-        if (channel == NotificationChannel.EMAIL && !recipient.contains("@")) {
-            throw new BusinessException(ErrorCode.VALIDATION_ERROR, "邮箱地址格式不正确");
-        }
-    }
-
     private NotificationLogResponse toResponse(NotificationLog log) {
         return new NotificationLogResponse(
                 log.getId(),
                 log.getTemplateCode(),
-                log.getChannel(),
                 log.getRecipient(),
                 log.getSubject(),
                 log.getContent(),

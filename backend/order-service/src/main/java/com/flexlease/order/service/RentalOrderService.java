@@ -5,7 +5,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.flexlease.common.exception.BusinessException;
 import com.flexlease.common.exception.ErrorCode;
-import com.flexlease.common.notification.NotificationChannel;
 import com.flexlease.common.notification.NotificationSendRequest;
 import com.flexlease.common.security.FlexleasePrincipal;
 import com.flexlease.common.security.SecurityUtils;
@@ -1036,7 +1035,6 @@ public class RentalOrderService {
     private void notifyUser(RentalOrder order, String subject, String content) {
         NotificationSendRequest request = new NotificationSendRequest(
                 null,
-                NotificationChannel.IN_APP,
                 order.getUserId().toString(),
                 subject,
                 content,
@@ -1052,7 +1050,6 @@ public class RentalOrderService {
     private void notifyVendor(RentalOrder order, String subject, String content) {
         NotificationSendRequest request = new NotificationSendRequest(
                 null,
-                NotificationChannel.IN_APP,
                 order.getVendorId().toString(),
                 subject,
                 content,
@@ -1092,7 +1089,6 @@ public class RentalOrderService {
                 .formatted(order.getOrderNo(), reasonText, logisticsLine);
         NotificationSendRequest notification = new NotificationSendRequest(
                 null,
-                NotificationChannel.IN_APP,
                 ADMIN_NOTIFICATION_RECIPIENT,
                 subject,
                 content,
