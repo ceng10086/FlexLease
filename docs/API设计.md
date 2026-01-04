@@ -312,12 +312,14 @@
 ## 8. 网关与前端约定
 - 所有微服务注册到 Eureka（`registry-service`，端口 8761），网关根据路径转发：
   - `/api/v1/auth/**` → auth-service
-  - `/api/v1/users/**` `/api/v1/admin/users/**` `/api/v1/vendors/**` `/api/v1/vendors/applications/**` `/api/v1/customers/profile/**` `/api/v1/internal/vendors/**` → user-service
+  - `/api/v1/users/**` `/api/v1/admin/users/**` `/api/v1/vendors/**` `/api/v1/customers/**` `/api/v1/internal/vendors/**` `/api/v1/internal/users/**` → user-service
   - `/api/v1/products/**` `/api/v1/catalog/**` `/api/v1/admin/products/**` `/api/v1/vendors/*/products/**` `/api/v1/vendors/*/inquiries/**` → product-service
   - `/api/v1/orders/**` `/api/v1/admin/orders/**` `/api/v1/analytics/**` `/api/v1/cart/**` `/api/v1/proofs/**` `/api/v1/proof-policy` → order-service
   - `/api/v1/payments/**` `/api/v1/internal/payments/**` → payment-service
   - `/api/v1/notifications/**` → notification-service
 - 前端 SPA 使用 axios 拦截器统一注入 token 与错误提示。
+
+> 说明：网关中保留 `/api/v1/users/**`、`/api/v1/products/**` 的预留转发（便于后续演进），但当前业务接口实际分别落在 `user-service` 的 `/vendors/**`、`/customers/profile` 与 `product-service` 的 `/catalog/**`、`/vendors/{vendorId}/products/**` 等路径下；以各服务 Controller 的 `@RequestMapping` 为准。
 
 ## 9. 事件与集成接口
 - **订单事件消息总线**：`order-service` 将 `OrderCreated`、`OrderPaid`/`PaymentConfirmed`、`OrderShipped`、`OrderCancelled` 等状态以 JSON 消息发布到 RabbitMQ `order.events` 主题交换机（路由键 `order.*`）。`notification-service` 订阅 `order.events.notification` 队列，当前已基于 `ORDER_CREATED` 事件向厂商推送“新订单待处理”站内通知，后续可扩展更多消费者。

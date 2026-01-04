@@ -7,11 +7,13 @@
 - 🧭 多角色导航：`AuthenticatedLayout` + `router/menu` 根据角色渲染菜单并在移动端自动折叠，`useViewport` 与面包屑/头像等组件统一头部体验。
 - 🛒 商品目录 & 购物车：`views/catalog/ProductFeedView.vue`、`views/catalog/ProductDetailShell.vue`、`views/checkout/CartBoardView.vue` 与 `views/checkout/CheckoutShell.vue` 直连 `/catalog/products`、`/cart`、`/orders/preview`，支持瀑布流选品、Sticky CTA 以及购物车卡片化结算。
 - 📃 订单详情与合同：`views/orders/OrderHubView.vue` + `views/orders/detail/*.vue` 拆分概览/聊天/凭证/时间线，配合 `components/orders/OrderContractDrawer.vue` 自动刷新 `/orders/{id}` 与 `/orders/{id}/contract`。
+- 💬 聊天中心：消费者 `views/orders/OrderConversationHubView.vue`（`/app/orders/chat-center`）与厂商 `views/vendor/VendorConversationHubView.vue`（`/app/vendor/chat-center`）集中查看需沟通的订单并快速跳转详情。
 - 🔔 通知中心：`views/notifications/NotificationCenterView.vue` 调用 `/notifications/logs` 并提供状态/渠道/上下文筛选，卡片化展示站内信。
 - 👤 个人资料：`views/profile/ProfileOverviewView.vue` 首次进入即触发 `/customers/profile` 建档，展示信用档位/冻结状态并允许修改姓名、联系方式与地址，保存后实时同步 user-service。
 - 🧾 厂商工作台：`VendorWorkbenchLayout` 下的 `ProductBoardView`、`FulfillmentBoardView`、`InsightsBoardView` 与 `SettlementBoardView` 以 Tabs 串联商品/履约/指标/结算，配套 `ProductDetailDrawer` 完成方案&SKU 管理、库存调整与咨询回复。
 - 🚚 厂商履约 & 结算：`FulfillmentBoardView` + `FulfillmentDetailSheet` 提供发货、续租/退租/买断审批、凭证墙与聊天抽屉；结算页基于 `/payments/settlements` 输出拆分卡片，依赖登录会话中的 `vendorId`。
-- 🛂 管理员运营：`AdminReviewSuiteView` 将厂商&商品审核汇总到 Review Split View，`AdminOrderMonitorView` + `AdminOrderDetailDrawer` 具备过滤、聊天/凭证/时间线展示与 `/admin/orders/{id}/force-close`、纠纷裁决入口。
+- 🛂 管理员运营：`AdminReviewSuiteView` 将厂商&商品审核汇总到 Review Split View，`AdminOrderMonitorView` + `AdminOrderDetailDrawer` 具备过滤、聊天/凭证/时间线展示与 `/admin/orders/{id}/force-close`。
+- ⚖️ 仲裁中心：`views/arbitration/ArbitrationOrderMonitorView.vue`（`/app/arbitration/orders`）供 `ARBITRATOR/REVIEW_PANEL` 查看纠纷订单、生成仲裁建议并提交裁决（平台管理员无此权限）。
 - 📊 仪表盘：`views/dashboard/DashboardHome.vue` 汇总平台 & 厂商 GMV、订单状态分布、7 日趋势、租赁模式构成、纠纷与信用统计，并挂载公告/快捷入口。
 - ⚙️ 工程化：Ant Design Vue 组件库、`services/*.ts` API 封装、`stores/auth` Token 恢复，以及 `flexlease.payment.auto-confirm` 驱动的自动支付模拟。
 

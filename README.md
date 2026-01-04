@@ -24,7 +24,7 @@ FlexLease 面向 B2C 场景，为厂商与消费者提供从入驻、商品配�
 | notification-service | 9006（仅容器/本地） | 模板管理、通知发送日志、订阅订单事件并向厂商推送站内信 |
 | redis / postgres / rabbitmq | 6379 / 5432 / 5672+15672（对外暴露） | 依赖中间件（Volume 持久化 + 管控台端口映射） |
 
-> 默认平台管理员账号由认证服务启动时自动创建：`admin@flexlease.test / Admin@123`。默认仲裁管理人员账号：`arbitrator@flexlease.test / Arbitrator@123`（用于纠纷仲裁与裁决，平台管理员无此权限）。所有内部互信调用需在 Header 中附带 `X-Internal-Token:flexlease-internal-secret`，生产部署请通过 `.env` 或 CI/CD 密文覆盖。
+> 默认平台管理员账号由认证服务启动时自动创建：`admin@flexlease.test / Admin@123`。默认仲裁管理人员账号：`arbitrator@flexlease.test / Arbitrator@123`（用于纠纷仲裁与裁决，平台管理员无此权限；登录后可在 `/app/arbitration/orders` 进入仲裁中心）。所有内部互信调用需在 Header 中附带 `X-Internal-Token:flexlease-internal-secret`，生产部署请通过 `.env` 或 CI/CD 密文覆盖。
 
 ## 核心能力一览
 
@@ -34,7 +34,7 @@ FlexLease 面向 B2C 场景，为厂商与消费者提供从入驻、商品配�
 - **厂商与用户**
   - 厂商入驻申请、管理员审核（自动回写认证中心并创建 vendor 资料）。
   - 厂商资料分页与状态管控、消费者档案（含管理员冻结）。
-  - `CreditEventService` 暴露 `/api/v1/internal/users/{id}/credit-events`，支持实名认证奖励、按时支付/提前归还奖励（连续履约达标额外 +5 分）、巡检配合奖励（+2 分）、逾期惩罚、友好协商加分、恶意行为冻结等自动信用事件，并同步站内信提示；管理员亦可经 `/api/v1/admin/users/{id}/credit-adjustments` 人工干预信用分、记录原因并下发通知（支持查询历史调整记录）。
+  - `CreditEventService` 暴露 `/api/v1/internal/users/{id}/credit-events`（内部事件），当前内置规则为：实名认证（预留/内部事件模拟）+10、按时支付 +5（每连续 3 单额外 +5）、按约归还（租期到期前或 24 小时宽限内）+8、巡检配合 +2、待支付超时取消 -8、友好协商 +3、恶意行为 -30 且冻结 30 天，并同步站内信提示；管理员亦可经 `/api/v1/admin/users/{id}/credit-adjustments` 人工干预信用分、记录原因并下发通知（支持查询历史调整记录）。
   - `AccountUnfreezeScheduler` 每小时自动检查并解冻到期账号（恶意行为冻结 30 天后自动恢复），确保账号生命周期完整闭环。
   - `VendorService` 为支付/订单服务提供 `/api/v1/internal/vendors/{id}/commission-profile` 内部接口与 `/vendors/{id}/commission-profile` 管理入口，管理员可直接维护行业基准费率、信用档位及最近一次 SLA 评分。
 - **商品域**
@@ -158,6 +158,7 @@ docker compose up --build
 5. 在订单详情体验续租/退租/买断、支付回执与电子合同签署，并查看凭证卡片展示的 `/api/v1/proof-policy` 拍摄指引与水印示例，同时打开通知中心验证 `/notifications/logs` 的最新日志。
 6. 切换到厂商角色，在订单履约抽屉中完成发货/审批，接着打开运营指标（含抽成洞察）与结算页面（若缺少 `vendorId`，请退出账号后重新登录）。
 7. 切换管理员查看订单监控列表、过滤条件与合同抽屉，并使用强制关闭演练补偿流程；如需纯 API 调试可导入 `docs/postman/cart-api.postman_collection.json`。
+8. 使用仲裁管理人员账号进入 `/app/arbitration/orders`，对升级仲裁的纠纷生成仲裁建议并提交裁决（可在同一抽屉中查看聊天/凭证/时间线）。
 
 ## 辅助脚本
 
@@ -166,6 +167,15 @@ docker compose up --build
   ```bash
   FLEXLEASE_API_BASE=http://localhost:8080/api/v1 \
   FLEXLEASE_API_TOKEN=<JWT> \
+  FLEXLEASE_REPORT_DIR=reports \
+  node scripts/dashboard-report.mjs
+  ```
+
+  也可使用内部访问令牌（无需 JWT）：
+
+  ```bash
+  FLEXLEASE_API_BASE=http://localhost:8080/api/v1 \
+  FLEXLEASE_INTERNAL_TOKEN=flexlease-internal-secret \
   FLEXLEASE_REPORT_DIR=reports \
   node scripts/dashboard-report.mjs
   ```
