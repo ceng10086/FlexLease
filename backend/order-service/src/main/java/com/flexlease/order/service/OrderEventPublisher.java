@@ -1,5 +1,6 @@
 package com.flexlease.order.service;
 
+import com.flexlease.common.audit.BusinessReplayLogWriter;
 import com.flexlease.common.messaging.MessagingConstants;
 import com.flexlease.common.messaging.OrderEventMessage;
 import com.flexlease.order.domain.OrderEventType;
@@ -23,11 +24,14 @@ public class OrderEventPublisher {
     private static final Logger LOG = LoggerFactory.getLogger(OrderEventPublisher.class);
 
     private final ObjectProvider<RabbitTemplate> rabbitTemplateProvider;
+    private final BusinessReplayLogWriter replayLogWriter;
     private final boolean messagingEnabled;
 
     public OrderEventPublisher(ObjectProvider<RabbitTemplate> rabbitTemplateProvider,
+                               BusinessReplayLogWriter replayLogWriter,
                                @Value("${flexlease.messaging.enabled:true}") boolean messagingEnabled) {
         this.rabbitTemplateProvider = rabbitTemplateProvider;
+        this.replayLogWriter = replayLogWriter;
         this.messagingEnabled = messagingEnabled;
     }
 
@@ -36,9 +40,6 @@ public class OrderEventPublisher {
                         String description,
                         UUID actorId,
                         Map<String, Object> attributes) {
-        if (!messagingEnabled) {
-            return;
-        }
         OrderEventMessage payload = new OrderEventMessage(
                 order.getId(),
                 order.getOrderNo(),
@@ -64,12 +65,24 @@ public class OrderEventPublisher {
     }
 
     private void dispatchEvent(OrderEventMessage payload, OrderEventType eventType, String orderNo) {
+        String routingKey = MessagingConstants.ORDER_EVENTS_ROUTING_KEY_PREFIX + eventType.name().toLowerCase();
+        replayLogWriter.writeOutgoing(
+                MessagingConstants.ORDER_EVENTS_EXCHANGE,
+                routingKey,
+                eventType.name(),
+                "RentalOrder",
+                payload.orderId(),
+                payload,
+                payload.occurredAt()
+        );
+        if (!messagingEnabled) {
+            return;
+        }
         RabbitTemplate rabbitTemplate = rabbitTemplateProvider.getIfAvailable();
         if (rabbitTemplate == null) {
             LOG.debug("Skip publishing order event {} because RabbitTemplate is not available.", eventType);
             return;
         }
-        String routingKey = MessagingConstants.ORDER_EVENTS_ROUTING_KEY_PREFIX + eventType.name().toLowerCase();
         try {
             rabbitTemplate.convertAndSend(MessagingConstants.ORDER_EVENTS_EXCHANGE, routingKey, payload);
         } catch (AmqpException ex) {

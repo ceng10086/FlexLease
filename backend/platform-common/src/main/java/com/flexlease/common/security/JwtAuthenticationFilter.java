@@ -32,6 +32,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private static final String INTERNAL_TOKEN_HEADER = "X-Internal-Token";
+    private static final String PRINCIPAL_REQUEST_ATTRIBUTE = "flexlease.principal";
 
     private final JwtTokenVerifier tokenVerifier;
     private final JwtAuthProperties properties;
@@ -86,6 +87,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     new UsernamePasswordAuthenticationToken(principal, token, user.getAuthorities());
             authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
             SecurityContextHolder.getContext().setAuthentication(authentication);
+            request.setAttribute(PRINCIPAL_REQUEST_ATTRIBUTE, principal);
         }, () -> writeUnauthorized(response, "访问令牌无效或已过期"));
 
         if (!response.isCommitted()) {
@@ -107,6 +109,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         Set.of(new SimpleGrantedAuthority("ROLE_INTERNAL")));
         authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
         SecurityContextHolder.getContext().setAuthentication(authentication);
+        request.setAttribute(PRINCIPAL_REQUEST_ATTRIBUTE, principal);
         return true;
     }
 

@@ -1,5 +1,6 @@
 package com.flexlease.notification.service;
 
+import com.flexlease.common.audit.BusinessReplayLogWriter;
 import com.flexlease.common.messaging.MessagingConstants;
 import com.flexlease.common.messaging.OrderEventMessage;
 import com.flexlease.common.notification.NotificationChannel;
@@ -17,13 +18,25 @@ public class OrderEventListener {
     private static final Logger LOG = LoggerFactory.getLogger(OrderEventListener.class);
 
     private final NotificationService notificationService;
+    private final BusinessReplayLogWriter replayLogWriter;
 
-    public OrderEventListener(NotificationService notificationService) {
+    public OrderEventListener(NotificationService notificationService,
+                              BusinessReplayLogWriter replayLogWriter) {
         this.notificationService = notificationService;
+        this.replayLogWriter = replayLogWriter;
     }
 
     @RabbitListener(queues = MessagingConstants.ORDER_EVENTS_NOTIFICATION_QUEUE)
     public void onOrderEvent(OrderEventMessage message) {
+        replayLogWriter.writeIncoming(
+                MessagingConstants.ORDER_EVENTS_EXCHANGE,
+                null,
+                message.eventType(),
+                "RentalOrder",
+                message.orderId(),
+                message,
+                message.occurredAt()
+        );
         if ("ORDER_CREATED".equalsIgnoreCase(message.eventType())) {
             dispatchNewOrderNotification(message);
         }
