@@ -10,6 +10,12 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
+/**
+ * 业务回放日志写入器（消息/事件级）。
+ *
+ * <p>用于把关键业务事件的收发记录落库到 {@code audit.business_replay_log}，便于排查跨服务事件链路、
+ * 以及基于同一聚合（如订单）做收发时间线回放。为保持主流程稳定，写入失败会被吞掉并仅输出 debug 日志。</p>
+ */
 @Component
 public class BusinessReplayLogWriter {
 
@@ -100,4 +106,3 @@ public class BusinessReplayLogWriter {
         return value.substring(0, maxLen);
     }
 }
-

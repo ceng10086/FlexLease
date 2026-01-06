@@ -8,6 +8,12 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
+/**
+ * 审计日志写入器（HTTP 请求级）。
+ *
+ * <p>该类负责把一次 HTTP 调用的关键信息落库到 {@code audit.api_audit_log}。为了不影响主流程，
+ * 写入失败会被吞掉并仅输出 debug 日志。</p>
+ */
 @Component
 public class AuditLogWriter {
 
@@ -83,4 +89,3 @@ public class AuditLogWriter {
         return trimmed.substring(0, maxLen);
     }
 }
-

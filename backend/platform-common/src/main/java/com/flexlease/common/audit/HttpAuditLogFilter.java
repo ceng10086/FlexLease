@@ -16,6 +16,14 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.AntPathMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+/**
+ * HTTP 请求级审计日志过滤器。
+ *
+ * <p>作用：在每次请求完成后（无论成功/失败）记录一条“谁在什么时间请求了什么接口、耗时多久、返回什么状态”的审计日志，
+ * 便于问题排查与事后复盘。日志内容写入 {@code audit.api_audit_log}（由 {@link AuditLogWriter} 落库）。</p>
+ *
+ * <p>注意：为保持 KISS，本过滤器不记录请求/响应 body，仅记录必要的元信息（method/path/query/status/duration/ip/userAgent 与主体信息）。</p>
+ */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 10)
 public class HttpAuditLogFilter extends OncePerRequestFilter {
@@ -54,6 +62,7 @@ public class HttpAuditLogFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
+        // 包一层 response：确保即使发生异常/重定向，也能拿到最终 status。
         StatusCaptureResponseWrapper responseWrapper = new StatusCaptureResponseWrapper(response);
         long start = System.nanoTime();
         try {
@@ -68,6 +77,7 @@ public class HttpAuditLogFilter extends OncePerRequestFilter {
                 statusCode = 500;
             }
             FlexleasePrincipal principal = null;
+            // 主体信息由鉴权过滤器解析后写入 request attribute（避免这里再次解析 token）。
             Object principalAttr = request.getAttribute(PRINCIPAL_REQUEST_ATTRIBUTE);
             if (principalAttr instanceof FlexleasePrincipal flexleasePrincipal) {
                 principal = flexleasePrincipal;
@@ -86,6 +96,7 @@ public class HttpAuditLogFilter extends OncePerRequestFilter {
     }
 
     private String resolveClientIp(HttpServletRequest request) {
+        // 优先取反向代理传入的 X-Forwarded-For（只取第一个 IP）。
         String forwardedFor = request.getHeader("X-Forwarded-For");
         if (forwardedFor != null && !forwardedFor.isBlank()) {
             int commaIndex = forwardedFor.indexOf(',');
