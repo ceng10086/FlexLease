@@ -5,6 +5,7 @@ FlexLease 采用 **Flyway + PostgreSQL**，按微服务拆分 schema。每个微
 ## 拆分策略
 
 - 业务域与 schema 一一对应：`auth`、`users`、`product`、`order`、`payment`、`notification`。
+- 统一审计/回放 schema：`audit`（`api_audit_log`、`business_replay_log`），用于 HTTP 请求级审计与跨服务消息回放（详见 `docs/日志与审计.md`）。
 - 所有主键使用 `UUID`，时间采用 `TIMESTAMP WITH TIME ZONE`；金额字段以 `NUMERIC(18,2)` 为主（部分比例/快照字段会使用更适合的精度，例如抽成比例 `NUMERIC(5,4)`）。
 
 ## 目录布局
@@ -35,3 +36,5 @@ FlexLease 采用 **Flyway + PostgreSQL**，按微服务拆分 schema。每个微
 - 优先使用约束/索引命名规范：`idx_<table>_<column>`、`fk_<from>_<to>` 等，便于排查。
 - 对历史数据有破坏性的迁移请在脚本顶部写明背景与回滚方式，并在 PR 描述中同步。
 - 需要核对最终结构时，以各服务实际运行的 Flyway 脚本为准；`docs/数据库设计.md` 也会对关键表做说明。
+
+> 补充：`audit` schema 的迁移脚本位于各服务内的 `V900__audit_logs.sql`，因此根目录 `db/migration/` 目录中可能不会单独出现 `audit/` 文件夹（以服务内脚本为准）。

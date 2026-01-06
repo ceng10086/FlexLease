@@ -266,23 +266,25 @@ npm run test:e2e -- --headed
 
 - 《项目说明》：`docs/项目说明-原始.md`
 - 《项目规划与任务分解》：`docs/项目规划与任务分解.md`
+- 《用户故事地图》：`docs/用户故事地图.md`
 - 《API 设计》：`docs/API设计.md`
 - 《数据库设计》：`docs/数据库设计.md`
 - 《用例设计》：`docs/用例设计.md`
 - 《测试与质量策略》：`docs/测试与质量策略.md`
+- 《日志与审计》：`docs/日志与审计.md`
 - 《纠纷仲裁智能助手》：`docs/纠纷仲裁智能助手.md`
 
 更多细节及迭代路线可参考 `docs/` 目录（尤其是 `docs/项目规划与任务分解.md` 的“三次大迭代”小节）。
 
-## Git 三次大迭代（当前位于第 3 次迭代结束）
+## Git 三次大迭代（已完成）
 
-仓库通过 git 记录了三次**大迭代**，当前代码处于第三次迭代结束的状态（`master` 分支 `7f81bb0`）：
+仓库通过 git 记录了三次**大迭代**；核心业务能力在第三次迭代完成后进入“以修订为主”的阶段（可用 `git log --oneline` 查看完整历史）：
 
-1. **第一次大迭代（2025-10-21～2025-11-19）**：`a5708fe chore: initialize repository` → `d3b7bed Fix auth-service login error responses`  
+1. **第一次大迭代（2025-10-21～2025-11-19）**：`chore: initialize repository` → `Fix auth-service login error responses`  
    主要交付：搭建微服务与 Compose 基础设施，完成认证/厂商入驻/商品/订单/支付/通知/运营看板的最小可用闭环；补齐服务发现与网关、购物车与库存预占、订单合同与幂等/权限边界等基础能力，并持续修复登录与路由等问题。
-2. **第二次大迭代（2025-11-22～2025-12-19）**：`0e97f91 Add end-to-end user story map and roadmap` → `970ad06 test(e2e): read data from UI instead of network responses`  
+2. **第二次大迭代（2025-11-22～2025-12-19）**：`Add end-to-end user story map and roadmap` → `test(e2e): read data from UI instead of network responses`  
    主要交付：补齐并强化“信用/沟通/平台抽成/履约证明/矛盾处理”能力（含纠纷仲裁流程、满意度调研、抽成与结算增强、取证策略与文件鉴权、信用奖惩与咨询渠道等），同时加入 Playwright E2E 与演示指南，确保核心旅程可回归。
-3. **第三次大迭代（2025-12-20～2026-01-04）**：`7a18483 feat: add LLM dispute arbitration assistant` → `7f81bb0 refactor(notification):keep in-app inbox only`  
+3. **第三次大迭代（2025-12-20～2026-01-04）**：`feat: add LLM dispute arbitration assistant` → `refactor(notification):keep in-app inbox only`  
    主要交付：新增纠纷仲裁智能助手（外部 LLM 可选、离线模板兜底）与审计/回放日志；补齐仲裁相关 RBAC，并对通知域做收敛（仅保留站内信），同时修复结算、入驻提示、E2E 稳定性等问题并同步文档。
 
 ## 目录结构
