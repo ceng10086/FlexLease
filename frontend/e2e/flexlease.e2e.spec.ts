@@ -6,7 +6,8 @@ import fs from 'node:fs';
 
 const stepScreenshotEnabled = (process.env.E2E_STEP_SCREENSHOT ?? '1') !== '0';
 const stepScreenshotDelayMs = Number(process.env.E2E_STEP_SCREENSHOT_DELAY_MS ?? 500);
-const stepScreenshotFullPage = (process.env.E2E_STEP_SCREENSHOT_FULL_PAGE ?? '0') === '1';
+// 默认截 fullPage，避免只截到固定 viewport 的“半屏/一屏”。
+const stepScreenshotFullPage = (process.env.E2E_STEP_SCREENSHOT_FULL_PAGE ?? '1') === '1';
 
 const adminCreds = {
   username: process.env.E2E_ADMIN_USERNAME ?? 'admin@flexlease.test',
