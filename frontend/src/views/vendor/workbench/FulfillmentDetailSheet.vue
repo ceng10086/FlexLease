@@ -178,6 +178,23 @@
                       {{ proofLabel(proofId) }}
                     </a-tag>
                   </div>
+                  <div
+                    v-if="item.status === 'CLOSED' && (item.adminDecisionOption || item.adminDecisionRemark)"
+                    class="dispute-arbitration"
+                  >
+                    <p class="dispute-arbitration__title">
+                      平台裁决：{{ item.adminDecisionOption ? disputeOptionLabel(item.adminDecisionOption) : '—' }}
+                    </p>
+                    <p v-if="item.adminDecisionRemark" class="dispute-arbitration__remark">
+                      仲裁备注：{{ item.adminDecisionRemark }}
+                    </p>
+                    <p v-if="item.userCreditDelta != null" class="text-muted dispute-arbitration__meta">
+                      信用调整：{{ item.userCreditDelta }}
+                    </p>
+                    <p v-if="item.adminDecisionAt" class="text-muted dispute-arbitration__meta">
+                      裁决时间：{{ new Date(item.adminDecisionAt).toLocaleString() }}
+                    </p>
+                  </div>
                   <div v-if="(item.status === 'OPEN' || item.status === 'PENDING_ADMIN') && item.deadlineAt" class="dispute-countdown">
                     <ClockCircleOutlined />
                     <span class="label">剩余处理时间：</span>
@@ -1065,6 +1082,27 @@ fetchProofPolicy()
 .dispute-proof-tags .label {
   font-size: 12px;
   color: var(--color-text-secondary);
+}
+
+.dispute-arbitration {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg-container);
+}
+
+.dispute-arbitration__title {
+  margin: 0;
+  font-weight: 600;
+}
+
+.dispute-arbitration__remark {
+  margin: 6px 0 0;
+}
+
+.dispute-arbitration__meta {
+  margin: 4px 0 0;
 }
 
 .proof-tag {

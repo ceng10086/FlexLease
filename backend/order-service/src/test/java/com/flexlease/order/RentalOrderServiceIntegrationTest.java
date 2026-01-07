@@ -373,6 +373,7 @@ class RentalOrderServiceIntegrationTest {
         }
 
         assertThat(resolved.status()).isEqualTo(OrderDisputeStatus.CLOSED);
+        assertThat(resolved.adminDecisionRemark()).isEqualTo("确认用户责任");
         assertThat(resolved.userCreditDelta()).isEqualTo(-12);
         Mockito.verify(userProfileClient).adjustCredit(Mockito.eq(userId), Mockito.eq(-12), Mockito.anyString());
     }
