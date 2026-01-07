@@ -1,8 +1,12 @@
 /// <reference types="node" />
-import { test, expect, chromium, type Browser, type Page, type Locator } from '@playwright/test';
+import { test, expect, chromium, type Browser, type Page, type Locator, type TestInfo } from '@playwright/test';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
+
+const stepScreenshotEnabled = (process.env.E2E_STEP_SCREENSHOT ?? '1') !== '0';
+const stepScreenshotDelayMs = Number(process.env.E2E_STEP_SCREENSHOT_DELAY_MS ?? 500);
+const stepScreenshotFullPage = (process.env.E2E_STEP_SCREENSHOT_FULL_PAGE ?? '0') === '1';
 
 const adminCreds = {
   username: process.env.E2E_ADMIN_USERNAME ?? 'admin@flexlease.test',
@@ -38,6 +42,77 @@ const defaultActionTimeoutMs = Number(process.env.E2E_ACTION_TIMEOUT_MS ?? 30_00
 const defaultNavigationTimeoutMs = Number(process.env.E2E_NAV_TIMEOUT_MS ?? 60_000);
 
 type DemoWindowSlot = 0 | 1 | 2;
+
+type StepRole = 'admin' | 'vendor' | 'user';
+
+const sanitizeForFileName = (raw: string) => {
+  // 保持可读性：保留字母数字/中文/下划线/短横线，其它统一替换成 -
+  const cleaned = raw
+    .trim()
+    .replace(/[^\p{L}\p{N}_-]+/gu, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+  return cleaned.length > 0 ? cleaned : 'step';
+};
+
+const settleForScreenshot = async (page: Page, delayMs: number) => {
+  if (page.isClosed()) return;
+  await page.waitForLoadState('domcontentloaded').catch(() => undefined);
+  if (delayMs > 0) await page.waitForTimeout(delayMs);
+};
+
+const createStepRunner = (testInfo: TestInfo, pagesByRole: Partial<Record<StepRole, Page>>) => {
+  let stepIndex = 0;
+
+  const capture = async (stepName: string, phase: 'before' | 'after' | 'error') => {
+    if (!stepScreenshotEnabled) return;
+
+    const dir = testInfo.outputPath('step-screenshots');
+    fs.mkdirSync(dir, { recursive: true });
+
+    const safeStepName = sanitizeForFileName(stepName);
+    const prefix = `${String(stepIndex).padStart(3, '0')}-${safeStepName}`;
+
+    const roles: StepRole[] = ['admin', 'vendor', 'user'];
+    await Promise.all(
+      roles.map(async (role) => {
+        const page = pagesByRole[role];
+        if (!page || page.isClosed()) return;
+
+        try {
+          await settleForScreenshot(page, stepScreenshotDelayMs);
+          const filePath = path.join(dir, `${prefix}__${phase}__${role}.png`);
+          await page.screenshot({
+            path: filePath,
+            fullPage: stepScreenshotFullPage,
+            animations: 'disabled'
+          });
+          await testInfo.attach(`${prefix} ${phase} ${role}`, {
+            path: filePath,
+            contentType: 'image/png'
+          });
+        } catch (error) {
+          console.log(`[e2e][screenshot] step=${stepName} phase=${phase} role=${role} failed`, error);
+        }
+      })
+    );
+  };
+
+  return async <T>(name: string, fn: () => Promise<T>) => {
+    stepIndex += 1;
+    return await test.step(name, async () => {
+      await capture(name, 'before');
+      try {
+        const result = await fn();
+        await capture(name, 'after');
+        return result;
+      } catch (error) {
+        await capture(name, 'error');
+        throw error;
+      }
+    });
+  };
+};
 
 const demoWindowLayout = {
   // 适配演示环境：3200*2000 且 Windows 200% 缩放下，Chromium 的可用坐标通常约等于 1600*1000。
@@ -1371,8 +1446,6 @@ test.describe.serial('FlexLease E2E（由 playwright-mcp 操作转换）', () =>
 	    const vendorEmail = uniqueEmail('e2e_vendor');
 	    const productName = `iPhone 15 Pro Max E2E ${Date.now()}`;
 
-	    console.log('[e2e] step=register-login');
-
 	    let sharedBrowser: Browser | undefined;
 	    let adminBrowser: Browser | undefined;
 	    let vendorBrowser: Browser | undefined;
@@ -1423,124 +1496,143 @@ test.describe.serial('FlexLease E2E（由 playwright-mcp 操作转换）', () =>
       await positionDemoWindows(adminPage, vendorPage, userPage);
     }
 
-	    await ensureE2EBaseUp(adminPage);
+    // 先把三个 page 都落到一个“非 about:blank”的稳定页面，避免 step 截图出现纯白图。
+    await Promise.all([ensureE2EBaseUp(adminPage), ensureE2EBaseUp(vendorPage), ensureE2EBaseUp(userPage)]);
 
-	    // 注册/登录
-	    await register(userPage, 'USER', userEmail, passwords.user);
-	    await login(userPage, userEmail, passwords.user);
-	    await userAssertChatCenterAccessible(userPage);
-	    await assertRbacRedirectToDashboard(userPage, '/app/admin/review');
-	    await assertRbacRedirectToDashboard(userPage, '/app/vendor/workbench/products');
+    const step = createStepRunner(testInfo, {
+      admin: adminPage,
+      vendor: vendorPage,
+      user: userPage
+    });
 
-	    await register(vendorPage, 'VENDOR', vendorEmail, passwords.vendor);
-	    await login(vendorPage, vendorEmail, passwords.vendor);
-	    await vendorAssertChatCenterAccessible(vendorPage);
-	    await assertRbacRedirectToDashboard(vendorPage, '/app/catalog');
-	    await assertRbacRedirectToDashboard(vendorPage, '/app/admin/orders');
+    await step('bootstrap', async () => {
+      await Promise.all([
+        expect(adminPage.getByText('账号登录')).toBeVisible(),
+        expect(vendorPage.getByText('账号登录')).toBeVisible(),
+        expect(userPage.getByText('账号登录')).toBeVisible()
+      ]);
+    });
 
-	    console.log('[e2e] step=onboarding-approve');
+    await step('register-login', async () => {
+      // 注册/登录
+      await register(userPage, 'USER', userEmail, passwords.user);
+      await login(userPage, userEmail, passwords.user);
+      await userAssertChatCenterAccessible(userPage);
+      await assertRbacRedirectToDashboard(userPage, '/app/admin/review');
+      await assertRbacRedirectToDashboard(userPage, '/app/vendor/workbench/products');
 
-	    // 厂商入驻 + 管理员审核
-	    await submitVendorOnboarding(vendorPage, vendorEmail);
+      await register(vendorPage, 'VENDOR', vendorEmail, passwords.vendor);
+      await login(vendorPage, vendorEmail, passwords.vendor);
+      await vendorAssertChatCenterAccessible(vendorPage);
+      await assertRbacRedirectToDashboard(vendorPage, '/app/catalog');
+      await assertRbacRedirectToDashboard(vendorPage, '/app/admin/orders');
+    });
 
-	    await login(adminPage, adminCreds.username, adminCreds.password);
-	    await assertRbacRedirectToDashboard(adminPage, '/app/vendor/onboarding');
-	    await adminApproveLatestVendorApplication(adminPage);
+    await step('onboarding-approve', async () => {
+      // 厂商入驻 + 管理员审核
+      await submitVendorOnboarding(vendorPage, vendorEmail);
 
-    // 建议审核通过后重新登录，让 vendorId 进入会话
-    await logoutIfNeeded(vendorPage);
-    await login(vendorPage, vendorEmail, passwords.vendor);
+      await login(adminPage, adminCreds.username, adminCreds.password);
+      await assertRbacRedirectToDashboard(adminPage, '/app/vendor/onboarding');
+      await adminApproveLatestVendorApplication(adminPage);
 
-    // 厂商创建商品并提交审核 + 管理员审核上架
-	    await vendorCreateAndSubmitProduct(vendorPage, productName);
-	    await adminApproveProductByUi(adminPage, productName);
+      // 建议审核通过后重新登录，让 vendorId 进入会话
+      await logoutIfNeeded(vendorPage);
+      await login(vendorPage, vendorEmail, passwords.vendor);
 
-	    console.log('[e2e] step=order1-create-pay');
+      // 厂商创建商品并提交审核 + 管理员审核上架
+      await vendorCreateAndSubmitProduct(vendorPage, productName);
+      await adminApproveProductByUi(adminPage, productName);
+    });
 
 	    const inquiryMessage = '请问大概多久可以发货？';
 	    const inquiryReply = `预计 24 小时内发货（e2e ${Date.now()}）`;
 	    const userChatMessage = '你好，我想确认发货时间与包装情况（e2e）';
 	    const vendorChatReply = '已收到，会按凭证指引发货并同步物流（e2e）';
 
-    // 旅程 C：发现与试算（咨询）
-	    await userFillProfile(userPage, userEmail);
+    const order1 = await step('order1-create-pay', async () => {
+      // 旅程 C：发现与试算（咨询）
+      await userFillProfile(userPage, userEmail);
 
-	    // 旅程 D：下单与支付（直接结算）
-	    const order1 = await userCreateOrderFromCatalog(userPage, productName, {
-	      inquiryMessage,
-	      remark: '请尽快发货'
-	    });
+      // 旅程 D：下单与支付（直接结算）
+      const created = await userCreateOrderFromCatalog(userPage, productName, {
+        inquiryMessage,
+        remark: '请尽快发货'
+      });
 
-	    // 主题：沟通（咨询回复 + 订单聊天）
-	    await vendorReplyInquiry(vendorPage, inquiryMessage, inquiryReply);
-	    await userAssertInquiryReply(userPage, productName, inquiryReply);
-	    await userSendOrderChat(userPage, order1.orderId, userChatMessage);
+      // 主题：沟通（咨询回复 + 订单聊天）
+      await vendorReplyInquiry(vendorPage, inquiryMessage, inquiryReply);
+      await userAssertInquiryReply(userPage, productName, inquiryReply);
+      await userSendOrderChat(userPage, created.orderId, userChatMessage);
 
-	    console.log('[e2e] step=order1-fulfillment-inspection-dispute');
+      return created;
+    });
 
-	    // 旅程 E：履约与售后（发货/收货/巡检/纠纷）
-	    await vendorShipOrder(vendorPage, order1.orderNo, {
-	      expectInbound: userChatMessage,
-	      reply: vendorChatReply
-	    });
-	    await userReceiveAndConfirm(userPage, order1.orderId);
+    await step('order1-fulfillment-inspection-dispute', async () => {
+      // 旅程 E：履约与售后（发货/收货/巡检/纠纷）
+      await vendorShipOrder(vendorPage, order1.orderNo, {
+        expectInbound: userChatMessage,
+        reply: vendorChatReply
+      });
+      await userReceiveAndConfirm(userPage, order1.orderId);
 
-	    const creditBeforeInspection = await readCreditScoreFromProfile(userPage);
-	    await vendorRequestInspection(vendorPage, order1.orderNo);
-	    await userUploadInspectionProof(userPage, order1.orderId);
-	    const creditAfterInspection = await readCreditScoreFromProfile(userPage);
-	    expect(creditAfterInspection).toBeGreaterThanOrEqual(creditBeforeInspection + 2);
+      const creditBeforeInspection = await readCreditScoreFromProfile(userPage);
+      await vendorRequestInspection(vendorPage, order1.orderNo);
+      await userUploadInspectionProof(userPage, order1.orderId);
+      const creditAfterInspection = await readCreditScoreFromProfile(userPage);
+      expect(creditAfterInspection).toBeGreaterThanOrEqual(creditBeforeInspection + 2);
 
-	    const creditBeforePenalty = await readCreditScoreFromProfile(userPage);
-	    await userDisputeAndEscalate(userPage, order1.orderId);
-	    await logoutIfNeeded(adminPage);
-	    await login(adminPage, arbitratorCreds.username, arbitratorCreds.password);
-	    await arbitratorResolveDispute(adminPage, order1.orderNo, 5);
-    await logoutIfNeeded(adminPage);
-    await login(adminPage, adminCreds.username, adminCreds.password);
-	    const creditAfterPenalty = await readCreditScoreFromProfile(userPage);
-	    expect(creditAfterPenalty).toBeLessThanOrEqual(creditBeforePenalty - 5);
+      const creditBeforePenalty = await readCreditScoreFromProfile(userPage);
+      await userDisputeAndEscalate(userPage, order1.orderId);
+      await logoutIfNeeded(adminPage);
+      await login(adminPage, arbitratorCreds.username, arbitratorCreds.password);
+      await arbitratorResolveDispute(adminPage, order1.orderNo, 5);
+      await logoutIfNeeded(adminPage);
+      await login(adminPage, adminCreds.username, adminCreds.password);
+      const creditAfterPenalty = await readCreditScoreFromProfile(userPage);
+      expect(creditAfterPenalty).toBeLessThanOrEqual(creditBeforePenalty - 5);
+    });
 
-	    console.log('[e2e] step=order2-extension-return');
+    await step('order2-extension-return', async () => {
+      // 单独订单覆盖：续租 + 退租全链路（避免与“纠纷裁决”互相影响订单状态）
+      const order2 = await userCreateOrderFromCart(userPage, productName);
+      await vendorShipOrder(vendorPage, order2.orderNo);
+      await userReceiveAndConfirm(userPage, order2.orderId);
+      await userApplyExtension(userPage, order2.orderId, { additionalMonths: 1, remark: 'e2e extend 1m' });
+      await vendorApproveExtension(vendorPage, order2.orderNo);
+      await userUploadReturnProof(userPage, order2.orderId);
+      await userApplyReturn(userPage, order2.orderId);
+      await vendorApproveReturn(vendorPage, order2.orderNo);
+      await vendorCompleteReturn(vendorPage, order2.orderNo);
+    });
 
-	    // 单独订单覆盖：续租 + 退租全链路（避免与“纠纷裁决”互相影响订单状态）
-	    const order2 = await userCreateOrderFromCart(userPage, productName);
-	    await vendorShipOrder(vendorPage, order2.orderNo);
-	    await userReceiveAndConfirm(userPage, order2.orderId);
-	    await userApplyExtension(userPage, order2.orderId, { additionalMonths: 1, remark: 'e2e extend 1m' });
-	    await vendorApproveExtension(vendorPage, order2.orderNo);
-	    await userUploadReturnProof(userPage, order2.orderId);
-	    await userApplyReturn(userPage, order2.orderId);
-	    await vendorApproveReturn(vendorPage, order2.orderNo);
-	    await vendorCompleteReturn(vendorPage, order2.orderNo);
+    await step('order3-buyout', async () => {
+      // 单独订单覆盖：买断申请 → 厂商审批
+      const order3 = await userCreateOrderFromCart(userPage, productName);
+      await vendorShipOrder(vendorPage, order3.orderNo);
+      await userReceiveAndConfirm(userPage, order3.orderId);
+      await userApplyBuyout(userPage, order3.orderId);
+      await vendorApproveBuyout(vendorPage, order3.orderNo);
+    });
 
-	    console.log('[e2e] step=order3-buyout');
+    await step('order4-force-close', async () => {
+      // 管理员订单监控：强制关闭一单（待支付）
+      const order4 = await userCreateOrderFromCart(userPage, productName, { pay: false });
+      await adminForceCloseOrder(adminPage, order4.orderNo);
+    });
 
-	    // 单独订单覆盖：买断申请 → 厂商审批
-	    const order3 = await userCreateOrderFromCart(userPage, productName);
-	    await vendorShipOrder(vendorPage, order3.orderNo);
-	    await userReceiveAndConfirm(userPage, order3.orderId);
-	    await userApplyBuyout(userPage, order3.orderId);
-	    await vendorApproveBuyout(vendorPage, order3.orderNo);
+    await step('post-assertions', async () => {
+      // 旅程 F：结算与运营
+      await vendorAssertSettlementHasCommission(vendorPage);
+      await vendorAssertInsightsHasMetrics(vendorPage);
+      await adminAssertDashboardHasMetrics(adminPage);
+      await userAssertNotificationHasContextType(userPage, 'DISPUTE');
+      await userAssertNotificationHasContextType(userPage, 'CREDIT');
 
-	    console.log('[e2e] step=order4-force-close');
-
-	    // 管理员订单监控：强制关闭一单（待支付）
-	    const order4 = await userCreateOrderFromCart(userPage, productName, { pay: false });
-	    await adminForceCloseOrder(adminPage, order4.orderNo);
-
-	    console.log('[e2e] step=post-assertions');
-
-		    // 旅程 F：结算与运营
-		    await vendorAssertSettlementHasCommission(vendorPage);
-		    await vendorAssertInsightsHasMetrics(vendorPage);
-		    await adminAssertDashboardHasMetrics(adminPage);
-	    await userAssertNotificationHasContextType(userPage, 'DISPUTE');
-	    await userAssertNotificationHasContextType(userPage, 'CREDIT');
-
-	    // 兜底：404 路由
-	    await userPage.goto(resolveUrl(userPage, `/not-exist-${Date.now()}`));
-	    await expect(userPage.getByText('页面不存在', { exact: true })).toBeVisible({ timeout: 30_000 });
+      // 兜底：404 路由
+      await userPage.goto(resolveUrl(userPage, `/not-exist-${Date.now()}`));
+      await expect(userPage.getByText('页面不存在', { exact: true })).toBeVisible({ timeout: 30_000 });
+    });
 
     await adminContext.close();
     await vendorContext.close();
