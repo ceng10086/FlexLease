@@ -89,7 +89,15 @@
         <a-input v-model:value="createForm.name" placeholder="请输入名称" />
       </a-form-item>
       <a-form-item label="分类编码" required>
-        <a-input v-model:value="createForm.categoryCode" placeholder="如 OFFICE" />
+        <a-select v-model:value="createForm.categoryCode" placeholder="请选择分类">
+          <a-select-option
+            v-for="option in categoryOptions"
+            :key="option.value"
+            :value="option.value"
+          >
+            {{ option.label }}（{{ option.value }}）
+          </a-select-option>
+        </a-select>
       </a-form-item>
       <a-form-item label="封面图">
         <div class="cover-upload">
@@ -151,6 +159,7 @@ import {
   type ProductInquiry
 } from '../../../services/vendorService';
 import { friendlyErrorMessage } from '../../../utils/error';
+import { PRODUCT_CATEGORY_OPTIONS } from '../../../utils/productCategories';
 
 const { vendorId } = useVendorContext();
 
@@ -312,6 +321,8 @@ const handleReply = async (inquiryId: string) => {
 
 const createDrawer = ref(false);
 const createSubmitting = ref(false);
+
+const categoryOptions = PRODUCT_CATEGORY_OPTIONS;
 const createForm = reactive({
   name: '',
   categoryCode: '',

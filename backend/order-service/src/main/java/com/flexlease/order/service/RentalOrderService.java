@@ -993,6 +993,7 @@ public class RentalOrderService {
         return OrderActorRole.INTERNAL;
     }
 
+    //计算订单金额小计
     private Totals calculateTotals(List<ResolvedOrderItem> items) {
         BigDecimal deposit = BigDecimal.ZERO;
         BigDecimal rent = BigDecimal.ZERO;

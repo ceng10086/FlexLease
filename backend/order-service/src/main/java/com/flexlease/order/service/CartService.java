@@ -83,6 +83,7 @@ public class CartService {
         return toResponse(item);
     }
 
+    //清理单个条目
     public void removeItem(UUID userId, UUID itemId) {
         requireUserAccess(userId);
         CartItem item = cartItemRepository.findByIdAndUserId(itemId, userId)
@@ -90,6 +91,7 @@ public class CartService {
         cartItemRepository.delete(item);
     }
 
+    //清理整个购物车
     public void clearCart(UUID userId) {
         requireUserAccess(userId);
         cartItemRepository.deleteByUserId(userId);

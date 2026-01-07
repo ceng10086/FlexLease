@@ -17,7 +17,15 @@
                 <a-input v-model:value="basicForm.name" placeholder="请输入商品名称" />
               </a-form-item>
               <a-form-item label="分类编码" required>
-                <a-input v-model:value="basicForm.categoryCode" placeholder="如 OFFICE" />
+                <a-select v-model:value="basicForm.categoryCode" placeholder="请选择分类">
+                  <a-select-option
+                    v-for="option in categoryOptions"
+                    :key="option.value"
+                    :value="option.value"
+                  >
+                    {{ option.label }}（{{ option.value }}）
+                  </a-select-option>
+                </a-select>
               </a-form-item>
               <a-form-item label="封面图 URL">
                 <a-input v-model:value="basicForm.coverImageUrl" placeholder="https://example" />
@@ -239,6 +247,7 @@ import {
 } from '../../../services/productService';
 import { friendlyErrorMessage } from '../../../utils/error';
 import { formatCurrency } from '../../../utils/number';
+import { PRODUCT_CATEGORY_OPTIONS, ensureCategoryOption } from '../../../utils/productCategories';
 
 const props = defineProps<{
   open: boolean;
@@ -275,6 +284,13 @@ const basicForm = reactive({
   coverImageUrl: '',
   description: ''
 });
+
+const categoryOptions = computed(() =>
+  ensureCategoryOption(
+    PRODUCT_CATEGORY_OPTIONS.map((item) => ({ label: item.label, value: item.value })),
+    basicForm.categoryCode
+  )
+);
 
 watch(
   () => props.product,
