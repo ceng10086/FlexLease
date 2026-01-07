@@ -256,11 +256,11 @@ public class OrderDisputeService {
 
 
     public OrderDisputeResponse resolve(UUID orderId, UUID disputeId, OrderDisputeResolveRequest request) {
-        // 复核组权限校验：二次申诉案件需要 REVIEW_PANEL 角色
+        // 复核组权限校验：二次申诉案件需要 REVIEW_PANEL/ARBITRATOR 角色
         RentalOrder order = loadOrder(orderId);
         OrderDispute dispute = loadDispute(orderId, disputeId);
         if (dispute.getStatus() == OrderDisputeStatus.PENDING_REVIEW_PANEL) {
-            SecurityUtils.requireRole("REVIEW_PANEL");
+            SecurityUtils.requireAnyRole("REVIEW_PANEL", "ARBITRATOR");
         } else {
             SecurityUtils.requireRole("ARBITRATOR");
         }

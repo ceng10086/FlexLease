@@ -453,7 +453,7 @@ class RentalOrderServiceIntegrationTest {
         }
         assertThat(appealed.status()).isEqualTo(OrderDisputeStatus.PENDING_REVIEW_PANEL);
 
-        try (SecurityContextHandle ignored = withPrincipal(arbitratorId, "review-panel", "REVIEW_PANEL")) {
+        try (SecurityContextHandle ignored = withPrincipal(arbitratorId, "arbitrator", "ARBITRATOR")) {
             OrderDisputeResponse finalResolved = orderDisputeService.resolve(created.id(), opened.id(), new OrderDisputeResolveRequest(
                     DisputeResolutionOption.PARTIAL_REFUND,
                     0,

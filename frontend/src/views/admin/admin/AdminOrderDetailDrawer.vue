@@ -94,7 +94,7 @@
                       show-icon
                       class="dispute-ai-card"
                       message="当前账号无仲裁权限"
-                      description="请使用“仲裁管理人员”账号处理仲裁建议/裁决；申诉复核案件由“复核组”处理。"
+                      description="请使用“仲裁管理人员”账号处理仲裁建议/裁决；申诉复核案件也可由“复核组”处理。"
                     />
                     <a-alert
                       v-if="aiSuggestions[item.id]"
@@ -233,7 +233,7 @@ const chatSelfRole = computed(() => {
 
 const canResolveDispute = (dispute: OrderDispute) => {
   if (auth.hasRole('ARBITRATOR')) {
-    return dispute.status === 'PENDING_ADMIN';
+    return dispute.status === 'PENDING_ADMIN' || dispute.status === 'PENDING_REVIEW_PANEL';
   }
   if (auth.hasRole('REVIEW_PANEL')) {
     return dispute.status === 'PENDING_REVIEW_PANEL';
