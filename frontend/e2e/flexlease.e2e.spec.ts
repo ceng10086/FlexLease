@@ -34,6 +34,8 @@ const assetPayload = (name: string, mimeType: string) => ({
 const rawBaseURL = process.env.E2E_BASE_URL ?? 'http://localhost:8080';
 
 const defaultSlowMoMs = Number(process.env.E2E_SLOW_MO_MS ?? 200);
+const defaultActionTimeoutMs = Number(process.env.E2E_ACTION_TIMEOUT_MS ?? 30_000);
+const defaultNavigationTimeoutMs = Number(process.env.E2E_NAV_TIMEOUT_MS ?? 60_000);
 
 type DemoWindowSlot = 0 | 1 | 2;
 
@@ -478,6 +480,33 @@ async function readOrderNoFromOrderDetail(page: Page): Promise<string> {
   return match[1];
 }
 
+const parseOrderIdFromUrl = (url: string) => {
+  const match = url.match(/\/app\/orders\/([^/]+)(?:\/|$)/);
+  if (!match) {
+    throw new Error(`无法从 url 解析 orderId：${url}`);
+  }
+  return match[1];
+};
+
+async function readOrderNoFromPaymentPage(page: Page): Promise<string> {
+  const value = page
+    .locator('.ant-descriptions-item-label', { hasText: '订单号' })
+    .locator('..')
+    .locator('.ant-descriptions-item-content')
+    .first();
+  await expect(value).toBeVisible({ timeout: 60_000 });
+  const text = ((await value.textContent().catch(() => '')) ?? '').trim();
+  if (!text) {
+    throw new Error('无法从支付页解析订单号：为空');
+  }
+  return text;
+}
+
+async function openOrderDetailByOrderId(page: Page, orderId: string) {
+  await gotoPath(page, `/app/orders/${orderId}/overview`);
+  await expect(page.locator('.detail-header__eyebrow')).toBeVisible({ timeout: 60_000 });
+}
+
 async function userCreateOrderFromCatalog(
   page: Page,
   productName: string,
@@ -520,18 +549,15 @@ async function userCreateOrderFromCatalog(
   await page.waitForURL('**/app/orders/**/payment', { timeout: 60_000 });
   await expect(page.getByRole('heading', { name: '支付订单' })).toBeVisible({ timeout: 60_000 });
 
+  const orderId = parseOrderIdFromUrl(page.url());
+  const orderNo = await readOrderNoFromPaymentPage(page);
+
   // 支付（演示）-> 订单墙
   await page.getByRole('button', { name: '我已完成支付（模拟）' }).click();
   await page.waitForURL('**/app/orders', { timeout: 60_000 });
   await expect(page.getByRole('heading', { name: '订单时间线' })).toBeVisible({ timeout: 60_000 });
 
-  // 只从 UI 上找最新订单卡片，不从网络响应取数。
-  const picked = await pickOrderCardByUi(page);
-  await expect(picked.card).toBeVisible({ timeout: 60_000 });
-  await picked.card.getByRole('button', { name: '查看详情' }).click();
-  await page.waitForURL('**/app/orders/**/overview', { timeout: 60_000 });
-  const orderNo = await readOrderNoFromOrderDetail(page);
-  return { orderNo };
+  return { orderId, orderNo };
 }
 
 async function openOrderDetailByOrderNo(page: Page, orderNo: string) {
@@ -604,8 +630,8 @@ async function userAssertInquiryReply(page: Page, productName: string, replyText
   await expect(page.locator('.history-reply-text', { hasText: replyText }).first()).toBeVisible({ timeout: 60_000 });
 }
 
-async function userSendOrderChat(page: Page, orderNo: string, messageText: string) {
-  await openOrderDetailByOrderNo(page, orderNo);
+async function userSendOrderChat(page: Page, orderId: string, messageText: string) {
+  await openOrderDetailByOrderId(page, orderId);
   await switchOrderTab(page, '聊天');
   await expect(page.getByRole('heading', { name: '聊天' })).toBeVisible({ timeout: 30_000 });
 
@@ -713,8 +739,8 @@ async function vendorShipOrder(
   await drawer.locator('button[aria-label="Close"], .ant-drawer-close').first().click().catch(() => undefined);
 }
 
-async function userReceiveAndConfirm(page: Page, orderNo: string) {
-  await openOrderDetailByOrderNo(page, orderNo);
+async function userReceiveAndConfirm(page: Page, orderId: string) {
+  await openOrderDetailByOrderId(page, orderId);
   await switchOrderTab(page, '凭证');
   await expect(page.getByRole('heading', { name: '凭证墙' })).toBeVisible();
 
@@ -785,8 +811,8 @@ async function vendorRequestInspection(page: Page, orderNo: string) {
   await drawer.locator('button[aria-label="Close"], .ant-drawer-close').first().click().catch(() => undefined);
 }
 
-async function userUploadInspectionProof(page: Page, orderNo: string) {
-  await openOrderDetailByOrderNo(page, orderNo);
+async function userUploadInspectionProof(page: Page, orderId: string) {
+  await openOrderDetailByOrderId(page, orderId);
   await switchOrderTab(page, '凭证');
   await expect(page.getByRole('heading', { name: '凭证墙' })).toBeVisible();
 
@@ -870,7 +896,11 @@ async function pickOrderCardByUi(page: Page, options?: { excludeOrderNos?: strin
   throw new Error(`无法在订单墙中找到目标订单卡片（exclude=${Array.from(exclude).join(',') || 'n/a'}）`);
 }
 
-async function userCreateOrderFromCart(page: Page, productName: string, options?: { excludeOrderNos?: string[] }) {
+async function userCreateOrderFromCart(
+  page: Page,
+  productName: string,
+  options?: { excludeOrderNos?: string[]; pay?: boolean }
+) {
   await gotoPath(page, '/app/catalog');
   await expect(page.getByRole('heading', { name: '逛逛精选' })).toBeVisible();
 
@@ -903,33 +933,96 @@ async function userCreateOrderFromCart(page: Page, productName: string, options?
   await page.waitForURL('**/app/orders/**/payment', { timeout: 60_000 });
   await expect(page.getByRole('heading', { name: '支付订单' })).toBeVisible({ timeout: 60_000 });
 
-  // 支付（演示）-> 订单墙
-  await page.getByRole('button', { name: '我已完成支付（模拟）' }).click();
-  await page.waitForURL('**/app/orders', { timeout: 60_000 });
-  await expect(page.getByRole('heading', { name: '订单时间线' })).toBeVisible({ timeout: 60_000 });
+  const orderId = parseOrderIdFromUrl(page.url());
+  const orderNo = await readOrderNoFromPaymentPage(page);
 
-  // 只从 UI 上找订单卡片，不从网络响应取数。
-  const picked = await pickOrderCardByUi(page, { excludeOrderNos: options?.excludeOrderNos });
-  await expect(picked.card).toBeVisible({ timeout: 60_000 });
-  await picked.card.getByRole('button', { name: '查看详情' }).click();
+  const shouldPay = options?.pay ?? true;
+  if (shouldPay) {
+    // 支付（演示）-> 订单墙
+    await page.getByRole('button', { name: '我已完成支付（模拟）' }).click();
+    await page.waitForURL('**/app/orders', { timeout: 60_000 });
+    await expect(page.getByRole('heading', { name: '订单时间线' })).toBeVisible({ timeout: 60_000 });
+  }
 
-  await page.waitForURL('**/app/orders/**/overview', { timeout: 60_000 });
-  const orderNo = await readOrderNoFromOrderDetail(page);
-  return { orderNo };
+  return { orderId, orderNo };
 }
 
-async function userApplyBuyout(page: Page, orderNo: string) {
-  await openOrderDetailByOrderNo(page, orderNo);
+async function userApplyBuyout(page: Page, orderId: string) {
+  await openOrderDetailByOrderId(page, orderId);
   await switchOrderTab(page, '概览');
   await expect(page.getByRole('heading', { name: '租赁摘要' })).toBeVisible({ timeout: 30_000 });
 
-  await page.getByRole('button', { name: '申请买断' }).click();
+  const actionBar = page.locator('.action-bar').first();
+  await expect(actionBar).toBeVisible({ timeout: 30_000 });
+  await actionBar.getByRole('button', { name: /申请买断/ }).click();
   const modal = page.getByRole('dialog', { name: '买断申请' });
   await expect(modal).toBeVisible({ timeout: 30_000 });
   await modal.locator('.ant-form-item', { hasText: '买断金额' }).locator('input').fill('100');
   await modal.locator('.ant-form-item', { hasText: '备注' }).locator('textarea').fill('e2e buyout');
   await modal.getByRole('button', { name: '提交申请' }).click();
   await expect(page.getByText('买断申请已提交')).toBeVisible({ timeout: 60_000 });
+}
+
+async function userApplyExtension(page: Page, orderId: string, options?: { additionalMonths?: number; remark?: string }) {
+  await openOrderDetailByOrderId(page, orderId);
+  await switchOrderTab(page, '概览');
+  await expect(page.getByRole('heading', { name: '租赁摘要' })).toBeVisible({ timeout: 30_000 });
+
+  const actionBar = page.locator('.action-bar').first();
+  await expect(actionBar).toBeVisible({ timeout: 30_000 });
+  await actionBar.getByRole('button', { name: /续\s*租/ }).click();
+  const modal = page.getByRole('dialog', { name: '续租申请' });
+  await expect(modal).toBeVisible({ timeout: 30_000 });
+
+  const additionalMonths = String(options?.additionalMonths ?? 1);
+  await modal.locator('.ant-form-item', { hasText: '追加月份' }).locator('input').fill(additionalMonths);
+  await modal
+    .locator('.ant-form-item', { hasText: '备注' })
+    .locator('input')
+    .fill(options?.remark ?? 'e2e extend');
+  await modal.getByRole('button', { name: '提交申请' }).click();
+  await expect(page.getByText('已提交续租申请')).toBeVisible({ timeout: 60_000 });
+}
+
+async function userApplyReturn(page: Page, orderId: string) {
+  await openOrderDetailByOrderId(page, orderId);
+  await switchOrderTab(page, '概览');
+  await expect(page.getByRole('heading', { name: '租赁摘要' })).toBeVisible({ timeout: 30_000 });
+
+  const actionBar = page.locator('.action-bar').first();
+  await expect(actionBar).toBeVisible({ timeout: 30_000 });
+  await actionBar.getByRole('button', { name: /申请退租/ }).click();
+  const modal = page.getByRole('dialog', { name: '退租申请' });
+  await expect(modal).toBeVisible({ timeout: 30_000 });
+
+  await modal
+    .locator('.ant-form-item', { hasText: '退租原因' })
+    .locator('textarea')
+    .fill('设备已满足使用需求，申请退租（e2e）');
+
+  // 覆盖一条校验路径：只填物流公司不填运单号，会提示 warning。
+  await modal.locator('.ant-form-item', { hasText: '物流公司' }).locator('input').fill('SF');
+  await modal.getByRole('button', { name: '提交申请' }).click();
+  await expect(page.getByText('请同时填写物流公司与运单号', { exact: false })).toBeVisible({ timeout: 30_000 });
+
+  await modal.locator('.ant-form-item', { hasText: '运单号' }).locator('input').fill('SF987654321');
+  await modal.getByRole('button', { name: '提交申请' }).click();
+  await expect(page.getByText('退租申请已提交')).toBeVisible({ timeout: 60_000 });
+}
+
+async function userUploadReturnProof(page: Page, orderId: string) {
+  await openOrderDetailByOrderId(page, orderId);
+  await switchOrderTab(page, '凭证');
+  await expect(page.getByRole('heading', { name: '凭证墙' })).toBeVisible();
+
+  await page.locator('.ant-radio-button-wrapper', { hasText: '退租' }).click();
+  await page.locator('input.proof-uploader__file-input').setInputFiles([
+    assetPayload('proof-receive-1.jpg', 'image/jpeg'),
+    assetPayload('proof-receive-2.jpg', 'image/jpeg'),
+    assetPayload('proof-video.mp4', 'video/mp4')
+  ]);
+  await page.getByRole('button', { name: '上传全部' }).click();
+  await expect(page.getByText('已上传凭证').first()).toBeVisible({ timeout: 60_000 });
 }
 
 async function vendorApproveBuyout(page: Page, orderNo: string) {
@@ -974,6 +1067,200 @@ async function vendorApproveBuyout(page: Page, orderNo: string) {
   await drawer.locator('button[aria-label="Close"], .ant-drawer-close').first().click().catch(() => undefined);
 }
 
+async function vendorApproveExtension(page: Page, orderNo: string) {
+  await gotoPath(page, '/app/vendor/workbench/fulfillment');
+  await expect(page.getByRole('heading', { name: '履约任务墙' })).toBeVisible();
+
+  const wallSection = page
+    .locator('section.page-section')
+    .filter({ has: page.getByRole('heading', { name: '履约任务墙' }) })
+    .first();
+  await wallSection
+    .locator('.filter-row')
+    .getByText('履约中', { exact: true })
+    .click({ timeout: 5_000, force: true })
+    .catch(() => undefined);
+  await wallSection.getByRole('button', { name: '刷新' }).click({ timeout: 5_000, force: true }).catch(() => undefined);
+
+  const card = page.locator('article.vendor-order-card', { hasText: orderNo }).first();
+  for (let i = 0; i < 6; i += 1) {
+    if (await card.isVisible().catch(() => false)) {
+      break;
+    }
+    const loadMore = wallSection.getByRole('button', { name: '加载更多' });
+    if (await loadMore.isVisible().catch(() => false)) {
+      await loadMore.click();
+    } else {
+      break;
+    }
+  }
+  await expect(card).toBeVisible({ timeout: 60_000 });
+  await card.getByRole('button', { name: '进入工作台' }).click();
+
+  const drawer = page.locator('.ant-drawer').filter({ hasText: '订单履约详情' }).first();
+  await expect(drawer).toBeVisible({ timeout: 30_000 });
+  await expect(drawer.getByText(orderNo)).toBeVisible({ timeout: 30_000 });
+
+  const extensionCard = drawer.locator('.action-card', { hasText: '续租审批' }).first();
+  await expect(extensionCard).toBeVisible({ timeout: 60_000 });
+  await extensionCard.getByRole('button', { name: '同意续租' }).click();
+  // 成功后抽屉会重新渲染，待办卡片应消失（status 变为非 PENDING）。
+  await expect
+    .poll(async () => await drawer.locator('.action-card', { hasText: '续租审批' }).count(), { timeout: 60_000 })
+    .toBe(0);
+  await drawer.locator('button[aria-label="Close"], .ant-drawer-close').first().click().catch(() => undefined);
+}
+
+async function vendorApproveReturn(page: Page, orderNo: string) {
+  await gotoPath(page, '/app/vendor/workbench/fulfillment');
+  await expect(page.getByRole('heading', { name: '履约任务墙' })).toBeVisible();
+
+  const wallSection = page
+    .locator('section.page-section')
+    .filter({ has: page.getByRole('heading', { name: '履约任务墙' }) })
+    .first();
+  await wallSection
+    .locator('.filter-row')
+    .getByText('退租审批', { exact: true })
+    .click({ timeout: 5_000, force: true })
+    .catch(() => undefined);
+  await wallSection.getByRole('button', { name: '刷新' }).click({ timeout: 5_000, force: true }).catch(() => undefined);
+
+  const card = page.locator('article.vendor-order-card', { hasText: orderNo }).first();
+  for (let i = 0; i < 6; i += 1) {
+    if (await card.isVisible().catch(() => false)) {
+      break;
+    }
+    const loadMore = wallSection.getByRole('button', { name: '加载更多' });
+    if (await loadMore.isVisible().catch(() => false)) {
+      await loadMore.click();
+    } else {
+      break;
+    }
+  }
+  await expect(card).toBeVisible({ timeout: 60_000 });
+  await card.getByRole('button', { name: '进入工作台' }).click();
+
+  const drawer = page.locator('.ant-drawer').filter({ hasText: '订单履约详情' }).first();
+  await expect(drawer).toBeVisible({ timeout: 30_000 });
+  await expect(drawer.getByText(orderNo)).toBeVisible({ timeout: 30_000 });
+
+  const returnCard = drawer.locator('.action-card', { hasText: '退租处理' }).first();
+  await expect(returnCard).toBeVisible({ timeout: 60_000 });
+  await returnCard.getByRole('button', { name: '同意退租' }).click();
+  await expect(page.getByText('已同意退租')).toBeVisible({ timeout: 60_000 });
+  await drawer.locator('button[aria-label="Close"], .ant-drawer-close').first().click().catch(() => undefined);
+}
+
+async function vendorCompleteReturn(page: Page, orderNo: string) {
+  await gotoPath(page, '/app/vendor/workbench/fulfillment');
+  await expect(page.getByRole('heading', { name: '履约任务墙' })).toBeVisible();
+
+  const wallSection = page
+    .locator('section.page-section')
+    .filter({ has: page.getByRole('heading', { name: '履约任务墙' }) })
+    .first();
+  const filterRow = wallSection.locator('.filter-row').first();
+  await filterRow.getByText('退租中', { exact: true }).click({ timeout: 10_000, force: true });
+  await wallSection.getByRole('button', { name: '刷新' }).click({ timeout: 5_000, force: true }).catch(() => undefined);
+
+  const card = page.locator('article.vendor-order-card', { hasText: orderNo }).first();
+  const findCard = async () => {
+    for (let i = 0; i < 6; i += 1) {
+      if (await card.isVisible().catch(() => false)) {
+        return true;
+      }
+      const loadMore = wallSection.getByRole('button', { name: '加载更多' });
+      if (await loadMore.isVisible().catch(() => false)) {
+        await loadMore.click();
+        await page.waitForTimeout(200);
+      } else {
+        break;
+      }
+    }
+    return false;
+  };
+
+  // 某些情况下筛选切换未生效或数据延迟，回退到“全部”再找一次。
+  if (!(await findCard())) {
+    await filterRow.getByText('全部', { exact: true }).click({ timeout: 10_000, force: true });
+    await wallSection.getByRole('button', { name: '刷新' }).click({ timeout: 5_000, force: true }).catch(() => undefined);
+    await expect
+      .poll(async () => (await findCard()) ? 1 : 0, { timeout: 60_000 })
+      .toBe(1);
+  }
+  await expect(card).toBeVisible({ timeout: 60_000 });
+  await card.getByRole('button', { name: '进入工作台' }).click();
+
+  const drawer = page.locator('.ant-drawer').filter({ hasText: '订单履约详情' }).first();
+  await expect(drawer).toBeVisible({ timeout: 30_000 });
+  await expect(drawer.getByText(orderNo)).toBeVisible({ timeout: 30_000 });
+
+  const returnCard = drawer.locator('.action-card', { hasText: '退租处理' }).first();
+  await expect(returnCard).toBeVisible({ timeout: 60_000 });
+  await returnCard.locator('input[placeholder="押金退款金额"]').fill('0');
+  await returnCard.locator('textarea[placeholder="备注"]').fill('e2e return completed');
+  await returnCard.getByRole('button', { name: '确认退租完成' }).click();
+  await expect(page.getByText('退租完成')).toBeVisible({ timeout: 60_000 });
+  await drawer.locator('button[aria-label="Close"], .ant-drawer-close').first().click().catch(() => undefined);
+}
+
+async function vendorAssertInsightsHasMetrics(page: Page) {
+  await gotoPath(page, '/app/vendor/workbench/insights');
+  await expect(page.getByText('累计 GMV')).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByText('活跃订单', { exact: true })).toBeVisible({ timeout: 60_000 });
+}
+
+async function userAssertChatCenterAccessible(page: Page) {
+  await gotoPath(page, '/app/orders/chat-center');
+  await expect(page.getByRole('main').getByRole('heading', { name: '聊天面板' })).toBeVisible({ timeout: 30_000 });
+}
+
+async function vendorAssertChatCenterAccessible(page: Page) {
+  await gotoPath(page, '/app/vendor/chat-center');
+  await expect(page.getByRole('main').getByRole('heading', { name: '沟通中心' })).toBeVisible({ timeout: 30_000 });
+}
+
+async function adminForceCloseOrder(page: Page, orderNo: string) {
+  await gotoPath(page, '/app/admin/orders');
+  await expect(page.getByRole('main').getByRole('heading', { name: '订单监控' })).toBeVisible({ timeout: 30_000 });
+
+  // 优先筛到“待支付”，缩短列表查找时间（历史数据多时更稳定）。
+  await page.getByLabel('状态').click().catch(() => undefined);
+  await page.getByRole('option', { name: '待支付' }).click().catch(() => undefined);
+  await page.getByRole('button', { name: /查\s*询/ }).click();
+
+  const card = page.locator('.admin-card', { hasText: orderNo }).first();
+  for (let i = 0; i < 6; i += 1) {
+    if (await card.isVisible().catch(() => false)) {
+      break;
+    }
+    const loadMore = page.getByRole('button', { name: '加载更多' });
+    if (await loadMore.isVisible().catch(() => false)) {
+      await loadMore.click();
+      await page.waitForTimeout(200);
+    } else {
+      break;
+    }
+  }
+  await expect(card).toBeVisible({ timeout: 60_000 });
+  await card.getByRole('button', { name: '查看' }).click();
+
+  const drawer = page.locator('.ant-drawer').filter({ hasText: '订单详情' }).first();
+  await expect(drawer).toBeVisible({ timeout: 30_000 });
+  await expect(drawer.getByText(orderNo)).toBeVisible({ timeout: 30_000 });
+
+  await drawer.getByPlaceholder('强制关闭原因').fill('e2e force close');
+  await drawer.getByRole('button', { name: '强制关闭订单' }).click();
+  await expect(page.getByText('已强制关闭订单')).toBeVisible({ timeout: 60_000 });
+  await drawer.locator('button[aria-label="Close"], .ant-drawer-close').first().click().catch(() => undefined);
+}
+
+async function assertRbacRedirectToDashboard(page: Page, pathname: string) {
+  await page.goto(resolveUrl(page, pathname));
+  await expect(page).toHaveURL(/\/app\/dashboard/, { timeout: 30_000 });
+}
+
 async function vendorAssertSettlementHasCommission(page: Page) {
   await gotoPath(page, '/app/vendor/workbench/settlement');
   await expect(page.locator('h2.page-section__title', { hasText: '结算中心' }).first()).toBeVisible({ timeout: 30_000 });
@@ -995,8 +1282,8 @@ async function userAssertNotificationHasContextType(page: Page, contextType: str
   });
 }
 
-async function userDisputeAndEscalate(page: Page, orderNo: string) {
-  await openOrderDetailByOrderNo(page, orderNo);
+async function userDisputeAndEscalate(page: Page, orderId: string) {
+  await openOrderDetailByOrderId(page, orderId);
   await switchOrderTab(page, '时间线');
   await expect(page.getByRole('heading', { name: '纠纷与仲裁' })).toBeVisible();
 
@@ -1037,9 +1324,12 @@ async function ensureE2EBaseUp(page: Page) {
 }
 
 async function newContextWithBase(browser: Browser) {
-  return browser.newContext({
+  const context = await browser.newContext({
     baseURL: rawBaseURL
   });
+  context.setDefaultTimeout(defaultActionTimeoutMs);
+  context.setDefaultNavigationTimeout(defaultNavigationTimeoutMs);
+  return context;
 }
 
 async function newContextWithBaseForDemo(browser: Browser) {
@@ -1050,7 +1340,7 @@ async function newContextWithBaseForDemo(browser: Browser) {
   const deviceScaleFactor =
     demoRenderMode === 'mobile' ? undefined : demoViewportLayout.deviceScaleFactor;
 
-  return browser.newContext({
+  const context = await browser.newContext({
     baseURL: rawBaseURL,
     viewport: {
       width: viewportWidth,
@@ -1060,10 +1350,13 @@ async function newContextWithBaseForDemo(browser: Browser) {
     isMobile: demoRenderMode === 'mobile',
     hasTouch: demoRenderMode === 'mobile'
   });
+  context.setDefaultTimeout(defaultActionTimeoutMs);
+  context.setDefaultNavigationTimeout(defaultNavigationTimeoutMs);
+  return context;
 }
 
 test.describe.serial('FlexLease E2E（由 playwright-mcp 操作转换）', () => {
-  test.setTimeout(15 * 60 * 1000);
+  test.setTimeout(45 * 60 * 1000);
 
   test('关键旅程覆盖：注册→入驻→上架→咨询/沟通→下单(直达+购物车)→履约(发货/收货/巡检)→纠纷裁决→买断→结算/看板/通知', async ({}, testInfo) => {
     // 以 Playwright 的实际配置为准判断是否 headed（比 argv/env 更可靠）。
@@ -1074,14 +1367,16 @@ test.describe.serial('FlexLease E2E（由 playwright-mcp 操作转换）', () =>
       `[e2e] headed=${isHeaded} slowMo=${slowMoMs} win=${demoWindowLayout.width}x${demoWindowLayout.height} gap=${demoWindowLayout.gap} chromeScale=${demoChromeScaleFactor} winDpiScale=${demoWinDpiScaleOverride || 'auto'}`
     );
 
-    const userEmail = uniqueEmail('e2e_user');
-    const vendorEmail = uniqueEmail('e2e_vendor');
-    const productName = `iPhone 15 Pro Max E2E ${Date.now()}`;
+	    const userEmail = uniqueEmail('e2e_user');
+	    const vendorEmail = uniqueEmail('e2e_vendor');
+	    const productName = `iPhone 15 Pro Max E2E ${Date.now()}`;
 
-    let sharedBrowser: Browser | undefined;
-    let adminBrowser: Browser | undefined;
-    let vendorBrowser: Browser | undefined;
-    let userBrowser: Browser | undefined;
+	    console.log('[e2e] step=register-login');
+
+	    let sharedBrowser: Browser | undefined;
+	    let adminBrowser: Browser | undefined;
+	    let vendorBrowser: Browser | undefined;
+	    let userBrowser: Browser | undefined;
 
     // 关键点：不要依赖 Playwright 的 browser fixture。
     // 否则 runner 仍会额外启动一个默认大窗口，导致“看起来还是重叠、没有三列”。
@@ -1128,83 +1423,124 @@ test.describe.serial('FlexLease E2E（由 playwright-mcp 操作转换）', () =>
       await positionDemoWindows(adminPage, vendorPage, userPage);
     }
 
-    await ensureE2EBaseUp(adminPage);
+	    await ensureE2EBaseUp(adminPage);
 
-    // 注册/登录
-    await register(userPage, 'USER', userEmail, passwords.user);
-    await login(userPage, userEmail, passwords.user);
+	    // 注册/登录
+	    await register(userPage, 'USER', userEmail, passwords.user);
+	    await login(userPage, userEmail, passwords.user);
+	    await userAssertChatCenterAccessible(userPage);
+	    await assertRbacRedirectToDashboard(userPage, '/app/admin/review');
+	    await assertRbacRedirectToDashboard(userPage, '/app/vendor/workbench/products');
 
-    await register(vendorPage, 'VENDOR', vendorEmail, passwords.vendor);
-    await login(vendorPage, vendorEmail, passwords.vendor);
+	    await register(vendorPage, 'VENDOR', vendorEmail, passwords.vendor);
+	    await login(vendorPage, vendorEmail, passwords.vendor);
+	    await vendorAssertChatCenterAccessible(vendorPage);
+	    await assertRbacRedirectToDashboard(vendorPage, '/app/catalog');
+	    await assertRbacRedirectToDashboard(vendorPage, '/app/admin/orders');
 
-    // 厂商入驻 + 管理员审核
-    await submitVendorOnboarding(vendorPage, vendorEmail);
+	    console.log('[e2e] step=onboarding-approve');
 
-    await login(adminPage, adminCreds.username, adminCreds.password);
-    await adminApproveLatestVendorApplication(adminPage);
+	    // 厂商入驻 + 管理员审核
+	    await submitVendorOnboarding(vendorPage, vendorEmail);
+
+	    await login(adminPage, adminCreds.username, adminCreds.password);
+	    await assertRbacRedirectToDashboard(adminPage, '/app/vendor/onboarding');
+	    await adminApproveLatestVendorApplication(adminPage);
 
     // 建议审核通过后重新登录，让 vendorId 进入会话
     await logoutIfNeeded(vendorPage);
     await login(vendorPage, vendorEmail, passwords.vendor);
 
     // 厂商创建商品并提交审核 + 管理员审核上架
-    await vendorCreateAndSubmitProduct(vendorPage, productName);
-    await adminApproveProductByUi(adminPage, productName);
+	    await vendorCreateAndSubmitProduct(vendorPage, productName);
+	    await adminApproveProductByUi(adminPage, productName);
 
-    const inquiryMessage = '请问大概多久可以发货？';
-    const inquiryReply = `预计 24 小时内发货（e2e ${Date.now()}）`;
-    const userChatMessage = '你好，我想确认发货时间与包装情况（e2e）';
-    const vendorChatReply = '已收到，会按凭证指引发货并同步物流（e2e）';
+	    console.log('[e2e] step=order1-create-pay');
+
+	    const inquiryMessage = '请问大概多久可以发货？';
+	    const inquiryReply = `预计 24 小时内发货（e2e ${Date.now()}）`;
+	    const userChatMessage = '你好，我想确认发货时间与包装情况（e2e）';
+	    const vendorChatReply = '已收到，会按凭证指引发货并同步物流（e2e）';
 
     // 旅程 C：发现与试算（咨询）
-    await userFillProfile(userPage, userEmail);
+	    await userFillProfile(userPage, userEmail);
 
-    // 旅程 D：下单与支付（直接结算）
-    const order1 = await userCreateOrderFromCatalog(userPage, productName, {
-      inquiryMessage,
-      remark: '请尽快发货'
-    });
+	    // 旅程 D：下单与支付（直接结算）
+	    const order1 = await userCreateOrderFromCatalog(userPage, productName, {
+	      inquiryMessage,
+	      remark: '请尽快发货'
+	    });
 
-    // 主题：沟通（咨询回复 + 订单聊天）
-    await vendorReplyInquiry(vendorPage, inquiryMessage, inquiryReply);
-    await userAssertInquiryReply(userPage, productName, inquiryReply);
-    await userSendOrderChat(userPage, order1.orderNo, userChatMessage);
+	    // 主题：沟通（咨询回复 + 订单聊天）
+	    await vendorReplyInquiry(vendorPage, inquiryMessage, inquiryReply);
+	    await userAssertInquiryReply(userPage, productName, inquiryReply);
+	    await userSendOrderChat(userPage, order1.orderId, userChatMessage);
 
-    // 旅程 E：履约与售后（发货/收货/巡检/纠纷）
-    await vendorShipOrder(vendorPage, order1.orderNo, {
-      expectInbound: userChatMessage,
-      reply: vendorChatReply
-    });
-    await userReceiveAndConfirm(userPage, order1.orderNo);
+	    console.log('[e2e] step=order1-fulfillment-inspection-dispute');
 
-    const creditBeforeInspection = await readCreditScoreFromProfile(userPage);
-    await vendorRequestInspection(vendorPage, order1.orderNo);
-    await userUploadInspectionProof(userPage, order1.orderNo);
-    const creditAfterInspection = await readCreditScoreFromProfile(userPage);
-    expect(creditAfterInspection).toBeGreaterThanOrEqual(creditBeforeInspection + 2);
+	    // 旅程 E：履约与售后（发货/收货/巡检/纠纷）
+	    await vendorShipOrder(vendorPage, order1.orderNo, {
+	      expectInbound: userChatMessage,
+	      reply: vendorChatReply
+	    });
+	    await userReceiveAndConfirm(userPage, order1.orderId);
 
-    const creditBeforePenalty = await readCreditScoreFromProfile(userPage);
-    await userDisputeAndEscalate(userPage, order1.orderNo);
-    await logoutIfNeeded(adminPage);
-    await login(adminPage, arbitratorCreds.username, arbitratorCreds.password);
-    await arbitratorResolveDispute(adminPage, order1.orderNo, 5);
+	    const creditBeforeInspection = await readCreditScoreFromProfile(userPage);
+	    await vendorRequestInspection(vendorPage, order1.orderNo);
+	    await userUploadInspectionProof(userPage, order1.orderId);
+	    const creditAfterInspection = await readCreditScoreFromProfile(userPage);
+	    expect(creditAfterInspection).toBeGreaterThanOrEqual(creditBeforeInspection + 2);
+
+	    const creditBeforePenalty = await readCreditScoreFromProfile(userPage);
+	    await userDisputeAndEscalate(userPage, order1.orderId);
+	    await logoutIfNeeded(adminPage);
+	    await login(adminPage, arbitratorCreds.username, arbitratorCreds.password);
+	    await arbitratorResolveDispute(adminPage, order1.orderNo, 5);
     await logoutIfNeeded(adminPage);
     await login(adminPage, adminCreds.username, adminCreds.password);
-    const creditAfterPenalty = await readCreditScoreFromProfile(userPage);
-    expect(creditAfterPenalty).toBeLessThanOrEqual(creditBeforePenalty - 5);
+	    const creditAfterPenalty = await readCreditScoreFromProfile(userPage);
+	    expect(creditAfterPenalty).toBeLessThanOrEqual(creditBeforePenalty - 5);
 
-    // 旅程 C：购物车试算下单（第二单）
-    const order2 = await userCreateOrderFromCart(userPage, productName, { excludeOrderNos: [order1.orderNo] });
-    await vendorShipOrder(vendorPage, order2.orderNo);
-    await userReceiveAndConfirm(userPage, order2.orderNo);
-    await userApplyBuyout(userPage, order2.orderNo);
-    await vendorApproveBuyout(vendorPage, order2.orderNo);
+	    console.log('[e2e] step=order2-extension-return');
 
-    // 旅程 F：结算与运营
-    await vendorAssertSettlementHasCommission(vendorPage);
-    await adminAssertDashboardHasMetrics(adminPage);
-    await userAssertNotificationHasContextType(userPage, 'DISPUTE');
-    await userAssertNotificationHasContextType(userPage, 'CREDIT');
+	    // 单独订单覆盖：续租 + 退租全链路（避免与“纠纷裁决”互相影响订单状态）
+	    const order2 = await userCreateOrderFromCart(userPage, productName);
+	    await vendorShipOrder(vendorPage, order2.orderNo);
+	    await userReceiveAndConfirm(userPage, order2.orderId);
+	    await userApplyExtension(userPage, order2.orderId, { additionalMonths: 1, remark: 'e2e extend 1m' });
+	    await vendorApproveExtension(vendorPage, order2.orderNo);
+	    await userUploadReturnProof(userPage, order2.orderId);
+	    await userApplyReturn(userPage, order2.orderId);
+	    await vendorApproveReturn(vendorPage, order2.orderNo);
+	    await vendorCompleteReturn(vendorPage, order2.orderNo);
+
+	    console.log('[e2e] step=order3-buyout');
+
+	    // 单独订单覆盖：买断申请 → 厂商审批
+	    const order3 = await userCreateOrderFromCart(userPage, productName);
+	    await vendorShipOrder(vendorPage, order3.orderNo);
+	    await userReceiveAndConfirm(userPage, order3.orderId);
+	    await userApplyBuyout(userPage, order3.orderId);
+	    await vendorApproveBuyout(vendorPage, order3.orderNo);
+
+	    console.log('[e2e] step=order4-force-close');
+
+	    // 管理员订单监控：强制关闭一单（待支付）
+	    const order4 = await userCreateOrderFromCart(userPage, productName, { pay: false });
+	    await adminForceCloseOrder(adminPage, order4.orderNo);
+
+	    console.log('[e2e] step=post-assertions');
+
+		    // 旅程 F：结算与运营
+		    await vendorAssertSettlementHasCommission(vendorPage);
+		    await vendorAssertInsightsHasMetrics(vendorPage);
+		    await adminAssertDashboardHasMetrics(adminPage);
+	    await userAssertNotificationHasContextType(userPage, 'DISPUTE');
+	    await userAssertNotificationHasContextType(userPage, 'CREDIT');
+
+	    // 兜底：404 路由
+	    await userPage.goto(resolveUrl(userPage, `/not-exist-${Date.now()}`));
+	    await expect(userPage.getByText('页面不存在', { exact: true })).toBeVisible({ timeout: 30_000 });
 
     await adminContext.close();
     await vendorContext.close();
