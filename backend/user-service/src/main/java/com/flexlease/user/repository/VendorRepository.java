@@ -9,6 +9,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+/**
+ * 厂商资料仓储（JPA）。
+ */
 public interface VendorRepository extends JpaRepository<Vendor, UUID> {
 
     Optional<Vendor> findByOwnerUserId(UUID ownerUserId);
@@ -17,4 +20,3 @@ public interface VendorRepository extends JpaRepository<Vendor, UUID> {
 
     List<Vendor> findByStatus(VendorStatus status);
 }
-

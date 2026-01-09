@@ -4,6 +4,9 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
+/**
+ * 厂商提交/更新入驻申请请求。
+ */
 public record VendorApplicationRequest(
         @NotBlank(message = "companyName 不能为空")
         @Size(max = 200)

@@ -8,6 +8,11 @@ import jakarta.persistence.Table;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+/**
+ * 信用分人工调整记录（管理员操作审计）。
+ *
+ * <p>用于记录每次 {@code delta} 变更以及调整原因，供后续追溯与通知。</p>
+ */
 @Entity
 @Table(name = "credit_adjustment", schema = "users")
 public class CreditAdjustment {

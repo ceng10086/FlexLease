@@ -7,6 +7,9 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * 租赁方案详情响应（含 SKU 列表）。
+ */
 public record RentalPlanResponse(
         UUID id,
         RentalPlanType planType,

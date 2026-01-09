@@ -6,6 +6,9 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import java.util.Map;
 
+/**
+ * SKU 创建/更新请求。
+ */
 public record SkuRequest(
         @NotBlank(message = "skuCode 不能为空")
         @Size(max = 64, message = "skuCode 最长 64 字符")

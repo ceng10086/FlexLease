@@ -5,6 +5,9 @@ import java.time.OffsetDateTime;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * SKU 详情响应（含库存与属性）。
+ */
 public record SkuResponse(
         UUID id,
         String skuCode,

@@ -4,6 +4,9 @@ import com.flexlease.user.domain.VendorApplicationStatus;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+/**
+ * 厂商入驻申请详情响应。
+ */
 public record VendorApplicationResponse(
         UUID id,
         UUID ownerUserId,

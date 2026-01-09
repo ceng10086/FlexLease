@@ -4,6 +4,9 @@ import com.flexlease.product.domain.ProductStatus;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+/**
+ * 商品列表摘要响应。
+ */
 public record ProductSummaryResponse(
         UUID id,
         UUID vendorId,

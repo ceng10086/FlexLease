@@ -6,6 +6,9 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+/**
+ * 商品媒体资源仓储（JPA）。
+ */
 public interface MediaAssetRepository extends JpaRepository<MediaAsset, UUID> {
 
     List<MediaAsset> findByProductIdOrderBySortOrderAscCreatedAtAsc(UUID productId);

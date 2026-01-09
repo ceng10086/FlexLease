@@ -4,6 +4,9 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
+/**
+ * 厂商资料更新请求（联系人与地址信息）。
+ */
 public record VendorUpdateRequest(
         @NotBlank(message = "联系人姓名不能为空")
         @Size(max = 100, message = "联系人姓名过长")

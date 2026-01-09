@@ -9,6 +9,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+/**
+ * 厂商入驻申请仓储（JPA）。
+ */
 public interface VendorApplicationRepository extends JpaRepository<VendorApplication, UUID> {
 
     Optional<VendorApplication> findByOwnerUserId(UUID ownerUserId);

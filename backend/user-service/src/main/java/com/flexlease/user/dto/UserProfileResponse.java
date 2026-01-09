@@ -5,6 +5,9 @@ import com.flexlease.user.domain.UserProfileGender;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+/**
+ * 用户档案响应（含信用分、实名认证、冻结信息等）。
+ */
 public record UserProfileResponse(
         UUID id,
         UUID userId,

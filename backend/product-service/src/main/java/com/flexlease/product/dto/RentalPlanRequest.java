@@ -6,6 +6,9 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import java.math.BigDecimal;
 
+/**
+ * 租赁方案创建/更新请求。
+ */
 public record RentalPlanRequest(
         @NotNull(message = "planType 不能为空")
         RentalPlanType planType,

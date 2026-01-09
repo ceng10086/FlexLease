@@ -12,6 +12,11 @@ import jakarta.persistence.Table;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+/**
+ * 商品媒体资源（图片/视频等）。
+ *
+ * <p>文件本体由服务端存储（默认本地文件系统），数据库只保存元信息与可访问的静态路径。</p>
+ */
 @Entity
 @Table(name = "media_asset", schema = "product")
 public class MediaAsset {
@@ -117,6 +122,9 @@ public class MediaAsset {
         return sortOrder;
     }
 
+    /**
+     * 更新展示排序。
+     */
     public void updateSortOrder(Integer sortOrder) {
         this.sortOrder = sortOrder;
     }

@@ -5,6 +5,9 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * 商品详情响应（包含媒体与租赁方案列表）。
+ */
 public record ProductResponse(
         UUID id,
         UUID vendorId,

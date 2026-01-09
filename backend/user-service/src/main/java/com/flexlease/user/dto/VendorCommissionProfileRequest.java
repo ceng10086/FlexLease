@@ -10,6 +10,9 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import java.math.BigDecimal;
 
+/**
+ * 厂商抽成画像维护请求（管理员维护行业基准、信用档位与 SLA 评分）。
+ */
 public record VendorCommissionProfileRequest(
         @NotBlank(message = "行业分类不能为空")
         @Size(max = 100, message = "行业分类长度不能超过 100 字符")

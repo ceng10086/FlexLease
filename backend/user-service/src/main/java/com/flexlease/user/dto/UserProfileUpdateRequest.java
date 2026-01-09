@@ -5,6 +5,9 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
+/**
+ * 用户档案更新请求（个人信息与联系方式）。
+ */
 public record UserProfileUpdateRequest(
         @NotBlank(message = "姓名不能为空")
         @Size(max = 100, message = "姓名过长")

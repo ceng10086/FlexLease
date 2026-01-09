@@ -3,6 +3,9 @@ package com.flexlease.product.dto;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
+/**
+ * 商品基础信息创建/更新请求（不包含租赁方案与库存）。
+ */
 public record ProductRequest(
         @NotBlank(message = "name 不能为空")
         @Size(max = 200, message = "name 最长 200 字符")
