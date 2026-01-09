@@ -5,6 +5,9 @@ import com.flexlease.order.domain.OrderEventType;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+/**
+ * OrderEventResponse 响应 DTO。
+ */
 public record OrderEventResponse(
         UUID id,
         OrderEventType eventType,

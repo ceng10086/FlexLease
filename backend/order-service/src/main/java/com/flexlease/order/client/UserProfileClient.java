@@ -18,6 +18,11 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
+/**
+ * 用户档案客户端：调用 user-service 的内部接口读取/调整信用分。
+ * <p>
+ * 订单服务在下单时读取信用档位，履约/纠纷等场景会写入信用事件（奖励或扣分）。
+ */
 @Component
 public class UserProfileClient {
 

@@ -19,6 +19,11 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 
+/**
+ * 订单合同服务：生成/获取合同草稿并支持用户签署。
+ * <p>
+ * 合同内容属于“可重放”的衍生数据：每次读取/签署前会基于订单快照重新刷新内容，确保一致性。
+ */
 @Service
 @Transactional
 public class OrderContractService {

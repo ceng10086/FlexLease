@@ -8,6 +8,13 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 import org.springframework.web.client.RestTemplate;
 
+/**
+ * HTTP 客户端配置。
+ * <ul>
+ *   <li>{@code loadBalancedRestTemplate}：用于服务间调用，支持通过服务名走注册发现。</li>
+ *   <li>{@code externalRestTemplate}：用于外部 LLM 调用（可配置超时）。</li>
+ * </ul>
+ */
 @Configuration
 public class HttpClientConfig {
 

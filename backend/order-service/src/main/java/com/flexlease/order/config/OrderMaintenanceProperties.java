@@ -2,6 +2,11 @@ package com.flexlease.order.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+/**
+ * 订单维护调度相关配置。
+ * <p>
+ * 主要用于“待支付订单超时自动取消”扫描。
+ */
 @ConfigurationProperties(prefix = "flexlease.order.maintenance")
 public class OrderMaintenanceProperties {
 

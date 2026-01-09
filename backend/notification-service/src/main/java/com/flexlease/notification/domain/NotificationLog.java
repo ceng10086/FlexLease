@@ -10,6 +10,11 @@ import jakarta.persistence.Table;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+/**
+ * 通知发送日志（站内信记录）。
+ * <p>
+ * 当前实现不做“异步真实发送”，保存后会直接标记为 SENT，前端用它作为通知中心的数据来源。
+ */
 @Entity
 @Table(name = "notification_log", schema = "notification")
 public class NotificationLog {

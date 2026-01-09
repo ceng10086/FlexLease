@@ -7,6 +7,11 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Component;
 
+/**
+ * 通知模板读取器（带缓存）。
+ * <p>
+ * 站内信模板相对稳定，使用 Redis 缓存可减少 DB 读取；模板变更后可通过 {@link #evict(String)} 清理缓存。
+ */
 @Component
 public class NotificationTemplateProvider {
 

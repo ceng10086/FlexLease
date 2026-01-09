@@ -17,6 +17,11 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
+/**
+ * 通知服务客户端：向 notification-service 发送站内信。
+ * <p>
+ * 通知属于“尽力而为”的副作用：发送失败不会阻塞主流程，但会在日志中告警。
+ */
 @Component
 public class NotificationClient {
 

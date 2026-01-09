@@ -10,6 +10,11 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
+/**
+ * 订单事件监听器：订阅 RabbitMQ 的订单事件队列，并转化为站内信提醒。
+ * <p>
+ * 当前仅处理 {@code ORDER_CREATED}，用于提醒厂商“新订单待处理”；其他事件可按需扩展。
+ */
 @Component
 @ConditionalOnProperty(prefix = "flexlease.messaging", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class OrderEventListener {

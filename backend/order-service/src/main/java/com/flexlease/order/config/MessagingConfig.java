@@ -11,6 +11,11 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+/**
+ * RabbitMQ 发布端配置（订单事件）。
+ * <p>
+ * 订单服务负责把关键状态变更发布到 {@code order.events} 交换机，供 notification-service 等订阅者消费。
+ */
 @Configuration
 @ConditionalOnProperty(prefix = "flexlease.messaging", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class MessagingConfig {

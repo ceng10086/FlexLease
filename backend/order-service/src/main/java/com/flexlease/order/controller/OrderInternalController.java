@@ -13,6 +13,11 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * 内部接口：供其他微服务回调订单状态（如支付成功通知）。
+ * <p>
+ * 必须携带内部令牌并具备 INTERNAL 角色。
+ */
 @RestController
 @RequestMapping("/api/v1/internal/orders")
 public class OrderInternalController {

@@ -7,6 +7,9 @@ import java.util.UUID;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+/**
+ * 取证材料仓库。
+ */
 public interface OrderProofRepository extends JpaRepository<OrderProof, UUID> {
 
     List<OrderProof> findByOrderIdOrderByUploadedAtAsc(UUID orderId);

@@ -33,6 +33,11 @@ import java.util.Map;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 
+/**
+ * 运营指标聚合服务（平台/厂商维度）。
+ * <p>
+ * 该服务以查询为主，聚合订单状态分布、GMV、近 7 日趋势、租赁模式占比，以及纠纷/满意度等辅助指标。
+ */
 @Service
 @Transactional(Transactional.TxType.SUPPORTS)
 public class OrderAnalyticsService {

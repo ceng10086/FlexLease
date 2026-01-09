@@ -24,6 +24,11 @@ import java.util.UUID;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
+/**
+ * 通知核心服务：负责模板渲染、写入发送日志，并提供“通知中心”查询能力。
+ * <p>
+ * 说明：当前通知仅实现站内信，因此发送逻辑会直接落库并标记为 SENT。
+ */
 @Service
 @Transactional
 public class NotificationService {

@@ -6,6 +6,9 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+/**
+ * 续租申请仓库。
+ */
 public interface OrderExtensionRequestRepository extends JpaRepository<OrderExtensionRequest, UUID> {
 
     Optional<OrderExtensionRequest> findFirstByOrderIdAndStatusOrderByRequestedAtDesc(UUID orderId, ExtensionRequestStatus status);

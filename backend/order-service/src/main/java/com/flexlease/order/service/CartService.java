@@ -18,6 +18,12 @@ import java.util.function.Function;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
+/**
+ * 购物车服务。
+ * <p>
+ * 支持“同一用户 + 同一 SKU”条目合并（避免重复行），并在服务端做访问控制：
+ * 普通用户只能操作自己的购物车；ADMIN/INTERNAL 可在后台指定 userId 进行排查或演示。
+ */
 @Service
 @Transactional
 public class CartService {

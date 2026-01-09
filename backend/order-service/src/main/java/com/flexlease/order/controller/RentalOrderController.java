@@ -45,6 +45,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * 用户/厂商侧订单接口。
+ * <p>
+ * 约定：创建订单支持 Idempotency-Key（避免前端重复提交导致重复下单），并在 Service 层做更细的角色与归属校验。
+ */
 @RestController
 @RequestMapping("/api/v1/orders")
 public class RentalOrderController {

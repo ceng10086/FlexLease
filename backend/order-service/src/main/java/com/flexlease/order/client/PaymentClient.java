@@ -19,6 +19,11 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
+/**
+ * 支付服务客户端：查询流水并触发内部退款。
+ * <p>
+ * 所有调用均以内部令牌互信方式访问（{@code X-Internal-Token}），用于订单状态流转与押金退款等场景。
+ */
 @Component
 public class PaymentClient {
 

@@ -10,6 +10,11 @@ import java.math.RoundingMode;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
 
+/**
+ * 信用评估服务：根据用户信用档案计算押金调整系数，并决定是否需要人工审核。
+ * <p>
+ * 目前规则较轻量：EXCELLENT 押金打折、WARNING 押金上浮且提示人工审核、RESTRICTED 直接禁止下单。
+ */
 @Component
 public class CreditAssessmentService {
 

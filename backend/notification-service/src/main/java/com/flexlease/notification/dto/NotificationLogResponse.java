@@ -4,6 +4,9 @@ import com.flexlease.notification.domain.NotificationStatus;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+/**
+ * 通知日志响应 DTO（站内信）。
+ */
 public record NotificationLogResponse(
         UUID id,
         String templateCode,

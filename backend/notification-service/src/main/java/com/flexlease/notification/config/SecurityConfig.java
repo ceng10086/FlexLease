@@ -12,6 +12,11 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
+/**
+ * 通知服务安全配置：复用平台统一的 JWT 鉴权。
+ * <p>
+ * 由于通知属于“用户可见数据”，除 permitAll 白名单外的接口均要求携带有效的访问令牌。
+ */
 @Configuration
 @EnableWebSecurity
 @EnableConfigurationProperties(JwtAuthProperties.class)

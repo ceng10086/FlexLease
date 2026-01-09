@@ -5,6 +5,9 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * DashboardMetricsResponse 响应 DTO。
+ */
 public record DashboardMetricsResponse(
         long totalOrders,
         long activeOrders,

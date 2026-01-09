@@ -4,6 +4,9 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+/**
+ * CartItemResponse 响应 DTO。
+ */
 public record CartItemResponse(
         UUID id,
         UUID userId,

@@ -3,6 +3,9 @@ package com.flexlease.order.dto;
 import java.math.BigDecimal;
 import java.util.UUID;
 
+/**
+ * RentalOrderItemResponse 响应 DTO。
+ */
 public record RentalOrderItemResponse(
         UUID id,
         UUID productId,

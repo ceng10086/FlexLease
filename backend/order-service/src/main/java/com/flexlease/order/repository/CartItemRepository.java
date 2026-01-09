@@ -6,6 +6,9 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+/**
+ * 购物车条目仓库。
+ */
 public interface CartItemRepository extends JpaRepository<CartItem, UUID> {
 
     List<CartItem> findByUserIdOrderByCreatedAtAsc(UUID userId);

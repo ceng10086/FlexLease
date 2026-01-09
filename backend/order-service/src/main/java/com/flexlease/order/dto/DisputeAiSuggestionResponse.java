@@ -5,6 +5,9 @@ import com.flexlease.order.domain.DisputeResolutionOption;
 import java.time.OffsetDateTime;
 import java.util.List;
 
+/**
+ * DisputeAiSuggestionResponse 响应 DTO。
+ */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record DisputeAiSuggestionResponse(
         String summary,
@@ -40,4 +43,3 @@ public record DisputeAiSuggestionResponse(
     ) {
     }
 }
-

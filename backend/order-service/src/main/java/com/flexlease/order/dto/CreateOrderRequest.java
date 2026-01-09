@@ -7,6 +7,9 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * CreateOrderRequest 请求 DTO。
+ */
 public record CreateOrderRequest(
         @NotNull UUID userId,
         @NotNull UUID vendorId,

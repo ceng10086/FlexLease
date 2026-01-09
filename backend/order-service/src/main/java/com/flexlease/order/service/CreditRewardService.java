@@ -11,6 +11,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+/**
+ * 信用奖惩服务：把订单关键行为映射为 user-service 的信用事件。
+ * <p>
+ * 该能力属于“尽力而为”的联动：若 user-service 暂时不可用，会记录告警但不阻塞主交易流程。
+ */
 @Service
 public class CreditRewardService {
 

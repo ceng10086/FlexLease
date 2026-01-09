@@ -29,6 +29,16 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+/**
+ * 订单满意度调研服务。
+ * <p>
+ * 主要流程：
+ * <ul>
+ *   <li>纠纷结案后为 USER 与 VENDOR 各创建一份调查（延迟开放）。</li>
+ *   <li>调度器扫描并激活到期调查，发送站内信邀请。</li>
+ *   <li>提交调查后写入订单时间线并发送感谢通知。</li>
+ * </ul>
+ */
 @Service
 @Transactional
 public class OrderSurveyService {

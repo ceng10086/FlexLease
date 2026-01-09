@@ -20,6 +20,15 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * 通知 API（站内信）。
+ * <p>
+ * 约定：
+ * <ul>
+ *   <li>发送通知仅允许 ADMIN/INTERNAL（避免前端或普通用户滥发）。</li>
+ *   <li>查询日志时会基于当前 JWT 角色做可见性收敛：用户只能看自己的 userId，厂商只能看自己的 vendorId。</li>
+ * </ul>
+ */
 @RestController
 @RequestMapping("/api/v1/notifications")
 public class NotificationController {

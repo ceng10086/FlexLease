@@ -13,6 +13,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+/**
+ * 满意度调查仓库。
+ */
 public interface OrderSatisfactionSurveyRepository extends JpaRepository<OrderSatisfactionSurvey, UUID> {
 
     List<OrderSatisfactionSurvey> findByOrderId(UUID orderId);

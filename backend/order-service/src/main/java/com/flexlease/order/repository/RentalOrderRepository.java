@@ -18,6 +18,9 @@ import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+/**
+ * 订单主表仓库：负责订单的查询、分页与指标聚合。
+ */
 public interface RentalOrderRepository extends JpaRepository<RentalOrder, UUID>, JpaSpecificationExecutor<RentalOrder> {
 
     @EntityGraph(attributePaths = {"items"})

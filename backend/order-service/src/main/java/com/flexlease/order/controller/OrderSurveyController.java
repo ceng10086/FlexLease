@@ -14,6 +14,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * 订单满意度调查接口：查看调查列表与提交问卷。
+ */
 @RestController
 @RequestMapping("/api/v1/orders/{orderId}/surveys")
 public class OrderSurveyController {

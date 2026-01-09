@@ -8,6 +8,11 @@ import jakarta.persistence.Table;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+/**
+ * 通知模板。
+ * <p>
+ * 通过 {@code code} 唯一标识一类通知，支持在发送时传入变量做简单占位符替换（{{key}}）。
+ */
 @Entity
 @Table(name = "notification_template", schema = "notification")
 public class NotificationTemplate {

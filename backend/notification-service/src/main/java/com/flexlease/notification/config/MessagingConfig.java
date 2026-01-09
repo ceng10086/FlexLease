@@ -13,6 +13,11 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+/**
+ * RabbitMQ 相关配置。
+ * <p>
+ * 订单服务会向 {@code order.events} 交换机投递订单事件；通知服务绑定自身队列用于消费并推送站内信。
+ */
 @Configuration
 @EnableRabbit
 @ConditionalOnProperty(prefix = "flexlease.messaging", name = "enabled", havingValue = "true", matchIfMissing = true)

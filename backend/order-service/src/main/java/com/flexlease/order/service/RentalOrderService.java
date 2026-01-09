@@ -69,6 +69,17 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 
+/**
+ * 订单核心服务：下单预览、创建与状态流转（支付、发货、收货、续租、退租、买断等）。
+ * <p>
+ * 该服务会协调多个外部依赖：
+ * <ul>
+ *   <li>product-service：库存预占/释放 + 商品方案校验</li>
+ *   <li>payment-service：支付流水校验与退款</li>
+ *   <li>notification-service：站内信通知（尽力而为）</li>
+ *   <li>user-service：信用评估与奖惩事件</li>
+ * </ul>
+ */
 @Service
 @Transactional
 public class RentalOrderService {

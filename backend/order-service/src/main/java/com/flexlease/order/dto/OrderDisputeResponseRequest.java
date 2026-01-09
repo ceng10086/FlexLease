@@ -5,6 +5,9 @@ import jakarta.validation.constraints.NotNull;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * OrderDisputeResponseRequest 请求 DTO。
+ */
 public record OrderDisputeResponseRequest(
         @NotNull(message = "缺少操作人")
         UUID actorId,

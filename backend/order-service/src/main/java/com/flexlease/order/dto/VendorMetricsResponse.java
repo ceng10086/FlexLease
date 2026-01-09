@@ -6,6 +6,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+/**
+ * VendorMetricsResponse 响应 DTO。
+ */
 public record VendorMetricsResponse(
         UUID vendorId,
         long totalOrders,

@@ -38,6 +38,12 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+/**
+ * 订单纠纷服务：支持发起纠纷、协商回应、升级仲裁以及平台裁决/申诉。
+ * <p>
+ * 纠纷的每一步都会写入订单时间线，并通过 notification-service 推送站内信提醒对方；
+ * 同时可联动信用事件与满意度调研调度（协商达成一致或平台裁决后触发）。
+ */
 @Service
 @Transactional
 public class OrderDisputeService {

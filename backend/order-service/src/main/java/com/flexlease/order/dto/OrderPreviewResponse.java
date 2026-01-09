@@ -3,6 +3,9 @@ package com.flexlease.order.dto;
 import com.flexlease.common.user.CreditTier;
 import java.math.BigDecimal;
 
+/**
+ * OrderPreviewResponse 响应 DTO。
+ */
 public record OrderPreviewResponse(
         BigDecimal depositAmount,
         BigDecimal rentAmount,

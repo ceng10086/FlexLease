@@ -14,6 +14,15 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * 运营指标接口（平台驾驶舱/厂商工作台）。
+ * <p>
+ * 访问控制：
+ * <ul>
+ *   <li>平台 dashboard：仅 ADMIN/INTERNAL</li>
+ *   <li>厂商指标：厂商仅可查看自身 vendorId，管理员可查看任意厂商</li>
+ * </ul>
+ */
 @RestController
 @RequestMapping("/api/v1/analytics")
 public class AnalyticsController {

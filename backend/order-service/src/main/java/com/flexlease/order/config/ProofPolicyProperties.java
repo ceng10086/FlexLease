@@ -2,6 +2,11 @@ package com.flexlease.order.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+/**
+ * 取证策略配置：每个阶段要求的最少照片/视频数量。
+ * <p>
+ * 约束点：发货、确认收货、退租完成等关键动作会据此校验取证是否足够。
+ */
 @ConfigurationProperties(prefix = "flexlease.order.proof-policy")
 public class ProofPolicyProperties {
 

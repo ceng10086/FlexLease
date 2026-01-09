@@ -18,6 +18,11 @@ import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
+/**
+ * 库存预占/释放客户端：调用 product-service 的内部库存接口。
+ * <p>
+ * 该接口属于内部互信调用，需携带 {@code X-Internal-Token}；出错时会尝试解析统一 {@code ApiResponse} 以保留更准确的错误信息。
+ */
 @Component
 public class InventoryReservationClient {
 

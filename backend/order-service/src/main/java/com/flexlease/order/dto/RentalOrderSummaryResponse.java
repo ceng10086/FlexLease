@@ -5,6 +5,9 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+/**
+ * RentalOrderSummaryResponse 响应 DTO。
+ */
 public record RentalOrderSummaryResponse(
         UUID id,
         String orderNo,

@@ -5,6 +5,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+/**
+ * 满意度调查调度器：定期激活到期的调查问卷。
+ * <p>
+ * 触发频率可配置；内部异常只记录日志，避免调度线程被打断。
+ */
 @Component
 public class OrderSurveyScheduler {
 

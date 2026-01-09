@@ -15,6 +15,11 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * 管理侧纠纷接口：仲裁建议生成与平台裁决。
+ * <p>
+ * 角色校验在 Service 层完成：AI 建议仅 ARBITRATOR；裁决根据纠纷状态要求 ARBITRATOR 或 REVIEW_PANEL。
+ */
 @RestController
 @RequestMapping("/api/v1/admin/orders/{orderId}/disputes")
 public class AdminOrderDisputeController {

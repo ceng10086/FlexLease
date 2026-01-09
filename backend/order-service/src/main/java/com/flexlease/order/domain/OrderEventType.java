@@ -1,5 +1,14 @@
 package com.flexlease.order.domain;
 
+/**
+ * 订单时间线事件类型。
+ * <p>
+ * 同一事件类型会同时用于：
+ * <ul>
+ *   <li>订单时间线展示（order_event）</li>
+ *   <li>消息总线事件（order.events，供 notification-service 等订阅）</li>
+ * </ul>
+ */
 public enum OrderEventType {
     ORDER_CREATED,
     PAYMENT_CONFIRMED,

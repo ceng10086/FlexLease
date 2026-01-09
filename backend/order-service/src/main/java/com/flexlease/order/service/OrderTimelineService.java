@@ -8,6 +8,11 @@ import java.util.Map;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
 
+/**
+ * 订单时间线服务：统一追加订单事件，并同步发布到事件总线。
+ * <p>
+ * 业务服务在变更订单状态、取证上传、纠纷处理等节点调用该服务，避免各处重复写事件/发消息逻辑。
+ */
 @Component
 public class OrderTimelineService {
 

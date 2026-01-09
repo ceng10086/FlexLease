@@ -6,6 +6,11 @@ import com.flexlease.order.dto.ProofPolicySummary.ProofStagePolicy;
 import java.util.List;
 import org.springframework.stereotype.Service;
 
+/**
+ * 取证策略服务：向前端返回各阶段的取证数量要求与拍摄指引。
+ * <p>
+ * 注意：这里只返回“策略与文案”，实际约束校验发生在发货/收货/退租等业务接口中。
+ */
 @Service
 public class ProofPolicyService {
 

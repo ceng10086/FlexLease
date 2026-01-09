@@ -18,6 +18,12 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 
+/**
+ * DeepSeek OpenAI 兼容接口客户端实现。
+ * <p>
+ * 约定：使用 JSON Output 模式（{@code response_format=json_object}）强制模型返回可解析 JSON，
+ * 并提供轻量重试以提升演示稳定性。
+ */
 @Component
 public class DeepSeekChatClientImpl implements DeepSeekChatClient {
 

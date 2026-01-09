@@ -16,6 +16,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+/**
+ * 订单取证接口：上传与查询取证材料。
+ * <p>
+ * 权限与可上传类型限制在 {@link com.flexlease.order.service.OrderProofService} 中统一校验。
+ */
 @RestController
 @RequestMapping("/api/v1/orders/{orderId}/proofs")
 public class OrderProofController {

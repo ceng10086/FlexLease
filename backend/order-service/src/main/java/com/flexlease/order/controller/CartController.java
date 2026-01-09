@@ -22,6 +22,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * 购物车接口。
+ * <p>
+ * 普通用户只能操作自己的购物车；管理员/内部账号可指定 userId 进行排查或演示。
+ */
 @RestController
 @RequestMapping("/api/v1/cart")
 public class CartController {

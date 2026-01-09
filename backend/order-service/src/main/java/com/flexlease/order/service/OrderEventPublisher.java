@@ -18,6 +18,12 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+/**
+ * 订单事件发布器：将订单状态变更发布到消息队列（RabbitMQ）。
+ * <p>
+ * 为避免“事务未提交但消息已发出”的不一致问题，默认在事务提交后（afterCommit）再发送消息。
+ * 同时会写入业务回放日志（audit.business_replay_log）用于排查与复盘。
+ */
 @Component
 public class OrderEventPublisher {
 

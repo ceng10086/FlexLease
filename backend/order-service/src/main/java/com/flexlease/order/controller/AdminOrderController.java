@@ -24,6 +24,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * 管理侧订单接口：订单查询与强制关闭。
+ * <p>
+ * 说明：ARBITRATOR/REVIEW_PANEL 也可访问查询接口用于仲裁工作台，但强制关闭仅允许 ADMIN。
+ */
 @RestController
 @RequestMapping("/api/v1/admin/orders")
 public class AdminOrderController {

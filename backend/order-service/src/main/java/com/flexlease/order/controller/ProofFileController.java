@@ -11,6 +11,11 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * 取证文件下载接口（鉴权）。
+ * <p>
+ * 下载前会通过订单归属校验访问权限，返回 {@code inline} 以便前端预览。
+ */
 @RestController
 @RequestMapping("/api/v1/proofs")
 public class ProofFileController {

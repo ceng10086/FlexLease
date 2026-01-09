@@ -17,6 +17,11 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * 订单纠纷接口（用户/厂商侧）。
+ * <p>
+ * 纠纷的操作人需同时满足：请求体 actorId 与当前 JWT 用户一致，并且拥有该订单的访问权限。
+ */
 @RestController
 @RequestMapping("/api/v1/orders/{orderId}/disputes")
 public class OrderDisputeController {

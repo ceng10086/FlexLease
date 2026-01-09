@@ -6,6 +6,9 @@ import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.util.UUID;
 
+/**
+ * OrderReturnCompleteRequest 请求 DTO。
+ */
 public record OrderReturnCompleteRequest(
         @NotNull UUID vendorId,
         @Size(max = 500) String remark,

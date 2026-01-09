@@ -17,6 +17,11 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
+/**
+ * 商品目录客户端：从 product-service 获取商品与方案信息。
+ * <p>
+ * 主要用于下单预览/创建时做“服务端可信校验”，并把 planSnapshot 固化到订单中（避免前端篡改定价）。
+ */
 @Component
 public class ProductCatalogClient {
 

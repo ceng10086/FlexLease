@@ -7,6 +7,9 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * RentalOrderResponse 响应 DTO。
+ */
 public record RentalOrderResponse(
         UUID id,
         String orderNo,

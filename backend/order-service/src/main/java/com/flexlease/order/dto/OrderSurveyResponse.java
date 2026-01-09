@@ -5,6 +5,9 @@ import com.flexlease.order.domain.OrderSurveyStatus;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+/**
+ * OrderSurveyResponse 响应 DTO。
+ */
 public record OrderSurveyResponse(
         UUID id,
         UUID disputeId,

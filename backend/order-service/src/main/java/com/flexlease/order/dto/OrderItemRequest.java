@@ -6,6 +6,9 @@ import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import java.util.UUID;
 
+/**
+ * OrderItemRequest 请求 DTO。
+ */
 public record OrderItemRequest(
         @NotNull UUID productId,
         UUID skuId,

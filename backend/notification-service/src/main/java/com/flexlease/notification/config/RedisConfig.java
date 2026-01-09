@@ -12,6 +12,11 @@ import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSeriali
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 import org.springframework.data.redis.serializer.RedisSerializationContext;
 
+/**
+ * Redis 配置（用于通知模板缓存）。
+ * <p>
+ * 只在 {@code flexlease.redis.enabled=true} 时启用，避免在本地/测试环境缺少 Redis 时影响启动。
+ */
 @Configuration
 @EnableCaching
 @ConditionalOnProperty(prefix = "flexlease.redis", name = "enabled", havingValue = "true")

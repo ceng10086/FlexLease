@@ -22,6 +22,11 @@ import java.util.Comparator;
 import java.util.List;
 import org.springframework.stereotype.Component;
 
+/**
+ * DTO 组装器：把领域对象转换为 Controller 对外返回的响应结构。
+ * <p>
+ * 同时把取证策略（最少照片/视频数量）打包到订单详情中，方便前端提示。
+ */
 @Component
 public class OrderAssembler {
 

@@ -20,6 +20,11 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
+/**
+ * 订单维护调度：处理“待支付超时自动取消”等后台任务。
+ * <p>
+ * 该任务会尽量做到幂等/可重试：即使库存释放或通知发送失败，也不会影响订单状态回写与事件记录。
+ */
 @Service
 public class OrderMaintenanceScheduler {
 

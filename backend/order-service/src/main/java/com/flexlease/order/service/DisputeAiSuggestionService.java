@@ -39,6 +39,16 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
+/**
+ * 纠纷仲裁建议生成服务（LLM + 离线模板兜底）。
+ * <p>
+ * 关键点：
+ * <ul>
+ *   <li>仅仲裁角色可调用；结果缓存到 {@code dispute_ai_suggestion}，同纠纷默认复用。</li>
+ *   <li>对输入做脱敏（手机号/邮箱）避免把隐私直接发送到外部模型。</li>
+ *   <li>当未启用 LLM / 缺少 Key / 调用失败时返回离线模板，保证演示与测试链路不被阻断。</li>
+ * </ul>
+ */
 @Service
 @Transactional
 public class DisputeAiSuggestionService {

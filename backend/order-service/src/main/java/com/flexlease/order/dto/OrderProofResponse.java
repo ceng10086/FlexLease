@@ -5,6 +5,9 @@ import com.flexlease.order.domain.OrderProofType;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+/**
+ * OrderProofResponse 响应 DTO。
+ */
 public record OrderProofResponse(
         UUID id,
         OrderProofType proofType,

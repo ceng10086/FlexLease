@@ -7,6 +7,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * 取证策略接口：返回发货/收货/退租阶段的取证要求与拍摄指引。
+ */
 @RestController
 @RequestMapping("/api/v1/proof-policy")
 public class ProofPolicyController {

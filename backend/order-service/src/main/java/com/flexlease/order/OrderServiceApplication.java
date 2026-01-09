@@ -14,6 +14,11 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
+/**
+ * 订单服务启动类。
+ * <p>
+ * 订单服务覆盖：购物车、下单/支付回执、履约（发货/收货/续租/退租/买断）、取证与纠纷、满意度调研、运营指标等能力。
+ */
 @SpringBootApplication(scanBasePackages = "com.flexlease")
 @EnableScheduling
 @EnableConfigurationProperties({

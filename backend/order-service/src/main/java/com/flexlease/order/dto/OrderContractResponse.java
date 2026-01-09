@@ -4,6 +4,9 @@ import com.flexlease.order.domain.OrderContractStatus;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+/**
+ * OrderContractResponse 响应 DTO。
+ */
 public record OrderContractResponse(
         UUID contractId,
         UUID orderId,
