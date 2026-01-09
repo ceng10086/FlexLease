@@ -45,6 +45,7 @@
 </template>
 
 <script lang="ts" setup>
+// 订单沟通中心：把需要跟进的订单集中展示，并快速跳转到详情聊天页。
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import PageShell from '../../components/layout/PageShell.vue';

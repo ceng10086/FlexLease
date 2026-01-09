@@ -1,3 +1,8 @@
+/**
+ * 左侧菜单配置（按角色裁剪）：
+ * - NAV_TREE 维护所有菜单分区与叶子路由 key
+ * - resolveMenuForRoles/flattenNavItems/findNavItem 提供过滤与查找工具
+ */
 export type NavLeaf = {
   key: string;
   label: string;

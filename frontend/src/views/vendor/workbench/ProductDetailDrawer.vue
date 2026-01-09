@@ -227,6 +227,7 @@
 </template>
 
 <script lang="ts" setup>
+// 商品详情抽屉：编辑商品基础信息、媒体与方案/SKU，并支持提交审核。
 import { computed, reactive, ref, watch } from 'vue';
 import { message } from 'ant-design-vue';
 import DataStateBlock from '../../../components/feedback/DataStateBlock.vue';

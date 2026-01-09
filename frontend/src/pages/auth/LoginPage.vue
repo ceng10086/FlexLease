@@ -57,6 +57,7 @@
 </template>
 
 <script lang="ts" setup>
+// 登录页：提交账号密码获取 JWT，并在成功后跳转到用户可访问的默认入口。
 import { reactive, watchEffect } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useAuthStore } from '../../stores/auth';

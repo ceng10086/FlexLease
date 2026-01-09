@@ -20,6 +20,7 @@
 </template>
 
 <script lang="ts" setup>
+// 公告/提醒列表：展示固定的演示公告与操作提示，便于演示“平台信息流”。
 import type { NotificationLog } from '../../services/notificationService';
 import DataStateBlock from '../feedback/DataStateBlock.vue';
 

@@ -167,6 +167,7 @@
 </template>
 
 <script lang="ts" setup>
+// 管理端订单详情抽屉：在列表页内快速查看订单明细、时间线与干预操作。
 import { computed, reactive, ref, watch } from 'vue';
 import PageSection from '../../../components/layout/PageSection.vue';
 import DataStateBlock from '../../../components/feedback/DataStateBlock.vue';

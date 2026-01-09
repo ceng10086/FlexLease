@@ -1,3 +1,8 @@
+/**
+ * 厂商工作台上下文（provide/inject）：
+ * - VendorWorkbenchLayout 提供 vendor 档案与 loading/refresh
+ * - 具体看板页通过 useVendorWorkbench 读取并复用数据
+ */
 import { inject, provide, type Ref } from 'vue';
 import type { Vendor } from '../services/vendorService';
 

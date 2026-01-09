@@ -1,3 +1,8 @@
+/**
+ * 方案快照（planSnapshot）：
+ * - 下单时固化定价/租期/模式等关键信息，便于回溯与展示
+ * - 本文件负责序列化/解析与“显式字段优先”的取值规则
+ */
 export type PlanSnapshot = {
   planId?: string | null;
   planType?: string | null;

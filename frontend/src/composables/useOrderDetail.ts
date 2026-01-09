@@ -1,3 +1,8 @@
+/**
+ * 订单详情上下文（provide/inject）：
+ * - 由 OrderDetailShell 提供 order/loading/refresh 等能力
+ * - 子页面（overview/chat/proofs/timeline）通过 useOrderDetail 统一读取
+ */
 import { inject, provide } from 'vue';
 import type { RentalOrderDetail } from '../services/orderService';
 

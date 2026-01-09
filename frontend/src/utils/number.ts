@@ -1,3 +1,7 @@
+/**
+ * 金额格式化：
+ * - 统一把 number/string/null 转成固定小数位字符串（避免各组件各写一套）
+ */
 export const formatCurrency = (
   value: number | string | null | undefined,
   fractionDigits = 2

@@ -19,6 +19,7 @@
 </template>
 
 <script lang="ts" setup>
+// 商品瀑布流：按卡片网格展示商品列表，并处理空态/加载态与分页触底。
 import type { CatalogProductSummary } from '../../services/catalogService';
 import ProductCardLarge from './ProductCardLarge.vue';
 import DataStateBlock from '../feedback/DataStateBlock.vue';

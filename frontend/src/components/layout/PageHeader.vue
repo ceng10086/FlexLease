@@ -12,6 +12,7 @@
 </template>
 
 <script lang="ts" setup>
+// 页面头部：提供标题/副标题/描述与 actions slot，用于统一工作台的页面抬头。
 defineProps<{
   title: string;
   description?: string;

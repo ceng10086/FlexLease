@@ -64,6 +64,7 @@
 </template>
 
 <script lang="ts" setup>
+// 商品评价面板：展示评分概览与评价列表（演示用数据/接口可按迭代补齐）。
 import { computed } from 'vue';
 import DataStateBlock from '../feedback/DataStateBlock.vue';
 import type { ReviewItem, ReviewSummary } from '../../types/review';

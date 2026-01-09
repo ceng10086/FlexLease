@@ -1,3 +1,7 @@
+/**
+ * 纠纷相关展示与选择项：
+ * - 预设方案/状态/角色的中文文案与颜色映射（时间线、仲裁抽屉复用）
+ */
 import type { DisputeResolutionOption, OrderDispute } from '../services/orderService';
 
 export const disputeOptions: { label: string; value: DisputeResolutionOption }[] = [

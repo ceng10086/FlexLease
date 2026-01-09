@@ -14,6 +14,7 @@
 </template>
 
 <script lang="ts" setup>
+// 订单操作栏：根据角色与状态装配可执行动作（支付/发货/续租/退租/买断等）。
 import { computed } from 'vue';
 import type { RentalOrderDetail } from '../../services/orderService';
 

@@ -18,6 +18,7 @@
 </template>
 
 <script lang="ts" setup>
+// 媒体画廊：展示商品图片/视频缩略图与预览（以“可演示”为目标，功能从简）。
 import { computed, ref, watch } from 'vue';
 
 const props = defineProps<{

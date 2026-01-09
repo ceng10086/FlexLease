@@ -1,3 +1,7 @@
+/**
+ * 统一错误提示：
+ * - 将 axios/network/后端错误 payload 转成更友好的中文提示
+ */
 import type { AxiosError } from 'axios';
 
 type ErrorPayload = {

@@ -30,6 +30,7 @@
 </template>
 
 <script lang="ts" setup>
+// 指标洞察：厂商维度的 GMV、趋势与状态分布等运营统计。
 import { ref, watch } from 'vue';
 import PageSection from '../../../components/layout/PageSection.vue';
 import TrendChart from '../../../components/analytics/TrendChart.vue';

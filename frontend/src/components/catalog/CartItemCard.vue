@@ -45,6 +45,7 @@
 </template>
 
 <script lang="ts" setup>
+// 购物车条目卡片：展示商品/方案摘要，并支持数量调整与删除。
 import { computed } from 'vue';
 import type { CartItem } from '../../services/cartService';
 import { cartItemDeposit, cartItemRent } from '../../utils/orderAmounts';

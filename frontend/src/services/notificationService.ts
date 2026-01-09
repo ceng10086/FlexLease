@@ -1,3 +1,7 @@
+/**
+ * 通知中心 API（notification-service）：
+ * - 站内信列表、状态/场景过滤等
+ */
 import http from './http';
 
 export type NotificationStatus = 'PENDING' | 'SENT' | 'FAILED';

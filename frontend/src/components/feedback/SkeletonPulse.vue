@@ -3,6 +3,7 @@
 </template>
 
 <script lang="ts" setup>
+// 轻量骨架屏：用于列表/卡片加载时的占位动效（避免页面“跳一下”）。
 withDefaults(
   defineProps<{
     height?: string;

@@ -1,3 +1,8 @@
+/**
+ * 路由入口：
+ * - 以 `/app` 为登录后主布局（AuthenticatedLayout）
+ * - 通过 `meta.public/meta.requiresAuth/meta.roles` 做最小权限控制
+ */
 import { createRouter, createWebHistory } from 'vue-router';
 import type { RouteLocationNormalized } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
@@ -207,6 +212,7 @@ const router = createRouter({
 router.beforeEach(async (to: RouteLocationNormalized) => {
   const auth = useAuthStore();
 
+  // 首次进入应用时拉取 /auth/me，确定当前登录态与角色信息
   if (auth.initializing) {
     await auth.bootstrap();
   }
@@ -223,6 +229,7 @@ router.beforeEach(async (to: RouteLocationNormalized) => {
     return { path: '/login', query: { redirect: to.fullPath } };
   }
 
+  // 按页面声明的 roles 做简单 RBAC；无权限则回到驾驶舱
   const requiredRoles = to.meta.roles as string[] | undefined;
   if (requiredRoles && requiredRoles.length > 0) {
     const allowed = requiredRoles.some((role) => auth.hasRole(role));

@@ -74,6 +74,7 @@
 </template>
 
 <script lang="ts" setup>
+// 订单聊天面板：文本输入 + 附件上传 + 发送，供订单详情与沟通中心复用。
 import { computed, nextTick, ref, watch } from 'vue';
 import { PaperClipOutlined, ThunderboltOutlined } from '@ant-design/icons-vue';
 import { message, type UploadProps } from 'ant-design-vue';

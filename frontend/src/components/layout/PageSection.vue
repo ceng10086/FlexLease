@@ -17,6 +17,7 @@
 </template>
 
 <script lang="ts" setup>
+// 页面分区：带标题/描述与 actions slot 的容器，用于驾驶舱与各看板分块展示。
 import { computed } from 'vue';
 
 const props = defineProps<{

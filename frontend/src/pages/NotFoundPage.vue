@@ -12,6 +12,7 @@
 </template>
 
 <script lang="ts" setup>
+// 404 页面：兜底未匹配路由的访问入口。
 import { useRouter } from 'vue-router';
 
 const router = useRouter();

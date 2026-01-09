@@ -10,6 +10,7 @@
 </template>
 
 <script lang="ts" setup>
+// 页面壳组件：统一 header slot 与内容区间距，减少各页面重复布局代码。
 defineProps<{
   compact?: boolean;
 }>();

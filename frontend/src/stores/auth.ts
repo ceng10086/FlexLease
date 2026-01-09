@@ -1,3 +1,9 @@
+/**
+ * 登录态 Store：
+ * - 负责 token/refreshToken 的持久化与 /auth/me 引导加载
+ * - 与 `services/http` 协作完成 401 自动刷新与失效清理
+ * - 为路由与菜单提供角色（roles/vendorId）判定
+ */
 import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
 import { message } from 'ant-design-vue';

@@ -64,6 +64,7 @@
 </template>
 
 <script lang="ts" setup>
+// 仲裁中心：仲裁/复核角色查看纠纷订单、生成 AI 建议并提交裁决。
 import { computed, reactive, ref } from 'vue';
 import PageShell from '../../components/layout/PageShell.vue';
 import PageHeader from '../../components/layout/PageHeader.vue';
@@ -198,4 +199,3 @@ fetchOrders();
   text-align: center;
 }
 </style>
-

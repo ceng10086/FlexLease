@@ -33,6 +33,7 @@
 </template>
 
 <script lang="ts" setup>
+// 履约中台：厂商处理发货、续租/退租/买断审批、取证与纠纷响应。
 import { computed, reactive, ref, watch } from 'vue';
 import PageSection from '../../../components/layout/PageSection.vue';
 import DataStateBlock from '../../../components/feedback/DataStateBlock.vue';

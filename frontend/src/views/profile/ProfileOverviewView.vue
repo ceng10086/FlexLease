@@ -100,6 +100,7 @@
 </template>
 
 <script lang="ts" setup>
+// 个人资料页：展示用户档案与信用信息，并提供基础信息维护入口。
 import { computed, onMounted, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import type { FormInstance, FormRules } from 'ant-design-vue';

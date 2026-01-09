@@ -1,3 +1,7 @@
+/**
+ * 厂商商品管理 API（product-service /vendors/**）：
+ * - 商品/租赁方案/SKU/库存/媒体上传等工作台能力
+ */
 import http from './http';
 
 export type ProductStatus = 'DRAFT' | 'PENDING_REVIEW' | 'ACTIVE' | 'INACTIVE' | 'REJECTED';

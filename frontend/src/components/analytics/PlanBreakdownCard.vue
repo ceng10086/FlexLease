@@ -19,6 +19,7 @@
 import { computed } from 'vue';
 import type { PlanBreakdownEntry } from '../../services/analyticsService';
 
+// 驾驶舱/洞察页使用：把不同租赁模式的订单数占比可视化（进度条 + GMV）。
 const PLAN_LABELS: Record<string, string> = {
   STANDARD: '标准方案',
   RENT_TO_OWN: '先租后买',

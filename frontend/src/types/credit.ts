@@ -1,3 +1,7 @@
+/**
+ * 信用相关类型与展示工具：
+ * - 信用分档位、颜色/文案映射（驾驶舱/个人资料/订单提示复用）
+ */
 export type CreditTier = 'EXCELLENT' | 'STANDARD' | 'WARNING' | 'RESTRICTED';
 
 export const creditTierLabel = (tier?: CreditTier | null) => {

@@ -1,3 +1,7 @@
+/**
+ * 支付与结算 API（payment-service）：
+ * - 支付初始化（模拟二维码/自动确认）、流水查询、结算统计等
+ */
 import http from './http';
 
 export type PaymentScene = 'DEPOSIT' | 'RENT' | 'BUYOUT' | 'PENALTY';

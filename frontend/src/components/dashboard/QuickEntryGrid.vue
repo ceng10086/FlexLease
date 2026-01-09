@@ -16,6 +16,7 @@
 </template>
 
 <script lang="ts" setup>
+// 快捷入口网格：根据角色装配可点击的功能入口卡片（跳转到对应路由）。
 export type QuickEntry = {
   key: string;
   title: string;

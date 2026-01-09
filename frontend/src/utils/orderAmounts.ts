@@ -1,3 +1,8 @@
+/**
+ * 订单金额计算工具：
+ * - 统一从“显式字段 / planSnapshot 快照 / 单价×数量”推导押金、租金、买断与总额
+ * - 用于购物车/下单预览/订单详情的金额展示一致性
+ */
 import type { CartItem } from '../services/cartService';
 import type { RentalOrderDetail, RentalOrderItem } from '../services/orderService';
 import { parsePlanSnapshot, resolveBuyout, resolveDeposit, resolveRent } from './planSnapshot';

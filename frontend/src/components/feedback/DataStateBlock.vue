@@ -14,6 +14,7 @@
 </template>
 
 <script lang="ts" setup>
+// 通用空态/错误态/无数据提示块：集中管理文案与样式，供各页面复用。
 import { computed } from 'vue';
 import { LoadingOutlined, InboxOutlined, WarningOutlined } from '@ant-design/icons-vue';
 

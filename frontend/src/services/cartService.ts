@@ -1,3 +1,7 @@
+/**
+ * 购物车 API（order-service /cart/**）：
+ * - 购物车增删改查，用于下单前汇总与试算
+ */
 import http from './http';
 
 type ApiResponse<T> = {

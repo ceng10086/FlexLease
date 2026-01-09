@@ -94,6 +94,7 @@
 </template>
 
 <script lang="ts" setup>
+// 合同签署页：展示电子合同草稿并提交签名完成签署。
 import { computed, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { message } from 'ant-design-vue';

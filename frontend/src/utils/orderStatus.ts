@@ -1,3 +1,7 @@
+/**
+ * 订单状态展示映射：
+ * - 订单状态 -> 中文文案/标签色（Ant Design Vue Tag 语义色）
+ */
 import type { OrderStatus } from '../services/orderService';
 
 export const orderStatusLabel = (status: OrderStatus): string => {

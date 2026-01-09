@@ -1,3 +1,8 @@
+/**
+ * 极简 useQuery（不引入第三方状态库）：
+ * - 支持 enabled/immediate/dependencies 触发
+ * - 默认按“用户 scope + key”做内存缓存，避免跨账号串数据
+ */
 import { computed, ref, unref, watch, type Ref, type WatchSource } from 'vue';
 
 type UseQueryOptions<T> = {

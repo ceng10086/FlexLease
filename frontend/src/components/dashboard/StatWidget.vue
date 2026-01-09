@@ -16,6 +16,7 @@
 </template>
 
 <script lang="ts" setup>
+// 指标卡片：展示单个统计值（支持图标/趋势/副标题），用于驾驶舱与洞察页。
 withDefaults(
   defineProps<{
     label: string;

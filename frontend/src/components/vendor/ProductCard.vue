@@ -22,6 +22,7 @@
 </template>
 
 <script lang="ts" setup>
+// 厂商商品卡片：展示商品基础信息、审核状态与快捷操作入口。
 import type { ProductSummary } from '../../services/productService';
 
 import { computed } from 'vue';

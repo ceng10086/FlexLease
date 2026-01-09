@@ -1,3 +1,8 @@
+/**
+ * 订单域 API（order-service）：
+ * - 下单预览/创建、订单详情、履约操作、沟通/取证/纠纷/满意度等
+ * - 本文件同时承载大量前端用到的 DTO 类型（与后端契约保持一致）
+ */
 import http from './http';
 import type { CreditTier } from '../types/credit';
 

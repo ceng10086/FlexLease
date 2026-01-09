@@ -30,6 +30,7 @@
 </template>
 
 <script lang="ts" setup>
+// 时间线列表：把订单事件/取证/纠纷节点按时间顺序可视化展示。
 import { computed, ref, watch } from 'vue';
 import type { OrderEvent } from '../../services/orderService';
 

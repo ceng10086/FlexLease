@@ -354,6 +354,7 @@
 </template>
 
 <script lang="ts" setup>
+// 履约详情抽屉：围绕单个订单完成发货/审批/取证/沟通与纠纷处理。
 import { computed, reactive, ref, watch } from 'vue';
 import { message } from 'ant-design-vue';
 import { ClockCircleOutlined } from '@ant-design/icons-vue';

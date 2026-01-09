@@ -1,3 +1,7 @@
+/**
+ * 商品类目字典：
+ * - 用于类目展示与下拉选项（演示项目按需扩展）
+ */
 export type ProductCategoryCode = 'ELECTRONICS' | 'HOME_APPLIANCE' | 'ENTERTAINMENT' | 'OUTDOOR';
 
 export const PRODUCT_CATEGORY_OPTIONS: Array<{ label: string; value: ProductCategoryCode }> = [

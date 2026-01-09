@@ -94,6 +94,7 @@
 </template>
 
 <script lang="ts" setup>
+// 订单支付页：初始化支付（模拟二维码/自动确认）并提交支付回执驱动订单流转。
 import { computed, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { message } from 'ant-design-vue';

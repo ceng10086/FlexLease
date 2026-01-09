@@ -1,3 +1,7 @@
+/**
+ * 前台商品目录 API（product-service /catalog/**）：
+ * - 商品列表、详情与下单前咨询等能力
+ */
 import http from './http';
 
 export type PagedResponse<T> = {

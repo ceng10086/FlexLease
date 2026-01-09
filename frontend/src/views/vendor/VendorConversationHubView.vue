@@ -70,6 +70,7 @@
 </template>
 
 <script lang="ts" setup>
+// 厂商沟通中心：汇总需要跟进的订单，快速进入聊天/取证/审批抽屉。
 import { computed, onBeforeUnmount, reactive, ref, watch } from 'vue';
 import { message } from 'ant-design-vue';
 import PageShell from '../../components/layout/PageShell.vue';

@@ -23,6 +23,7 @@
 </template>
 
 <script lang="ts" setup>
+// 时间线页：展示订单事件、纠纷协商/升级仲裁与满意度调研入口。
 import { computed } from 'vue';
 import PageSection from '../../../components/layout/PageSection.vue';
 import TimelineList from '../../../components/timeline/TimelineList.vue';

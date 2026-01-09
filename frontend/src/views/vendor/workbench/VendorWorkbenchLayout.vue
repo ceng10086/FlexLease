@@ -49,6 +49,7 @@
 </template>
 
 <script lang="ts" setup>
+// 厂商工作台布局：统一提供厂商档案与刷新能力，并承载子看板路由。
 import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { message } from 'ant-design-vue';

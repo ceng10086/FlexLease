@@ -79,6 +79,7 @@
 </template>
 
 <script lang="ts" setup>
+// 目录筛选条：封装关键词/类目/排序等筛选项，并向外发出查询参数变更事件。
 import { computed, reactive, ref, watch } from 'vue';
 import { FilterOutlined } from '@ant-design/icons-vue';
 

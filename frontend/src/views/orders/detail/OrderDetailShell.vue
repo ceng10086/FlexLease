@@ -36,6 +36,7 @@
 </template>
 
 <script lang="ts" setup>
+// 订单详情壳：负责加载订单详情并向子路由提供 OrderDetailContext（provide/inject）。
 import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import PageShell from '../../../components/layout/PageShell.vue';

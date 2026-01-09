@@ -130,6 +130,7 @@
 </template>
 
 <script lang="ts" setup>
+// 厂商入驻页：提交资质、查看审核状态，并在通过后进入工作台。
 import { computed, reactive, ref, watch } from 'vue';
 import { message } from 'ant-design-vue';
 import PageShell from '../../../components/layout/PageShell.vue';

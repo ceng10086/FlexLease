@@ -95,6 +95,7 @@
 </template>
 
 <script lang="ts" setup>
+// 商品详情壳：加载商品/方案/SKU，并在此发起“下单前咨询”与进入结算流程。
 import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { message } from 'ant-design-vue';

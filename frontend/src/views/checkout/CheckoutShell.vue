@@ -113,6 +113,7 @@
 </template>
 
 <script lang="ts" setup>
+// 结算页：根据购物车/直接购买明细进行订单试算与创建订单。
 import { computed, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { message } from 'ant-design-vue';

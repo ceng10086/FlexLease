@@ -1,3 +1,7 @@
+/**
+ * 厂商目录/资料 API（user-service）：
+ * - 管理员查看厂商列表、驾驶舱选择器的数据来源
+ */
 import http from './http';
 
 export type VendorApplicationStatus = 'SUBMITTED' | 'APPROVED' | 'REJECTED';

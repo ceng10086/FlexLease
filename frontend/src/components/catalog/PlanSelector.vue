@@ -22,6 +22,7 @@
 </template>
 
 <script lang="ts" setup>
+// 方案选择器：在商品详情/下单前选择租赁方案、租期与对应定价快照。
 import type { CatalogRentalPlan } from '../../services/catalogService';
 
 defineProps<{

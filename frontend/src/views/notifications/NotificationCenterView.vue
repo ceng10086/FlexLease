@@ -73,6 +73,7 @@
 </template>
 
 <script lang="ts" setup>
+// 通知中心：以“站内信”方式收敛订单/纠纷/信用等消息，并支持筛选检索。
 import { computed, reactive } from 'vue';
 import PageShell from '../../components/layout/PageShell.vue';
 import PageHeader from '../../components/layout/PageHeader.vue';

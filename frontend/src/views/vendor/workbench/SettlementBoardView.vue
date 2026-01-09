@@ -25,6 +25,7 @@
 </template>
 
 <script lang="ts" setup>
+// 结算中心：展示押金/租金/退款/平台抽成等拆分统计与结算明细。
 import { ref, watch } from 'vue';
 import type { Dayjs } from 'dayjs';
 import PageSection from '../../../components/layout/PageSection.vue';

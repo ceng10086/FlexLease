@@ -1,3 +1,8 @@
+/**
+ * 自动支付（演示用）：
+ * - 下单后自动走 MOCK 通道创建并确认支付
+ * - 按押金/租金/买断拆分 splits，方便结算页展示
+ */
 import {
   initPayment,
   type PaymentScene,

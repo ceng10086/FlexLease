@@ -69,6 +69,7 @@
 </template>
 
 <script lang="ts" setup>
+// 注册页：支持消费者/厂商两种角色注册（role 由 query 参数决定）。
 import { reactive } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { message } from 'ant-design-vue';

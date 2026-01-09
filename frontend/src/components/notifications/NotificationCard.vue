@@ -27,6 +27,7 @@
 </template>
 
 <script lang="ts" setup>
+// 站内信卡片：统一通知的标题/摘要/标签与时间展示，供通知中心复用。
 import type { NotificationLog, NotificationStatus } from '../../services/notificationService';
 
 defineProps<{

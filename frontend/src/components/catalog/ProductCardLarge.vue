@@ -20,6 +20,7 @@
 </template>
 
 <script lang="ts" setup>
+// 商品大卡片：用于目录与推荐位，展示封面、价格区间、库存/状态等摘要信息。
 import { computed } from 'vue';
 import type { CatalogProductSummary } from '../../services/catalogService';
 

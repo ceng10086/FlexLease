@@ -33,6 +33,7 @@
 import { computed } from 'vue';
 import type { TrendPoint } from '../../services/analyticsService';
 
+// 轻量 SVG 趋势图：同时绘制 GMV 与订单数两条折线，用于驾驶舱的 7 日趋势展示。
 const props = defineProps<{
   data: TrendPoint[];
   height?: number;

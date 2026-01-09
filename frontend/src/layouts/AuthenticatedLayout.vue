@@ -104,6 +104,7 @@
 </template>
 
 <script lang="ts" setup>
+// 登录后主布局：渲染左侧菜单/顶部信息，并承载各角色的业务路由视图。
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import {

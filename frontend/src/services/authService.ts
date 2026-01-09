@@ -1,3 +1,8 @@
+/**
+ * 认证相关 API：
+ * - 登录、刷新、注册、拉取当前用户（/auth/me）
+ * - 对 auth-service 的 503 做轻量重试，避免服务启动初期抖动影响体验
+ */
 import http from './http';
 import type { AxiosError } from 'axios';
 

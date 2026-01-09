@@ -7,6 +7,7 @@
 <script lang="ts" setup>
 import { computed } from 'vue';
 
+// 全局 UI 主题（Ant Design Vue token），用于保持各角色工作台视觉一致。
 const theme = computed(() => ({
   token: {
     colorPrimary: '#2563eb',

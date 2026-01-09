@@ -15,6 +15,7 @@
 </template>
 
 <script lang="ts" setup>
+// 取证页：按后端 proof-policy 指引上传/预览凭证（发货/收货/退租/巡检）。
 import { computed } from 'vue';
 import { useOrderDetail } from '../../../composables/useOrderDetail';
 import PageSection from '../../../components/layout/PageSection.vue';

@@ -134,6 +134,7 @@
 </template>
 
 <script lang="ts" setup>
+// 商品看板：厂商管理商品、租赁方案、SKU 与库存，并处理下单前咨询。
 import { computed, reactive, ref, watch } from 'vue';
 import { message, Upload } from 'ant-design-vue';
 import type { UploadProps } from 'ant-design-vue';

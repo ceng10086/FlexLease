@@ -49,6 +49,7 @@
 </template>
 
 <script lang="ts" setup>
+// 下单前咨询面板：消费者提交问题并查看 72 小时窗口内的咨询记录与回复。
 import { onMounted, reactive, ref, watch } from 'vue';
 import { message } from 'ant-design-vue';
 import { useRoute, useRouter } from 'vue-router';

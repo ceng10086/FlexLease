@@ -233,6 +233,7 @@
 </template>
 
 <script lang="ts" setup>
+// 纠纷面板：展示协商倒计时、预设方案选择，并支持升级平台仲裁/申诉复核。
 import { computed, reactive, ref } from 'vue';
 import { message } from 'ant-design-vue';
 import type {

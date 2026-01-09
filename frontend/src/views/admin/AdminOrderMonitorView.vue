@@ -64,6 +64,7 @@
 </template>
 
 <script lang="ts" setup>
+// 管理员订单监控：按条件检索订单，查看详情并可执行平台侧强制干预。
 import { computed, reactive, ref } from 'vue';
 import PageShell from '../../components/layout/PageShell.vue';
 import PageHeader from '../../components/layout/PageHeader.vue';

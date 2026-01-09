@@ -86,6 +86,7 @@
 </template>
 
 <script lang="ts" setup>
+// 满意度调研面板：在纠纷结束后收集双方评分与反馈（多角色复用）。
 import { computed, reactive, ref, watch } from 'vue';
 import { message } from 'ant-design-vue';
 import type { OrderSurvey, RentalOrderDetail } from '../../services/orderService';

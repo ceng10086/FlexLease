@@ -30,6 +30,7 @@
 </template>
 
 <script lang="ts" setup>
+// 订单墙：消费者查看订单列表（含状态筛选）并进入订单详情。
 import { computed, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { message } from 'ant-design-vue';

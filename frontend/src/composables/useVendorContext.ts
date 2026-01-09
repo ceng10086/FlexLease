@@ -1,3 +1,8 @@
+/**
+ * 厂商身份上下文：
+ * - 从登录态读取 vendorId，并提供“要求 vendorId/刷新身份”的便捷方法
+ * - 避免各页面重复写一套校验与提示逻辑
+ */
 import { computed, ref } from 'vue';
 import { message } from 'ant-design-vue';
 import { useAuthStore } from '../stores/auth';

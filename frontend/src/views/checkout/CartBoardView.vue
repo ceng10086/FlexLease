@@ -143,6 +143,7 @@
 </template>
 
 <script lang="ts" setup>
+// 购物车页：编辑条目并可跳转到订单试算/下单页。
 import { computed, onMounted, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { message } from 'ant-design-vue';

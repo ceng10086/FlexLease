@@ -1,3 +1,7 @@
+/**
+ * 视口尺寸监听：
+ * - 提供响应式的 width/height 与断点判断（isMobile/isTablet）
+ */
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 
 const fallbackSize = { width: 1280, height: 720 };

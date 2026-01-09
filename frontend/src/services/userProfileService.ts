@@ -1,3 +1,7 @@
+/**
+ * 用户档案 API（user-service）：
+ * - 消费者个人资料、信用与基础信息读取/更新
+ */
 import http from './http';
 import type { CreditTier } from '../types/credit';
 

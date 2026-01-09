@@ -24,6 +24,7 @@
 </template>
 
 <script lang="ts" setup>
+// 厂商订单卡片：在履约中台以卡片方式展示订单关键信息与状态提示。
 import { computed } from 'vue';
 import type { RentalOrderSummary } from '../../services/orderService';
 import { orderStatusColor, orderStatusLabel } from '../../utils/orderStatus';

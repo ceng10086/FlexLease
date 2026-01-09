@@ -213,6 +213,7 @@ import { listVendors, type Vendor, type PagedResponse } from '../../services/ven
 import { listNotificationLogs, type NotificationLog } from '../../services/notificationService';
 import { creditTierLabel, creditTierColor } from '../../types/credit';
 
+// 驾驶舱：按角色展示快捷入口、平台指标（管理员）与厂商指标（厂商/管理员）。
 const auth = useAuthStore();
 const router = useRouter();
 const vendorId = computed(() => auth.vendorId ?? null);

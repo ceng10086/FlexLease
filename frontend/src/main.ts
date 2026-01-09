@@ -1,3 +1,8 @@
+/**
+ * 应用入口：
+ * - 注册 Pinia、路由与 Ant Design Vue
+ * - 引入全局样式（tokens/global）
+ */
 import { createApp } from 'vue';
 import { createPinia } from 'pinia';
 import Antd from 'ant-design-vue';

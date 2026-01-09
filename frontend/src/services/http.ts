@@ -1,3 +1,9 @@
+/**
+ * Axios 统一封装：
+ * - 自动注入 `Authorization: Bearer <token>`
+ * - 401 时尝试用 refreshToken 续期（并发场景用 refreshPromise 合并请求）
+ * - refresh 失败或重复 401 时触发 onUnauthorized（清理会话并提示）
+ */
 import axios, { AxiosError, AxiosHeaders } from 'axios';
 import type { InternalAxiosRequestConfig, AxiosResponse } from 'axios';
 
@@ -46,6 +52,7 @@ http.interceptors.response.use(
       _skipAuthRefresh?: boolean;
     }) | undefined;
 
+    // 约定：对 refresh 接口本身跳过自动刷新，避免递归死循环
     if (response?.status === 401 && originalRequest && !originalRequest._skipAuthRefresh) {
       if (originalRequest._retry) {
         authHandlers.onUnauthorized();
@@ -61,6 +68,7 @@ http.interceptors.response.use(
       }
 
       if (!refreshPromise) {
+        // 同一时间只允许一个 refresh 请求；其余 401 等待该 Promise 结束后复用结果
         refreshPromise = refreshTokens(currentRefreshToken).finally(() => {
           refreshPromise = null;
         });

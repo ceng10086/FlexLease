@@ -93,6 +93,7 @@
 </template>
 
 <script lang="ts" setup>
+// 取证上传组件：按 proofType 上传图片/视频，并做最小的数量/大小校验提示。
 import { computed, reactive, ref, watch } from 'vue';
 import type { OrderProofType } from '../../services/orderService';
 

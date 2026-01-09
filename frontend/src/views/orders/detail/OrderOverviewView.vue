@@ -176,6 +176,7 @@
 </template>
 
 <script lang="ts" setup>
+// 订单概览页：展示金额/物流/信用快照等摘要，并串联合同、支付与履约操作。
 import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { message, Modal } from 'ant-design-vue';

@@ -98,6 +98,7 @@
 </template>
 
 <script lang="ts" setup>
+// 管理员审核大厅：集中处理厂商入驻与商品审核（通过/驳回/备注）。
 import { computed, reactive, ref } from 'vue';
 import { useViewport } from '../../composables/useViewport';
 import PageShell from '../../components/layout/PageShell.vue';

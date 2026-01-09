@@ -24,6 +24,7 @@
 </template>
 
 <script lang="ts" setup>
+// 订单列表卡片：用于“订单墙/监控列表”展示订单摘要并支持进入详情。
 import { computed } from 'vue';
 import type { RentalOrderSummary } from '../../services/orderService';
 import { orderStatusLabel, orderStatusColor } from '../../utils/orderStatus';

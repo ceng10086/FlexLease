@@ -3,6 +3,7 @@
 </template>
 
 <script lang="ts" setup>
+// 状态胶囊：以短标签形式展示订单状态与关键提醒（如人工复核）。
 import { computed } from 'vue';
 import type { OrderStatus } from '../../services/orderService';
 import { orderStatusLabel, orderStatusColor } from '../../utils/orderStatus';

@@ -64,6 +64,7 @@
 </template>
 
 <script lang="ts" setup>
+// 合同抽屉：在订单详情中展示合同内容，并提供刷新/签署等相关操作入口。
 import { computed, ref, watch } from 'vue';
 import { message } from 'ant-design-vue';
 import {

@@ -5,6 +5,7 @@
 </template>
 
 <script lang="ts" setup>
+// 订单沟通页：围绕单个订单的文本+附件留言（供消费者/厂商/管理员协作）。
 import { computed, ref } from 'vue';
 import PageSection from '../../../components/layout/PageSection.vue';
 import OrderChatPanel from '../../../components/chat/OrderChatPanel.vue';

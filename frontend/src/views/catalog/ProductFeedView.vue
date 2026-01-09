@@ -32,6 +32,7 @@
 </template>
 
 <script lang="ts" setup>
+// 商品目录页：消费者浏览可租赁商品、筛选排序并跳转详情。
 import { reactive, ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { message } from 'ant-design-vue';

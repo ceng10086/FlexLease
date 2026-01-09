@@ -1,4 +1,8 @@
 import type { CreditTier } from '../types/credit';
+/**
+ * 运营指标 API（order-service /analytics/**）：
+ * - 平台驾驶舱与厂商洞察所需的聚合统计
+ */
 import http from './http';
 
 export type OrderStatusBreakdown = Record<string, number>;

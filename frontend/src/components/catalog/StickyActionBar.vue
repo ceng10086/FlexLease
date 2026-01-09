@@ -23,6 +23,7 @@
 </template>
 
 <script lang="ts" setup>
+// 吸底操作栏：在移动端/长页面提供“加入购物车/去下单”等主要行动按钮。
 withDefaults(
   defineProps<{
     price: number;
