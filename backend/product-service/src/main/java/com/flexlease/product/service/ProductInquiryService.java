@@ -24,6 +24,11 @@ import org.springframework.stereotype.Service;
 @Transactional
 public class ProductInquiryService {
 
+    /**
+     * 商品咨询服务。
+     * <p>
+     * 咨询默认 72 小时有效；厂商回复前会再次校验是否过期，避免“过期后仍可回复”的边界问题。
+     */
     private static final Duration EXPIRE_WINDOW = Duration.ofHours(72);
 
     private final ProductRepository productRepository;

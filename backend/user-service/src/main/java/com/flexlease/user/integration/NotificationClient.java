@@ -12,6 +12,11 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
+/**
+ * 通知服务客户端（user-service -> notification-service）。
+ * <p>
+ * 用于信用分变更、账号解冻等场景发送站内信；内部调用使用 {@code X-Internal-Token}。
+ */
 @Component
 public class NotificationClient {
 

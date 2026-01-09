@@ -15,6 +15,11 @@ import java.time.OffsetDateTime;
 import java.util.Locale;
 import java.util.UUID;
 
+/**
+ * 厂商主体（B 端）。
+ * <p>
+ * 在厂商入驻审核通过后创建；同时维护抽成档案（行业类目、基准费率、信用档位与 SLA 评分），并可据此计算实际抽成费率。
+ */
 @Entity
 @Table(name = "vendor", schema = "users")
 public class Vendor {

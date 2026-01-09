@@ -14,6 +14,11 @@ import org.springframework.web.multipart.MultipartFile;
 @Transactional
 public class ProductAssetService {
 
+    /**
+     * 资产/文件相关的轻量封装服务。
+     * <p>
+     * 当前主要用于封面图上传（返回可访问 URL）与临时文件删除。
+     */
     private final FileStorageService fileStorageService;
 
     public ProductAssetService(FileStorageService fileStorageService) {

@@ -24,6 +24,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * 管理员商品审核接口。
+ * <p>
+ * 覆盖待审核商品列表、审核通过/驳回等操作。
+ */
 @RestController
 @RequestMapping("/api/v1/admin/products")
 public class AdminProductController {

@@ -25,6 +25,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * 管理员用户管理接口。
+ * <p>
+ * 包含用户列表、冻结/解冻账号（联动 auth-service）以及信用分人工调整与历史查询。
+ */
 @RestController
 @RequestMapping("/api/v1/admin/users")
 public class AdminUserController {

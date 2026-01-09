@@ -21,6 +21,12 @@ public class FileStorageService {
 
     private static final Logger LOG = LoggerFactory.getLogger(FileStorageService.class);
 
+    /**
+     * 本地文件存储服务（媒体资源）。
+     * <p>
+     * 大学项目/演示场景下采用本地文件系统存储，返回的 URL 统一为 {@code /media/<fileName>}，
+     * 由 {@link com.flexlease.product.config.WebConfig} 负责映射到实际目录。
+     */
     private final Path rootLocation;
 
     public FileStorageService(StorageProperties properties) {

@@ -23,6 +23,11 @@ import org.springframework.stereotype.Component;
 @Component
 public class ProductAssembler {
 
+    /**
+     * 商品域的 DTO 组装器。
+     * <p>
+     * 负责将 JPA 实体转换为对外 DTO（含 Catalog、厂商侧管理视图），以及 SKU attributes 的 JSON 编解码。
+     */
     private final ObjectMapper objectMapper;
 
     public ProductAssembler(ObjectMapper objectMapper) {

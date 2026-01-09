@@ -20,6 +20,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * 厂商侧商品咨询管理接口。
+ * <p>
+ * 厂商可查看咨询列表并对咨询进行回复；咨询默认 72 小时有效，过期后不允许回复。
+ */
 @RestController
 @RequestMapping("/api/v1/vendors/{vendorId}/inquiries")
 public class VendorInquiryController {

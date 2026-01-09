@@ -8,6 +8,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+/**
+ * 商品咨询过期调度器。
+ * <p>
+ * 定期将超过有效期且仍处于 OPEN 的咨询批量置为 EXPIRED，避免咨询列表长期积压未关闭记录。
+ */
 @Component
 public class ProductInquiryExpirationScheduler {
 
@@ -34,4 +39,3 @@ public class ProductInquiryExpirationScheduler {
         }
     }
 }
-

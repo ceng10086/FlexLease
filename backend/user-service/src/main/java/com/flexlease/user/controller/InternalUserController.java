@@ -16,6 +16,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import jakarta.validation.Valid;
 
+/**
+ * 用户内部接口（供微服务之间调用）。
+ * <p>
+ * 例如订单服务在试算押金/风控时，需要读取用户信用档案；内部接口要求 INTERNAL 角色。
+ */
 @RestController
 @RequestMapping("/api/v1/internal/users")
 public class InternalUserController {

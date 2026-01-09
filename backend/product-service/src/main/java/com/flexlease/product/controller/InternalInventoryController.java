@@ -10,6 +10,11 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * 库存内部接口（供微服务之间调用）。
+ * <p>
+ * 典型调用方为 order-service：下单/取消/履约等场景需要预占/释放/出入库库存。
+ */
 @RestController
 @RequestMapping("/api/v1/internal/inventory")
 public class InternalInventoryController {

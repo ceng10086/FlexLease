@@ -24,6 +24,12 @@ import org.springframework.util.StringUtils;
 @Transactional(Transactional.TxType.SUPPORTS)
 public class CatalogQueryService {
 
+    /**
+     * Catalog 查询服务（面向消费者）。
+     * <p>
+     * 为了保持实现简单：当使用“高级筛选”（按租赁类型/押金区间/租金排序）时，会先查询出满足基础条件的全部商品，
+     * 再在内存中进行过滤与排序，最后手动分页；基础查询则直接走数据库分页。
+     */
     private final ProductRepository productRepository;
     private final ProductAssembler assembler;
 

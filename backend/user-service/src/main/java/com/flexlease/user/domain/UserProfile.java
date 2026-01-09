@@ -13,6 +13,12 @@ import jakarta.persistence.Table;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+/**
+ * 用户档案（含信用分）。
+ * <p>
+ * 与认证中心账号（auth.user_account）通过 {@code userId} 关联；信用分变化会实时刷新档位（CreditTier），
+ * 若发生恶意行为会记录冻结截止时间 {@code suspendedUntil} 供调度器自动解冻。
+ */
 @Entity
 @Table(name = "user_profile", schema = "users")
 public class UserProfile {

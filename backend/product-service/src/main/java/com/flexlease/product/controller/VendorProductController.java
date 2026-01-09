@@ -37,6 +37,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+/**
+ * 厂商侧商品管理接口。
+ * <p>
+ * 覆盖商品 CRUD、提交审核/上下架、租赁方案与 SKU、库存调整，以及封面图上传等能力。
+ */
 @RestController
 @RequestMapping("/api/v1/vendors/{vendorId}/products")
 public class VendorProductController {

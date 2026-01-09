@@ -23,6 +23,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * 厂商入驻申请接口。
+ * <p>
+ * 厂商账号提交入驻资料；管理员对申请进行审核通过/驳回。审核通过后会联动 auth-service 激活账号并绑定 vendorId。
+ */
 @RestController
 @RequestMapping("/api/v1/vendors/applications")
 public class VendorApplicationController {

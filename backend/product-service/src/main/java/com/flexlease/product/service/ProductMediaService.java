@@ -20,6 +20,11 @@ import org.springframework.web.multipart.MultipartFile;
 @Transactional
 public class ProductMediaService {
 
+    /**
+     * 商品媒体资源管理服务。
+     * <p>
+     * 文件先写入本地存储，再落库保存元信息与排序；删除时会同时删除数据库记录与本地文件。
+     */
     private final ProductRepository productRepository;
     private final MediaAssetRepository mediaAssetRepository;
     private final FileStorageService fileStorageService;

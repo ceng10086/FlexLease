@@ -12,6 +12,12 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
+/**
+ * Spring Security 配置。
+ * <p>
+ * user-service 使用 JWT 鉴权，并通过 {@link JwtAuthProperties#getPermitAll()} 配置放行登录/注册等白名单接口；
+ * 其余接口默认需要认证。
+ */
 @Configuration
 @EnableWebSecurity
 @EnableConfigurationProperties(JwtAuthProperties.class)

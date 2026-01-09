@@ -33,6 +33,11 @@ public class UserProfileService {
 
     private static final Logger LOG = LoggerFactory.getLogger(UserProfileService.class);
 
+    /**
+     * 用户档案与信用分聚合服务。
+     * <p>
+     * 覆盖：用户资料读写、信用分加载（用于下单试算）、管理员/内部的信用分人工调整与记录。
+     */
     private final UserProfileRepository userProfileRepository;
     private final CreditEventService creditEventService;
     private final CreditAdjustmentRepository creditAdjustmentRepository;
@@ -59,6 +64,7 @@ public class UserProfileService {
     public UserProfileResponse update(UUID userId, UserProfileUpdateRequest request) {
         UserProfile profile = userProfileRepository.findByUserId(userId)
                 .orElseGet(() -> UserProfile.create(userId));
+        // 这里用“资料补全”模拟一次 KYC 完成：避免引入外部实名接口，满足演示闭环即可。
         boolean eligibleForKyc = !profile.isKycVerified()
                 && request.fullName() != null
                 && !request.fullName().isBlank()
@@ -89,6 +95,7 @@ public class UserProfileService {
                 .orElseGet(() -> userProfileRepository.save(UserProfile.create(userId)));
         profile.applyCreditDelta(delta);
         UserProfile saved = userProfileRepository.save(profile);
+        // 记录人工调整流水，便于后续审计与对用户解释。
         CreditAdjustment adjustment = creditAdjustmentRepository.save(CreditAdjustment.create(
                 userId,
                 delta,

@@ -11,6 +11,11 @@ import jakarta.persistence.Table;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+/**
+ * 厂商入驻申请。
+ * <p>
+ * 厂商账号提交资料后进入 SUBMITTED；管理员审核通过/驳回会更新审核信息与备注。
+ */
 @Entity
 @Table(name = "vendor_application", schema = "users")
 public class VendorApplication {

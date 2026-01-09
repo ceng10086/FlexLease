@@ -16,6 +16,12 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.UUID;
 
+/**
+ * 商品聚合根。
+ * <p>
+ * 以厂商（vendorId）为归属，包含租赁方案（{@link RentalPlan}）与媒体资源（{@link MediaAsset}）等子对象；
+ * 商品需先提交审核，管理员审核通过后才会对 C 端 Catalog 上架（ACTIVE）。
+ */
 @Entity
 @Table(name = "product", schema = "product")
 public class Product {

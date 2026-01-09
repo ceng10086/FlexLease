@@ -12,6 +12,11 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * 厂商内部接口（供微服务之间调用）。
+ * <p>
+ * 主要提供抽成配置等信息给订单/支付等服务使用；内部接口要求 INTERNAL 角色。
+ */
 @RestController
 @RequestMapping("/api/v1/internal/vendors")
 public class InternalVendorController {

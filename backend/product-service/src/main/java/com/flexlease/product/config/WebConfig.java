@@ -4,6 +4,11 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
+/**
+ * Web MVC 配置。
+ * <p>
+ * 将本地文件系统中的上传目录映射为静态资源路径 {@code /media/**}，以便前端通过 Nginx / 网关直接访问。
+ */
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
 

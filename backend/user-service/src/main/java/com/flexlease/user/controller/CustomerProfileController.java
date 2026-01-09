@@ -15,6 +15,11 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * 消费者个人资料接口。
+ * <p>
+ * 支持消费者查看/更新自己的档案信息；当资料满足条件时，会触发一次“实名认证加分”（见 {@code UserProfileService}）。
+ */
 @RestController
 @RequestMapping("/api/v1/customers/profile")
 public class CustomerProfileController {

@@ -26,6 +26,16 @@ public class InventoryReservationService {
 
     private static final Logger LOG = LoggerFactory.getLogger(InventoryReservationService.class);
 
+    /**
+     * 库存写入（预占/释放/出入库）服务。
+     * <p>
+     * 关键点：
+     * <ul>
+     *   <li>通过 {@link ProductSku#getVersion()} 的乐观锁控制并发写入冲突</li>
+     *   <li>发生 {@link OptimisticLockingFailureException} 时按配置做重试与退避</li>
+     *   <li>每条库存变更都会写入 {@link InventorySnapshot} 形成流水</li>
+     * </ul>
+     */
     private final ProductSkuRepository productSkuRepository;
     private final InventorySnapshotRepository inventorySnapshotRepository;
     private final TransactionTemplate transactionTemplate;
@@ -45,6 +55,11 @@ public class InventoryReservationService {
         this.backoff = configuredBackoff == null ? Duration.ZERO : configuredBackoff;
     }
 
+    /**
+     * 批量处理库存变更命令。
+     * <p>
+     * 该方法会将一次批量请求放在事务中执行；如遇乐观锁冲突，则回滚并整体重试，确保批次内命令“要么都成功，要么都失败”。
+     */
     public void processReservations(InventoryReservationBatchRequest request) {
         int attempt = 0;
         while (true) {

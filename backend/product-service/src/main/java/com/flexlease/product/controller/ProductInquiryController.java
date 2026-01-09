@@ -17,6 +17,11 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * 商品咨询接口（消费者侧）。
+ * <p>
+ * 消费者可对商品发起“下单前咨询”，并查看自己在该商品下的咨询记录。
+ */
 @RestController
 @RequestMapping("/api/v1/catalog/products/{productId}/inquiries")
 public class ProductInquiryController {

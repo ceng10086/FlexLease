@@ -23,6 +23,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+/**
+ * 商品媒体资源管理接口（厂商侧）。
+ * <p>
+ * 用于上传/排序/删除商品图片或附件；文件实际存储在本地目录，并通过 {@code /media/**} 对外访问。
+ */
 @RestController
 @RequestMapping("/api/v1/vendors/{vendorId}/products/{productId}/media")
 public class ProductMediaController {

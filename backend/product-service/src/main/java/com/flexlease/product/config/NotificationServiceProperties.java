@@ -4,6 +4,11 @@ import jakarta.validation.constraints.NotBlank;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
+/**
+ * 通知服务（notification-service）调用配置。
+ * <p>
+ * 主要用于商品咨询等场景向厂商/用户发送站内信通知。
+ */
 @Validated
 @ConfigurationProperties(prefix = "flexlease.notification-service")
 public class NotificationServiceProperties {

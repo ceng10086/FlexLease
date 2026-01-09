@@ -27,6 +27,16 @@ public class CreditEventService {
     private static final int SUSPEND_DAYS = 30;
     private static final int INSPECTION_BONUS = 2;
 
+    /**
+     * 信用事件处理服务。
+     * <p>
+     * 以“事件”驱动信用分加减（KYC、按时支付、巡检配合、纠纷友好协商、恶意行为等），并在必要时联动：
+     * <ul>
+     *   <li>写入用户档案（信用分/档位/冻结截止时间）</li>
+     *   <li>调用 auth-service 更新账号状态（冻结/解冻）</li>
+     *   <li>通过通知服务发送站内信提醒</li>
+     * </ul>
+     */
     private final UserProfileRepository userProfileRepository;
     private final NotificationClient notificationClient;
     private final AuthServiceClient authServiceClient;

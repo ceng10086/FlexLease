@@ -3,6 +3,11 @@ package com.flexlease.product.config;
 import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+/**
+ * 库存并发控制配置。
+ * <p>
+ * 商品库存写入采用 JPA 乐观锁（{@code ProductSku.version}），当发生版本冲突时由服务层做重试与退避。
+ */
 @ConfigurationProperties(prefix = "flexlease.inventory")
 public class InventoryConcurrencyProperties {
 

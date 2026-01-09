@@ -12,6 +12,12 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
+/**
+ * 认证服务客户端（user-service -> auth-service）。
+ * <p>
+ * 用于账号启用/停用、以及厂商入驻审核通过后绑定 vendorId；调用 auth-service 内部接口需要
+ * {@code X-Internal-Token}。
+ */
 @Component
 public class AuthServiceClient {
 

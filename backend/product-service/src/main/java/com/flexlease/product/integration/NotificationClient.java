@@ -15,6 +15,11 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
+/**
+ * 通知服务客户端（商品服务 -> 通知服务）。
+ * <p>
+ * 通过站内信向厂商/用户发送咨询相关提醒；内部调用使用 {@code X-Internal-Token} 作为微服务互信凭证。
+ */
 @Component
 public class NotificationClient {
 

@@ -16,6 +16,15 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class VendorApplicationService {
 
+    /**
+     * 厂商入驻申请服务。
+     * <p>
+     * 负责入驻资料的提交/重新提交、管理员审核通过/驳回，并在审核通过时联动：
+     * <ul>
+     *   <li>调用 auth-service 内部接口激活账号</li>
+     *   <li>创建/更新厂商主体资料并将 vendorId 绑定回认证中心</li>
+     * </ul>
+     */
     private final VendorApplicationRepository vendorApplicationRepository;
     private final AuthServiceClient authServiceClient;
     private final VendorService vendorService;

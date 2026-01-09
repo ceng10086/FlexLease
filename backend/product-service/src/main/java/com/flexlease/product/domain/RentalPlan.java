@@ -20,6 +20,11 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.UUID;
 
+/**
+ * 租赁方案。
+ * <p>
+ * 归属某个商品（product），描述租期、押金、月租、买断价以及是否支持续租等配置；方案启用后才会在 Catalog 中展示。
+ */
 @Entity
 @Table(name = "rental_plan", schema = "product")
 public class RentalPlan {

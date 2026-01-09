@@ -15,6 +15,15 @@ import jakarta.persistence.Version;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+/**
+ * SKU（商品规格）与库存实体。
+ * <p>
+ * 关键字段：
+ * <ul>
+ *   <li>{@code stockTotal}/{@code stockAvailable}：总库存/可用库存</li>
+ *   <li>{@code version}：JPA 乐观锁版本号，用于高并发库存扣减/预占重试</li>
+ * </ul>
+ */
 @Entity
 @Table(name = "product_sku", schema = "product")
 public class ProductSku {

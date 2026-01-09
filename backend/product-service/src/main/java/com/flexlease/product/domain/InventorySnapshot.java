@@ -15,6 +15,11 @@ import jakarta.persistence.Table;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+/**
+ * 库存变更流水（快照）。
+ * <p>
+ * 每次对 SKU 的库存进行入库/出库/预占/释放等操作时，都会记录一条流水，便于审计与问题排查。
+ */
 @Entity
 @Table(name = "inventory_snapshot", schema = "product")
 public class InventorySnapshot {

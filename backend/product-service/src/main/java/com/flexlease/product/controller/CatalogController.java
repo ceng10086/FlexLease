@@ -17,6 +17,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * C 端商品目录（Catalog）接口。
+ * <p>
+ * 用于前台列表/详情页展示已上架商品，支持按类目/关键词/租赁类型/押金区间筛选与按租金排序。
+ */
 @RestController
 @RequestMapping("/api/v1/catalog/products")
 public class CatalogController {

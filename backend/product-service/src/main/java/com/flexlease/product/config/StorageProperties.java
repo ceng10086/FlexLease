@@ -2,6 +2,11 @@ package com.flexlease.product.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+/**
+ * 文件存储配置。
+ * <p>
+ * 当前实现使用本地文件系统存储媒体文件（大学生项目/演示用途），并通过 {@code /media/**} 提供访问。
+ */
 @ConfigurationProperties(prefix = "flexlease.storage")
 public class StorageProperties {
 

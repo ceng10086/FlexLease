@@ -38,6 +38,11 @@ import org.springframework.util.StringUtils;
 @Transactional
 public class VendorProductService {
 
+    /**
+     * 厂商侧商品管理服务。
+     * <p>
+     * 聚合商品、租赁方案、SKU、库存流水等操作；并负责对“是否属于当前厂商”的权限边界做二次校验。
+     */
     private final ProductRepository productRepository;
     private final RentalPlanRepository rentalPlanRepository;
     private final ProductSkuRepository productSkuRepository;

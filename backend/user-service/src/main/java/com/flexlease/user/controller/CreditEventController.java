@@ -17,6 +17,11 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * 信用事件内部入口。
+ * <p>
+ * 由其他微服务（订单、仲裁等）在特定业务节点触发信用奖惩；内部接口要求 INTERNAL 角色。
+ */
 @RestController
 @RequestMapping("/api/v1/internal/users")
 public class CreditEventController {

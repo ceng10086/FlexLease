@@ -23,6 +23,11 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class VendorService {
 
+    /**
+     * 厂商资料服务。
+     * <p>
+     * 厂商主体在“入驻审核通过”时创建；后续可由管理员维护抽成档案，也可由厂商维护联系信息等资料。
+     */
     private final VendorRepository vendorRepository;
 
     public VendorService(VendorRepository vendorRepository) {

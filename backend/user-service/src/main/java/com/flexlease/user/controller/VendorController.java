@@ -25,6 +25,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * 厂商资料接口。
+ * <p>
+ * 管理员可查询/维护厂商资料与抽成策略；厂商只能查看/更新自身资料。
+ */
 @RestController
 @RequestMapping("/api/v1/vendors")
 public class VendorController {

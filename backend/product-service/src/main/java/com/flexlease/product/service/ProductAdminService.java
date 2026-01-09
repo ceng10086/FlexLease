@@ -20,6 +20,11 @@ import org.springframework.util.StringUtils;
 @Transactional
 public class ProductAdminService {
 
+    /**
+     * 管理员商品审核服务。
+     * <p>
+     * 主要用于查询待审核商品、审核通过与驳回，并写入审核人/备注等信息。
+     */
     private final ProductRepository productRepository;
     private final ProductAssembler assembler;
 

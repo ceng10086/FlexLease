@@ -13,6 +13,11 @@ import jakarta.persistence.Table;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+/**
+ * 商品咨询（下单前沟通）。
+ * <p>
+ * 消费者可对商品发起咨询，咨询在固定窗口内有效；厂商回复后状态变更为 RESPONDED，过期后为 EXPIRED。
+ */
 @Entity
 @Table(name = "product_inquiry", schema = "product")
 public class ProductInquiry {
