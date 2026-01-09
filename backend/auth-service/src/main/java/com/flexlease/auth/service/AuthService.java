@@ -12,6 +12,11 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * 认证服务门面：封装注册/登录/重置密码/刷新 token 的对外调用。
+ *
+ * <p>登录验证交给 Spring Security 的 AuthenticationManager；成功后由 TokenService 统一签发 token。</p>
+ */
 @Service
 public class AuthService {
 
@@ -43,6 +48,7 @@ public class AuthService {
         );
         Object principal = authentication.getPrincipal();
         if (principal instanceof UserPrincipal userPrincipal) {
+            // 记录最近登录时间，供 /auth/me 与管理端展示
             userAccountService.updateLastLogin(userPrincipal.getUserId());
             return tokenService.generateTokens(userPrincipal);
         }

@@ -29,6 +29,12 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * 对外认证 API：注册、登录、刷新令牌、查询当前用户信息等。
+ *
+ * <p>说明：项目中 JWT 校验主要由过滤器完成；这里的 /me 仍会自行解析 token，
+ * 用于输出一致的错误信息，并补齐 lastLoginAt 等账号字段。</p>
+ */
 @RestController
 @RequestMapping("/api/v1/auth")
 public class AuthController {
@@ -115,6 +121,7 @@ public class AuthController {
             return ResponseEntity.status(401)
                     .body(ApiResponse.failure(ErrorCode.UNAUTHORIZED.code(), "令牌无效"));
         }
+        // /me 只接受 access token，避免前端误把 refresh token 当作登录态
         String tokenType = claims.get().get("tokenType", String.class);
         if (tokenType != null && !tokenType.equalsIgnoreCase(TOKEN_TYPE_ACCESS)) {
             return ResponseEntity.status(401)
@@ -127,6 +134,7 @@ public class AuthController {
         if (vendorIdRaw != null && !vendorIdRaw.isBlank()) {
             vendorId = UUID.fromString(vendorIdRaw);
         }
+        // lastLoginAt 来自数据库；token 中不携带该字段（避免频繁刷新 token）
         var account = userAccountRepository.findById(userId);
         var lastLoginAt = account.map(UserAccount::getLastLoginAt).orElse(null);
         String username = claims.get().get("username", String.class);

@@ -15,6 +15,11 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.stereotype.Service;
 
+/**
+ * Token 相关业务逻辑：生成 access/refresh、从 claims 构造 Authentication、刷新 token。
+ *
+ * <p>约定：access token 才会被用于请求鉴权；refresh token 只用于换取新的 token 对。</p>
+ */
 @Service
 public class TokenService {
 
@@ -58,6 +63,7 @@ public class TokenService {
     public Optional<UsernamePasswordAuthenticationToken> buildAuthentication(Claims claims, String token) {
         String tokenType = claims.get("tokenType", String.class);
         if (tokenType != null && !TOKEN_TYPE_ACCESS.equalsIgnoreCase(tokenType)) {
+            // refresh token 不参与接口鉴权
             return Optional.empty();
         }
         String username = claims.get("username", String.class);
@@ -92,6 +98,7 @@ public class TokenService {
         if (username == null || username.isBlank()) {
             throw new BusinessException(ErrorCode.UNAUTHORIZED, "刷新令牌缺少用户名信息");
         }
+        // refresh token 本身的角色/venderId 可能已经过时，这里以数据库加载的最新信息重新签发
         UserDetails userDetails = userDetailsService.loadUserByUsername(username);
         if (!(userDetails instanceof UserPrincipal userPrincipal)) {
             throw new BusinessException(ErrorCode.INTERNAL_ERROR, "无法刷新令牌，用户信息异常");

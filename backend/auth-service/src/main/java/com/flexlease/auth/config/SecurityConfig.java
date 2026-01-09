@@ -27,6 +27,16 @@ import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
+/**
+ * Spring Security 配置（Servlet/MVC）。
+ *
+ * <p>要点：</p>
+ * <ul>
+ *   <li>无状态：JWT 鉴权，不使用 Session。</li>
+ *   <li>登录失败：统一返回 JSON 格式的错误响应（前端更好处理）。</li>
+ *   <li>内部接口：/api/v1/internal/** 走自定义 Header 鉴权，不走 JWT。</li>
+ * </ul>
+ */
 @Configuration
 @EnableMethodSecurity
 public class SecurityConfig {
@@ -67,6 +77,7 @@ public class SecurityConfig {
                                 writeErrorResponse(response, HttpStatus.FORBIDDEN, ErrorCode.FORBIDDEN, null))
                 )
                 .authenticationProvider(authenticationProvider())
+                // 先解析 JWT 并将认证信息写入 SecurityContext，后续 Controller 才能做 RBAC 校验
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable);

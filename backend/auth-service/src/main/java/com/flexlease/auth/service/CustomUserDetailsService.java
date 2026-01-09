@@ -18,6 +18,11 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Spring Security 用户加载逻辑：根据用户名查账号、校验状态、加载角色并转换为 GrantedAuthority。
+ *
+ * <p>约定：角色在 token 中以 `ROLE_` 前缀的 authority 形式参与 RBAC。</p>
+ */
 @Service
 public class CustomUserDetailsService implements UserDetailsService {
 
@@ -41,6 +46,7 @@ public class CustomUserDetailsService implements UserDetailsService {
         if (account.getStatus() == UserStatus.DISABLED) {
             throw new DisabledException("账号已被禁用");
         }
+        // 先查关联表拿到 roleId，再批量查角色表，最后拼成 ROLE_xxx 的 Spring Security authority
         Set<java.util.UUID> roleIds = userRoleRepository.findByIdUserId(account.getId())
             .stream()
             .map(UserRole::getId)

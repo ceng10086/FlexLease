@@ -2,6 +2,11 @@ package com.flexlease.auth.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+/**
+ * JWT 相关配置项（见 `application.yml` 的 `security.jwt.*`）。
+ *
+ * <p>约定：setter 对空值做保护，避免环境变量未设置时把默认值覆盖成空串。</p>
+ */
 @ConfigurationProperties(prefix = "security.jwt")
 public class SecurityProperties {
 

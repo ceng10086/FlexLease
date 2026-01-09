@@ -11,6 +11,11 @@ import jakarta.persistence.Table;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+/**
+ * 认证中心账号表实体。
+ *
+ * <p>说明：vendorId 在厂商入驻审核通过后由 user-service 通过内部接口回写，用于后续 RBAC/数据隔离。</p>
+ */
 @Entity
 @Table(name = "user_account", schema = "auth")
 public class UserAccount {

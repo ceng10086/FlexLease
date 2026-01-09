@@ -7,6 +7,11 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
+/**
+ * 认证后的用户主体（Principal）。
+ *
+ * <p>相比 Spring 默认的 User，这里额外携带 userId / vendorId，方便各服务做业务鉴权与数据隔离。</p>
+ */
 public class UserPrincipal implements UserDetails {
 
     private final UUID userId;

@@ -6,6 +6,11 @@ import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * 角色基础服务：确保内置角色存在，并提供按 code 查询能力。
+ *
+ * <p>角色 code 会被用于：token roles 字段、Spring Security authority、@PreAuthorize 等。</p>
+ */
 @Service
 public class RoleService {
 

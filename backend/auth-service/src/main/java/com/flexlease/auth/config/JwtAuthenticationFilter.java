@@ -15,6 +15,12 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+/**
+ * JWT 鉴权过滤器：从 Authorization Header 解析 Bearer Token，并在成功时写入 SecurityContext。
+ *
+ * <p>注意：本过滤器只负责“解析+放行”，不会在 Token 无效时主动拦截请求；拦截由
+ * {@link org.springframework.security.web.AuthenticationEntryPoint} 统一处理。</p>
+ */
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 

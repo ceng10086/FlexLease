@@ -10,6 +10,13 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+/**
+ * 启动初始化数据：
+ * <ul>
+ *   <li>确保系统内置角色存在</li>
+ *   <li>创建默认平台管理员与仲裁管理人员账号（仅在不存在时创建）</li>
+ * </ul>
+ */
 @Component
 public class DataInitializer {
 
@@ -37,6 +44,7 @@ public class DataInitializer {
 
     @PostConstruct
     public void init() {
+        // 角色是 RBAC 的基础数据，后续服务间 token/权限校验都依赖它
         roleService.ensureRole(RoleService.ROLE_ADMIN, "平台管理员", "平台全局管理员");
         roleService.ensureRole(RoleService.ROLE_VENDOR, "厂商", "B 端厂商用户");
         roleService.ensureRole(RoleService.ROLE_USER, "消费者", "C 端用户");
@@ -44,6 +52,7 @@ public class DataInitializer {
         roleService.ensureRole(RoleService.ROLE_REVIEW_PANEL, "复核组", "纠纷申诉后的复核裁决角色");
 
         try {
+            // 默认管理员用于本地/演示环境快速启动；生产环境建议通过配置覆盖账号密码
             userAccountService.register(adminUsername, adminPassword, UserStatus.ENABLED,
                     Set.of(RoleService.ROLE_ADMIN));
             log.info("Bootstrap admin account created: {}", adminUsername);

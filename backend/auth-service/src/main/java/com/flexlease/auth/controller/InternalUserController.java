@@ -19,6 +19,11 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * 内部账号管理接口：供微服务间互信调用（例如厂商入驻审核通过后激活账号并写入 vendorId）。
+ *
+ * <p>鉴权方式：Header `X-Internal-Token`，值由 `security.jwt.internal-access-token` 配置。</p>
+ */
 @RestController
 @RequestMapping("/api/v1/internal/users")
 public class InternalUserController {

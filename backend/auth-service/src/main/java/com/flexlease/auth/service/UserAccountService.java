@@ -16,6 +16,11 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * 账号领域服务：注册、分配角色、重置密码、更新状态、绑定 vendorId 等。
+ *
+ * <p>注意：这里只做最小闭环实现（大学生项目），不引入复杂的注册验证流程。</p>
+ */
 @Service
 public class UserAccountService {
 
@@ -39,6 +44,7 @@ public class UserAccountService {
         userAccountRepository.findByUsernameIgnoreCase(username).ifPresent(acc -> {
             throw new BusinessException(ErrorCode.DUPLICATE_RESOURCE, "账号已存在");
         });
+        // 密码只存 Hash（BCrypt），避免明文落库
         String passwordHash = passwordEncoder.encode(password);
         UserAccount account = UserAccount.create(username.toLowerCase(), passwordHash, initialStatus);
         UserAccount saved = userAccountRepository.save(account);
@@ -91,6 +97,7 @@ public class UserAccountService {
         }
         UserAccount account = userAccountRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RESOURCE_NOT_FOUND, "账号不存在"));
+        // 厂商入驻审核通过后，由 user-service 通过内部接口把 vendorId 回写到认证中心
         account.updateVendorId(vendorId);
     }
 }
