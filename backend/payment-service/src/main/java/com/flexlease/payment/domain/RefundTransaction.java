@@ -16,6 +16,11 @@ import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 import java.util.UUID;
 
+/**
+ * 退款流水实体。
+ *
+ * <p>对应表 {@code payment.refund_transaction}。在模拟通道中，退款会“立即成功”。</p>
+ */
 @Entity
 @Table(name = "refund_transaction", schema = "payment")
 public class RefundTransaction {

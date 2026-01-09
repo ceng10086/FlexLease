@@ -12,6 +12,11 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
+/**
+ * 安全配置（JWT + INTERNAL Token）。
+ *
+ * <p>鉴权逻辑复用 platform-common：优先识别 {@code X-Internal-Token}，否则校验 Bearer JWT。</p>
+ */
 @Configuration
 @EnableWebSecurity
 @EnableConfigurationProperties(JwtAuthProperties.class)

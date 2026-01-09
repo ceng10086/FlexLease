@@ -16,6 +16,11 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * 支付内部接口（服务间调用）。
+ *
+ * <p>目前主要用于订单服务在退租/押金返还等场景触发退款。</p>
+ */
 @RestController
 @RequestMapping("/api/v1/internal/payments")
 public class InternalPaymentController {

@@ -1,5 +1,10 @@
 package com.flexlease.common.exception;
 
+/**
+ * 统一错误码枚举。
+ *
+ * <p>各微服务通过该枚举保持错误码语义一致，前端可根据 code 做统一提示与分支处理。</p>
+ */
 public enum ErrorCode {
     SUCCESS(0, "ok"),
     VALIDATION_ERROR(1001, "参数校验失败"),

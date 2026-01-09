@@ -11,6 +11,12 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+/**
+ * JWT 解析与校验器。
+ *
+ * <p>只接受 {@code tokenType=ACCESS}（或缺省）令牌，并要求 {@code issuer} 匹配。
+ * 解析成功后返回 {@link FlexleasePrincipal}，供鉴权过滤器写入安全上下文。</p>
+ */
 public class JwtTokenVerifier {
 
     private final String issuer;
@@ -62,6 +68,7 @@ public class JwtTokenVerifier {
             Decoders.BASE64.decode(secret);
             return secret;
         } catch (RuntimeException ex) {
+            // 兼容开发期直接填明文密钥：这里自动做一次 Base64 编码，避免长度不足导致的校验异常。
             return java.util.Base64.getEncoder().encodeToString(secret.getBytes());
         }
     }

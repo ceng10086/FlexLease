@@ -13,6 +13,12 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
+/**
+ * 全局异常处理器。
+ *
+ * <p>将常见异常（参数校验、认证鉴权、业务异常等）统一转换为 {@link ApiResponse}，
+ * 避免各 Controller 重复写 try/catch。</p>
+ */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 

@@ -29,6 +29,11 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+/**
+ * 支付对外接口（供前端/管理员使用）。
+ *
+ * <p>对齐文档：{@code docs/API设计.md} 中 “支付与结算（payment-service）” 部分。</p>
+ */
 @RestController
 @RequestMapping("/api/v1/payments")
 public class PaymentController {
@@ -63,6 +68,7 @@ public class PaymentController {
         }
         String normalizedKey = idempotencyKey.trim();
         return idempotencyService.execute(
+                // 幂等 key 只在短时间窗口内生效：避免用户重复点击导致创建多条 PENDING 流水
                 "payment:init:" + normalizedKey,
                 IDEMPOTENCY_TTL,
                 () -> ApiResponse.success(paymentTransactionService.initPayment(orderId, request))

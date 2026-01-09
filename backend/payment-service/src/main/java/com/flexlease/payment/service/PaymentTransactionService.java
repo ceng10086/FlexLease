@@ -44,12 +44,29 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+/**
+ * 支付交易核心服务。
+ *
+ * <p>职责：
+ * <ul>
+ *   <li>创建支付流水（支持幂等：同一订单+场景只允许存在一条 PENDING 流水）</li>
+ *   <li>自动/手动确认支付成功与失败回调</li>
+ *   <li>创建退款流水（模拟通道立即成功）</li>
+ *   <li>按厂商维度聚合结算汇总</li>
+ * </ul></p>
+ */
 @Service
 @Transactional
 public class PaymentTransactionService {
 
     private static final Logger LOG = LoggerFactory.getLogger(PaymentTransactionService.class);
+    /**
+     * 优秀信用阈值：用于对平台抽成做轻微优惠（见 {@link #applyCustomerCreditDiscount(BigDecimal, OrderServiceClient.OrderCreditSnapshot)}）。
+     */
     private static final int EXCELLENT_CREDIT_THRESHOLD = 90;
+    /**
+     * 平台抽成优惠：示例为 “减 1 个百分点”（如 8% -> 7%）。
+     */
     private static final BigDecimal EXCELLENT_CREDIT_COMMISSION_DISCOUNT = new BigDecimal("0.01");
 
     private final PaymentTransactionRepository paymentTransactionRepository;
@@ -80,6 +97,7 @@ public class PaymentTransactionService {
                     throw new BusinessException(ErrorCode.VALIDATION_ERROR, "存在待支付的同类流水");
                 });
 
+        // 可选：从订单服务读取“下单时信用快照”，用于对平台抽成做优惠展示（不影响支付金额本身）。
         OrderServiceClient.OrderCreditSnapshot creditSnapshot = null;
         try {
             creditSnapshot = orderServiceClient.loadOrderCreditSnapshot(orderId);
@@ -206,9 +224,9 @@ public class PaymentTransactionService {
         PaymentTransaction transaction = getTransactionForUpdate(transactionId);
         try {
             RefundTransaction refund = transaction.createRefund(request.amount(), request.reason());
-            // 模拟通道立即退款成功
+            // 模拟通道：发起后立即返回成功（真实支付通道可在这里扩展异步处理与回调验签）
             refund.markSucceeded();
-                notifyRefundSucceeded(transaction, refund);
+            notifyRefundSucceeded(transaction, refund);
             return assembler.toResponse(transaction).refunds().stream()
                     .filter(r -> r.id().equals(refund.getId()))
                     .findFirst()
@@ -476,6 +494,7 @@ public class PaymentTransactionService {
                 transaction.getAmount()
         );
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            // 避免“事务未提交就回调订单服务”导致订单读不到最新支付流水
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override
                 public void afterCommit() {

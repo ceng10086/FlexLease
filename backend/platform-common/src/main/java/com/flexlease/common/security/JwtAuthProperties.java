@@ -4,6 +4,12 @@ import java.util.ArrayList;
 import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+/**
+ * JWT 相关配置（各微服务复用）。
+ *
+ * <p>约定配置前缀：{@code security.jwt.*}。其中 {@code internalAccessToken} 用于服务间互信调用，
+ * 对应请求头 {@code X-Internal-Token}。</p>
+ */
 @ConfigurationProperties(prefix = "security.jwt")
 public class JwtAuthProperties {
 

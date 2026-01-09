@@ -17,6 +17,11 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
+/**
+ * notification-service 调用封装。
+ *
+ * <p>以内部调用方式发送站内信（Header: {@code X-Internal-Token}）。失败时仅记录日志，不阻断主流程。</p>
+ */
 @Component
 public class NotificationClient {
 

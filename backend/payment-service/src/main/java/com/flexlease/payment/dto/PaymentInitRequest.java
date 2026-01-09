@@ -10,6 +10,11 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * 创建支付单请求。
+ *
+ * <p>支持可选分账明细（splits）：由订单服务在下单/试算阶段生成，用于结算展示。</p>
+ */
 public record PaymentInitRequest(
         @NotNull UUID userId,
         @NotNull UUID vendorId,

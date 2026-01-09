@@ -7,6 +7,12 @@ import java.util.UUID;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 
+/**
+ * 安全上下文工具类。
+ *
+ * <p>对 {@link org.springframework.security.core.context.SecurityContext} 做轻量封装，
+ * 方便业务代码获取当前登录主体并进行角色/身份校验。</p>
+ */
 public final class SecurityUtils {
 
     private SecurityUtils() {

@@ -13,6 +13,11 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+/**
+ * 支付分账记录。
+ *
+ * <p>一笔 {@link PaymentTransaction} 可拆分为多条分账：例如押金留存、平台抽成、厂商实收等。</p>
+ */
 @Entity
 @Table(name = "payment_split", schema = "payment")
 public class PaymentSplit {

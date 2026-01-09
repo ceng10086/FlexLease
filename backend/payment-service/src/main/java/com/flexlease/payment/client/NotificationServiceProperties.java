@@ -4,6 +4,11 @@ import jakarta.validation.constraints.NotBlank;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
+/**
+ * notification-service 访问配置。
+ *
+ * <p>默认使用服务名访问（配合 Eureka + LoadBalanced RestTemplate）。</p>
+ */
 @Validated
 @ConfigurationProperties(prefix = "flexlease.notification-service")
 public class NotificationServiceProperties {

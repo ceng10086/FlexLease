@@ -18,6 +18,12 @@ import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 
+/**
+ * 支付流水实体。
+ *
+ * <p>对应表 {@code payment.payment_transaction}。流水包含场景（押金/租金等）、金额、渠道、状态，
+ * 并可关联分账明细（{@link PaymentSplit}）与退款流水（{@link RefundTransaction}）。</p>
+ */
 @Entity
 @Table(name = "payment_transaction", schema = "payment")
 public class PaymentTransaction {
@@ -211,12 +217,20 @@ public class PaymentTransaction {
         this.paidAt = paidAt != null ? paidAt : OffsetDateTime.now();
     }
 
+    /**
+     * 标记为支付失败（仅允许从 {@link PaymentStatus#PENDING} 转移）。
+     */
     public void markFailed(String channelTransactionNo) {
         ensurePending();
         this.status = PaymentStatus.FAILED;
         this.channelTransactionNo = channelTransactionNo;
     }
 
+    /**
+     * 创建一笔退款流水并挂载到当前支付流水上。
+     *
+     * <p>注意：不在这里做“真实退款通道”的调用，仅做本地状态与额度校验。</p>
+     */
     public RefundTransaction createRefund(BigDecimal refundAmount, String reason) {
         if (status != PaymentStatus.SUCCEEDED) {
             throw new IllegalStateException("仅成功的支付可以退款");

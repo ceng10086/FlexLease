@@ -20,6 +20,11 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
+/**
+ * user-service（厂商域）调用封装。
+ *
+ * <p>读取厂商抽成档案（行业/信用档/SLA 等），用于计算平台抽成比例并写入支付流水快照。</p>
+ */
 @Component
 public class VendorServiceClient {
 
@@ -71,6 +76,9 @@ public class VendorServiceClient {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
+    /**
+     * 厂商抽成档案（user-service 返回的只读结构）。
+     */
     public record VendorCommissionProfile(String industryCategory,
                                           BigDecimal baseRate,
                                           String creditTier,

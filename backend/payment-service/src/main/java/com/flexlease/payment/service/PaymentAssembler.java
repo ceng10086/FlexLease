@@ -12,6 +12,11 @@ import java.util.Comparator;
 import java.util.List;
 import org.springframework.stereotype.Component;
 
+/**
+ * 支付域对象组装器。
+ *
+ * <p>将 JPA 实体转换为对外 DTO，避免 Controller/Service 直接暴露实体结构。</p>
+ */
 @Component
 public class PaymentAssembler {
 

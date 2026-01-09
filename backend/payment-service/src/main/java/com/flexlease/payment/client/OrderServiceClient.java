@@ -21,6 +21,15 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.client.RestTemplate;
 
+/**
+ * order-service 调用封装。
+ *
+ * <p>用于：
+ * <ul>
+ *   <li>支付成功后回调订单服务更新订单状态</li>
+ *   <li>读取订单信用快照（用于抽成展示/优惠，不作为强依赖）</li>
+ * </ul></p>
+ */
 @Component
 public class OrderServiceClient {
 
@@ -108,6 +117,9 @@ public class OrderServiceClient {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
+    /**
+     * 订单信用快照（order-service 返回的只读结构）。
+     */
     public record OrderCreditSnapshot(UUID id, Integer creditScore, CreditTier creditTier) {
     }
 }

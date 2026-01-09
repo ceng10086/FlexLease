@@ -5,6 +5,9 @@ import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+/**
+ * 退款流水响应。
+ */
 public record RefundTransactionResponse(
         UUID id,
         String refundNo,
